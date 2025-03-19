@@ -1,0 +1,7 @@
+django
+pymongo
+mongoengine
+djangorestframework
+drf-yasg
+requests
+django-environ
