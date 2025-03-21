@@ -3,19 +3,23 @@ import json
 import requests
 from django.http import JsonResponse, FileResponse
 from django.conf import settings
-from rest_framework import viewsets
+from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from core.utils.entity_mapping import extract_entity_data, get_unique_field
-from core.utils.rate_limit import rate_limit_headers
+from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from datetime import datetime
 from bson import ObjectId
+import time
 
-class BaseViewSet(viewsets.ModelViewSet):
+from core.utils.pagination import fetch_all_pages
+
+class BaseViewSet(viewsets.ViewSet):
     """Base viewset for Okta API integration."""
     
     okta_endpoint = ""
     model = None
     serializer_class = None
+    list_serializer_class = None
     entity_type = None
     http_method_names = ["get"]
     
@@ -25,19 +29,26 @@ class BaseViewSet(viewsets.ModelViewSet):
             return {"error": "Okta endpoint not defined"}, 500
 
         okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint}"
-        API_TOKEN = settings.OKTA_API_TOKEN
-        headers = {"Authorization": f"SSWS {API_TOKEN}"}
+        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        while True:  # Keep retrying if rate limited
+            response = requests.get(okta_url, headers=headers)
 
-        response = requests.get(okta_url, headers=headers)
-        
-        rate_limit = rate_limit_headers(response)
+            if handle_rate_limit(response):  # Handle rate limit
+                continue  # Retry after waiting
 
-        if response.status_code != 200:
-            return {"error": f"Failed to fetch data from Okta API: {response.text}"}, response.status_code
+            if response.status_code != 200:
+                return {"error": f"Failed to fetch data from Okta API: {response.text}"}, response.status_code, rate_limit_headers(response)
 
-        response_data = response.json()
+            response_data = response.json()
 
-        return response_data, 200, rate_limit
+            # Check if pagination is needed
+            next_url = response.links.get("next", {}).get("url")
+            if next_url:
+                all_data = fetch_all_pages(okta_url, headers)
+                return all_data, 200, rate_limit_headers(response)
+
+            return response_data, 200, rate_limit_headers(response)
+
 
     def extract_data(self, okta_data):
         """

@@ -1,5 +1,5 @@
 """
-WSGI config for okta_project project.
+WSGI config for bridgesec_data_transformer project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 
@@ -11,6 +11,6 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'okta_project.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'okta_prbridgesec_data_transformeroject.settings')
 
 application = get_wsgi_application()
