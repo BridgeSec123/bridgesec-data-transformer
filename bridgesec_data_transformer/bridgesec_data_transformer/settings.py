@@ -10,11 +10,12 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
-from pathlib import Path
-import environ
 import os
+from pathlib import Path
 
+import environ
 from mongoengine import connect
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -128,7 +129,71 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-MONGO_DB_NAME = "bridgesec_data_transformer_db"
-MONGO_URI = "mongodb://localhost:27017/"
+MONGO_DB_NAME = env("MONGO_DB_NAME")
+MONGO_URI = env("MONGO_URI")
 
 connect(db=MONGO_DB_NAME, host=MONGO_URI)
+
+# Logging configuration
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LOG_DIR = os.path.join(PROJECT_ROOT, 'logs')
+
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+
+    'formatters': {
+        'verbose': {
+            'format': '{asctime} | {levelname} | {module}.{funcName}:{lineno} | {message}',
+            'style': '{',
+        },
+        'colored': {
+            '()': 'colorlog.ColoredFormatter',
+            'format': '%(log_color)s%(asctime)s | %(levelname)s | %(module)s.%(funcName)s:%(lineno)d | %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+            'log_colors': {
+                'DEBUG': 'cyan',
+                'INFO': 'green',
+                'WARNING': 'yellow',
+                'ERROR': 'red',
+                'CRITICAL': 'bold_red',
+            },
+        },
+    },
+
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'colored',
+            'level': 'DEBUG',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOG_DIR, 'app.log'),
+            'formatter': 'verbose',
+            'level': 'DEBUG',
+        },
+        'error_file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOG_DIR, 'error.log'),
+            'formatter': 'verbose',
+            'level': 'ERROR',
+        },
+    },
+
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file', 'error_file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'core': {
+            'handlers': ['console', 'file', 'error_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}

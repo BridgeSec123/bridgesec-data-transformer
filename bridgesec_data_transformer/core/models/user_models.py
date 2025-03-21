@@ -1,4 +1,5 @@
 from mongoengine import DictField, EmailField, StringField
+
 from core.models.base import BaseOktaModel
 
 

@@ -1,7 +1,8 @@
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from core.views.user_views import UserViewSet
+
 from core.views.group_views import GroupViewSet
+from core.views.user_views import UserViewSet
 
 router = DefaultRouter()
 router.register(r"users", UserViewSet, basename="users")

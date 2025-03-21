@@ -5,3 +5,4 @@ djangorestframework
 drf-yasg
 requests
 django-environ
+colorlog
