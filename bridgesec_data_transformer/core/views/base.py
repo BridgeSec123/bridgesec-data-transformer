@@ -73,42 +73,51 @@ class BaseViewSet(viewsets.ViewSet):
         return extracted_data
 
     def store_in_mongodb(self, records):
-        """Store entire records dynamically in MongoDB."""
+        """Store records with versioning instead of separate collections."""
         if not self.model:
             logger.error("MongoDB model not defined")
             return {"error": "MongoDB model not defined"}, 500
 
         try:
-            valid_records = [record for record in records if record and isinstance(record, dict)]
-
-            if not valid_records:
-                logger.warning("No valid records to store")
-                return {"error": "No valid records to store"}, 400
-
             collection = self.model._get_collection()
             unique_field = get_unique_field(self.entity_type)
-            for record in valid_records:
+            current_timestamp = datetime.utcnow()
+
+            for record in records:
                 unique_value = record.get(unique_field)
                 if not unique_value:
                     continue
-                
-                # Check if record already exists
+
                 existing_record = collection.find_one({unique_field: unique_value})
+
                 if not existing_record:
-                    # New record: Generate _id and created_at
-                    record["_id"] = str(ObjectId())  # Store _id as string
-                    record["created_at"] = datetime.now()
-                    collection.insert_one(record)  # Insert new record
+                    # First time inserting the record
+                    record["_id"] = str(ObjectId())
+                    record["versions"] = [
+                        {
+                            "version": 1,
+                            "timestamp": current_timestamp,
+                            "data": record.copy()
+                        }
+                    ]
+                    collection.insert_one(record)
                 else:
-                    update_data = record.copy()
-                    update_data.pop("_id", None)  # Remove _id to prevent update errors
-                    
+                    # Increment version number and store previous data
+                    new_version = len(existing_record.get("versions", [])) + 1
+                    version_entry = {
+                        "version": new_version,
+                        "timestamp": current_timestamp,
+                        "data": record.copy()
+                    }
+
                     collection.update_one(
                         {unique_field: unique_value},
-                        {"$set": update_data}  # Update without modifying _id
+                        {"$push": {"versions": version_entry}}
                     )
-            logger.info("Data stored/updated successfully in MongoDB")
-            return {"message": "Data stored/updated successfully"}, 200
+
+            logger.info("Data stored with versioning successfully in MongoDB")
+            return {"message": "Data stored with versioning"}, 200
+
         except Exception as e:
             logger.exception("Error while storing data in MongoDB")
             return {"error": str(e)}, 500
