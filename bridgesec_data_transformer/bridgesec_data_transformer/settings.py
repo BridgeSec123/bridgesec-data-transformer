@@ -15,7 +15,7 @@ from pathlib import Path
 
 import environ
 from mongoengine import connect
-
+from core.utils.mongo_utils import connect_to_mongo
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -48,7 +48,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'drf_yasg',
-    'core'
+    'core',
+    'entities'
 ]
 
 MIDDLEWARE = [
@@ -133,6 +134,8 @@ MONGO_DB_NAME = env("MONGO_DB_NAME")
 MONGO_URI = env("MONGO_URI")
 
 connect(db=MONGO_DB_NAME, host=MONGO_URI)
+connect_to_mongo()
+MONGO_CONNECTIONS = set()
 
 # Logging configuration
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -185,15 +188,11 @@ LOGGING = {
     },
 
     'loggers': {
-        'django': {
+        # Default logger for all modules
+        '': {
             'handlers': ['console', 'file', 'error_file'],
             'level': 'INFO',
             'propagate': True,
-        },
-        'core': {
-            'handlers': ['console', 'file', 'error_file'],
-            'level': 'DEBUG',
-            'propagate': False,
         },
     },
 }
