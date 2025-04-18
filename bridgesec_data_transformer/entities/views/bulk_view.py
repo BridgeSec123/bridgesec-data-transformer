@@ -1,3 +1,5 @@
+import json
+import os
 from datetime import datetime
 
 from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
@@ -10,8 +12,6 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from entities.registry import ENTITY_VIEWSETS
-import os
-import json
 
 
 class BulkEntityViewSet(viewsets.ViewSet):

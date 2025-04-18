@@ -1,4 +1,3 @@
-from entities.okta_entities.identity_providers.views.identity_provider_saml_viewset import IdentityProviderSAMLViewSet
 from entities.okta_entities.auth_server.views.auth_server_base_viewset import (
     BaseAuthServerViewSet,
 )
@@ -25,6 +24,21 @@ from entities.okta_entities.authenticator.views.authenticator_viewset import (
 )
 from entities.okta_entities.behavior.views.behavior_viewset import BehaviorViewSet
 from entities.okta_entities.brands.views.brand_viewset import BrandEntityViewSet
+from entities.okta_entities.device_assurance_policies.views.device_android_viewset import (
+    DeviceAndroidViewSet,
+)
+from entities.okta_entities.device_assurance_policies.views.device_base_viewset import (
+    BaseDeviceAssurancePolicyViewSet,
+)
+from entities.okta_entities.device_assurance_policies.views.device_ios_viewset import (
+    DeviceIOSViewSet,
+)
+from entities.okta_entities.device_assurance_policies.views.device_macos_viewset import (
+    DeviceMacOSViewSet,
+)
+from entities.okta_entities.device_assurance_policies.views.device_windows_viewset import (
+    DeviceWindowsViewSet,
+)
 from entities.okta_entities.event_hook.views.event_hook_viewset import EventHookViewSet
 from entities.okta_entities.groups.views.group_base_viewset import BaseGroupViewSet
 from entities.okta_entities.groups.views.group_membership_viewset import (
@@ -38,6 +52,9 @@ from entities.okta_entities.identity_providers.views.identity_provider_base_view
 )
 from entities.okta_entities.identity_providers.views.identity_provider_oidc_viewset import (
     IdentityProviderOIDCViewSet,
+)
+from entities.okta_entities.identity_providers.views.identity_provider_saml_viewset import (
+    IdentityProviderSAMLViewSet,
 )
 from entities.okta_entities.inline_hooks.views.inline_hook_viewset import (
     InlineHookEntityViewSet,
@@ -64,22 +81,23 @@ from entities.okta_entities.users.views.user_viewset import UserViewSet
 
 # Dictionary to register all entity viewsets
 ENTITY_VIEWSETS = {
-    # "users": BaseUserViewSet,
+    "users": BaseUserViewSet,
     # "domains": DomainEntityViewSet,
     "identity_providers": BaseIdentityProviderViewSet,
     # "roles": AdministrativeRoleEntityViewSet,
-    # "behavior": BehaviorViewSet, 
-    # "orgs": OrgViewSet,
-    # "authenticators": AuthenticatorViewSet,
-    # "groups": BaseGroupViewSet,
-    # "brands": BrandEntityViewSet,
-    # "sms_templates": SmsTemplateViewSet,
-    # "threat_insights": ThreatInsightViewSet,
-    # "network_zones": NetworkZoneViewSet,
-    # "inline_hooks": InlineHookEntityViewSet,
-    # "event_hooks": EventHookViewSet,
+    "behavior": BehaviorViewSet, 
+    "orgs": OrgViewSet,
+    "authenticators": AuthenticatorViewSet,
+    "groups": BaseGroupViewSet,
+    "brands": BrandEntityViewSet,
+    "sms_templates": SmsTemplateViewSet,
+    "threat_insights": ThreatInsightViewSet,
+    "network_zones": NetworkZoneViewSet,
+    "inline_hooks": InlineHookEntityViewSet,
+    "event_hooks": EventHookViewSet,
     "auth_server": BaseAuthServerViewSet,
-    # "trusted_origins": TrustedOriginViewSet
+    "trusted_origins": TrustedOriginViewSet,
+    "device_assurance_policy": BaseDeviceAssurancePolicyViewSet
 }
 
 GROUP_ENTITY_VIEWSETS = {
@@ -92,21 +110,27 @@ GROUP_ENTITY_VIEWSETS = {
 
 AUTH_SERVER_ENTITY_VIEWSETS = {
     "auth_servers": AuthorizationServerViewSet,
-    # "auth_server_claims": AuthorizationServerClaimViewSet,
-    # "auth_server_policy": AuthorizationServerPolicyViewSet,
-    # "auth_server_policy_rules": AuthorizationServerPolicyRuleViewSet,
-    # "auth_server_scopes": AuthorizationServerScopeViewSet,
+    "auth_server_claims": AuthorizationServerClaimViewSet,
+    "auth_server_policy": AuthorizationServerPolicyViewSet,
+    "auth_server_policy_rules": AuthorizationServerPolicyRuleViewSet,
+    "auth_server_scopes": AuthorizationServerScopeViewSet,
     "auth_trusted_servers": AuthTrustedServerViewSet,
 }
 
 USER_ENTITY_VIEWSETS = {
     "users": UserViewSet,
     "user_types": UserTypeViewSet,
-    "user_factors": UserFactorViewSet
+    # "user_factors": UserFactorViewSet
 }
 
 IDENTITY_PROVIDER_ENTITY_VIEWSETS = {
     "okta_idp_oidc": IdentityProviderOIDCViewSet,
-    "okta_idp_saml": IdentityProviderSAMLViewSet,
+    # "okta_idp_saml": IdentityProviderSAMLViewSet,
+}
 
+DEVICE_ASSURANCE_POLICY_ENTITY_VIEWSETS = {
+    "okta_policy_device_assurance_android": DeviceAndroidViewSet,
+    "okta_policy_device_assurance_macos": DeviceMacOSViewSet,
+    "okta_policy_device_assurance_windows": DeviceWindowsViewSet,
+    "okta_policy_device_assurance_ios": DeviceIOSViewSet
 }

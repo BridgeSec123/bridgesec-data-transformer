@@ -30,7 +30,7 @@ class BaseGroupViewSet(BaseEntityViewSet):
             else:
                 extracted_data[entity_name] = []
                 for group in extracted_data.get("groups", []):
-                    group_id = group["okta_group_id"]
+                    group_id = group["group_id"]
                     data = viewset_instance.fetch_from_okta(group_id)
                     
                     extracted = viewset_instance.extract_data(data, group_id)

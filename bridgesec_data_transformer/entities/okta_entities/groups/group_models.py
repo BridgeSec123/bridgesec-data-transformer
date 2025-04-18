@@ -4,6 +4,7 @@ from entities.models.base import BaseEntityModel
 
 
 class Group(BaseEntityModel):
+    group_id = StringField()
     name = StringField()
     description = StringField()
     custom_profile_attributes = DictField(null = True, required=False)

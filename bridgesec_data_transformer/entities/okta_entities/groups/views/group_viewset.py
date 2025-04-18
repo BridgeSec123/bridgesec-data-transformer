@@ -1,8 +1,8 @@
 import logging
 
 from entities.okta_entities.groups.group_models import Group
-from entities.okta_entities.groups.views.group_base_viewset import BaseGroupViewSet
 from entities.okta_entities.groups.group_serializers import GroupSerializer
+from entities.okta_entities.groups.views.group_base_viewset import BaseGroupViewSet
 from rest_framework import status
 from rest_framework.response import Response
 
@@ -51,7 +51,7 @@ class GroupEntityViewSet(BaseGroupViewSet):
                 profile = record["profile"]
                 # changes here
                 modified_profile = {
-                    "okta_group_id": record.get("id"),
+                    "group_id": record.get("id"),
                     "name": profile.get("name", ""),
                     "description": profile.get("description", ""),
                 }

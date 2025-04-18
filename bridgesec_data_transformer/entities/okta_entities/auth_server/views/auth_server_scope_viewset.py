@@ -2,8 +2,6 @@ import logging
 
 import requests
 from django.conf import settings
-from rest_framework import status
-from rest_framework.response import Response
 
 from entities.okta_entities.auth_server.auth_server_models import (
     AuthorizationServerScope,
