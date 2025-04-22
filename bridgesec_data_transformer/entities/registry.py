@@ -18,7 +18,7 @@ from entities.okta_entities.auth_server.views.auth_server_scope_viewset import (
 )
 from entities.okta_entities.auth_server.views.auth_server_viewset import (
     AuthorizationServerViewSet,
-)
+)   
 from entities.okta_entities.auth_server.views.auth_trusted_server_viewset import (
     AuthTrustedServerViewSet,
 )
@@ -83,6 +83,9 @@ from entities.okta_entities.users.views.user_admin_roles_viewset import (
 )
 from entities.okta_entities.users.views.user_base_viewset import BaseUserViewSet
 from entities.okta_entities.users.views.user_factor_viewset import UserFactorViewSet
+from entities.okta_entities.users.views.user_schema_property_viewset import (
+    UserSchemaPropertyViewSet,
+)
 from entities.okta_entities.users.views.user_type_viewset import UserTypeViewSet
 from entities.okta_entities.users.views.user_viewset import UserViewSet
 
@@ -132,7 +135,8 @@ USER_ENTITY_VIEWSETS = {
     "users": UserViewSet,
     "user_types": UserTypeViewSet,
     "user_admin_roles": UserAdminRolesViewSet,
-    "user_factors": UserFactorViewSet
+    # "user_factors": UserFactorViewSet,
+    # "user_schema_properties": UserSchemaPropertyViewSet
 }
 
 IDENTITY_PROVIDER_ENTITY_VIEWSETS = {
