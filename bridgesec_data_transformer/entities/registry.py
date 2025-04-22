@@ -4,6 +4,9 @@ from entities.okta_entities.auth_server.views.auth_server_base_viewset import (
 from entities.okta_entities.auth_server.views.auth_server_claim_viewset import (
     AuthorizationServerClaimViewSet,
 )
+from entities.okta_entities.auth_server.views.auth_server_default_viewset import (
+    AuthorizationServerDefaultViewSet,
+)
 from entities.okta_entities.auth_server.views.auth_server_policy_rule_viewset import (
     AuthorizationServerPolicyRuleViewSet,
 )
@@ -46,6 +49,9 @@ from entities.okta_entities.groups.views.group_membership_viewset import (
 )
 from entities.okta_entities.groups.views.group_role_viewset import GroupRoleViewSet
 from entities.okta_entities.groups.views.group_rule_viewset import GroupRuleViewSet
+from entities.okta_entities.groups.views.group_schema_property_viewset import (
+    GroupSchemaPropertyViewSet,
+)
 from entities.okta_entities.groups.views.group_viewset import GroupEntityViewSet
 from entities.okta_entities.identity_providers.views.identity_provider_base_viewset import (
     BaseIdentityProviderViewSet,
@@ -71,6 +77,9 @@ from entities.okta_entities.threat_insights.views.threat_insight_viewset import 
 )
 from entities.okta_entities.trusted_origins.views.trusted_origin_viewset import (
     TrustedOriginViewSet,
+)
+from entities.okta_entities.users.views.user_admin_roles_viewset import (
+    UserAdminRolesViewSet,
 )
 from entities.okta_entities.users.views.user_base_viewset import BaseUserViewSet
 from entities.okta_entities.users.views.user_factor_viewset import UserFactorViewSet
@@ -103,13 +112,15 @@ ENTITY_VIEWSETS = {
 GROUP_ENTITY_VIEWSETS = {
     "groups": GroupEntityViewSet,
     "group_memberships": GroupMembershipViewSet,
-    # "group_owners": GroupOwnerViewSet
+    # "group_owners": GroupOwnerViewSet,
     "group_roles": GroupRoleViewSet,
-    "group_rules": GroupRuleViewSet
+    "group_rules": GroupRuleViewSet,
+    "group_schemas": GroupSchemaPropertyViewSet
 }
 
 AUTH_SERVER_ENTITY_VIEWSETS = {
     "auth_servers": AuthorizationServerViewSet,
+    "auth_servers_default": AuthorizationServerDefaultViewSet,
     "auth_server_claims": AuthorizationServerClaimViewSet,
     "auth_server_policy": AuthorizationServerPolicyViewSet,
     "auth_server_policy_rules": AuthorizationServerPolicyRuleViewSet,
@@ -120,7 +131,8 @@ AUTH_SERVER_ENTITY_VIEWSETS = {
 USER_ENTITY_VIEWSETS = {
     "users": UserViewSet,
     "user_types": UserTypeViewSet,
-    # "user_factors": UserFactorViewSet
+    "user_admin_roles": UserAdminRolesViewSet,
+    "user_factors": UserFactorViewSet
 }
 
 IDENTITY_PROVIDER_ENTITY_VIEWSETS = {

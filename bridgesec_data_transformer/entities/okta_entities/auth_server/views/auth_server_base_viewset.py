@@ -17,7 +17,7 @@ class BaseAuthServerViewSet(BaseEntityViewSet):
         for entity_name, viewset_class in AUTH_SERVER_ENTITY_VIEWSETS.items():
             viewset_instance = viewset_class()
 
-            if entity_name == "auth_servers":
+            if entity_name == "auth_servers" or entity_name == "auth_servers_default":
                 data, status_code, rate_limit = viewset_instance.fetch_from_okta()
                 extracted_data[entity_name] = viewset_instance.extract_data(data)
             

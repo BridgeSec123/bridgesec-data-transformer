@@ -24,7 +24,7 @@ class BaseGroupViewSet(BaseEntityViewSet):
         for entity_name, viewset_class in GROUP_ENTITY_VIEWSETS.items():
             viewset_instance = viewset_class()
 
-            if entity_name == "groups":
+            if entity_name == "groups" or entity_name == "group_schemas":
                 data, status_code, rate_limit = viewset_instance.fetch_from_okta()
                 extracted_data[entity_name] = viewset_instance.extract_data(data)
             else:
