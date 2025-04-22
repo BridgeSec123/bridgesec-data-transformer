@@ -1,17 +1,118 @@
+import logging
+
+logger = logging.getLogger(__name__)
 ENTITY_TYPE_MAPPING = {
+    "authenticators": {
+        "okta_endpoint": "/api/v1/authenticators",
+        "attributes": ["key", "name", "status", "settings"],
+    },
+    "trusted_origins": {
+        "okta_endpoint": "/api/v1/trustedOrigins",
+        "attributes": ["name", "origin", "scopes", "status"]
+    },
     "users": {
         "okta_endpoint": "/api/v1/users",
-        "attributes": ["profile"],
+        "attributes": ["id", "profile"],
+    },
+    "user_factors":{
+        "okta_endpoint": "/api/v1/users/{userId}/factors",
+        "attributes": ["id", "status"]
+    },
+    "user_admin_roles": {
+        "okta_endpoint": "/api/v1/users/{userId}/roles",
+        "attributes": ["type", "disableNotifications"]
     },
     "groups": {
         "okta_endpoint": "/api/v1/groups",
-        "attributes": ["profile"],
+        "attributes": ["id", "profile"],
+    },
+    "group_owners": {
+        "okta_endpoint": "/api/v1/groups/{groupId}/owners",
+        "attributes": ["id"]
+    },
+    "group_memberships": {
+        "okta_endpoint": "/api/v1/groups/{groupId}/users",
+        "attributes": ["id"]
+    },
+    "group_schemas": {
+        "okta_endpoint": "/api/v1/meta/schemas/group/default",
+        "attributes": ["title", "type", "definitions", "description"]
+        },
+    "user_types" : {
+        "okta_endpoint": "/api/v1/meta/types/user",
+        "attributes": ["name", "displayName", "description"]
+    },
+    "brands": {
+        "okta_endpoint": "/api/v1/brands",
+        "attributes": ["id", "name", "removePoweredByOkta", "customPrivacyPolicyUrl", "agreeToCustomPrivacyPolicy", "defaultApp", "locale"],
+    },
+    "domains": {
+        "okta_endpoint": "/api/v1/domains",
+        "attributes": ["id", "domain", "brandId", "certificateSourceType", "validationStatus"]
+    },
+    "event_hooks" : {
+        "okta_endpoint": "/api/v1/eventHooks",
+        "attributes": ["name", "events", "channel"]
+    },
+    "okta_idp_oidc": {
+        "okta_endpoint": "/api/v1/idps",        
+        "attributes" : ["name", "protocol", "policy", "type"]
+    },
+    "auth_servers": {
+        "okta_endpoint": "/api/v1/authorizationServers",
+        "attributes": ["id", "name", "audiences", "description", "issuerMode", "status"]
+    },
+    "auth_servers_default":{
+        "okta_endpoint": "/api/v1/authorizationServers/default",
+        "attributes": ["name", "audiences", "description", "issuerMode", "status", "credentials"]
+    },
+    "inline_hooks": {
+        "okta_endpoint" : "/api/v1/inlineHooks",
+        "attributes": ["name", "type", "version", "channel"]
+    },
+    "sms_templates": {
+        "okta_endpoint": "/api/v1/templates/sms",
+        "attributes": ["type", "template", "translations"]
+    },
+    "threat_insights": {
+        "okta_endpoint": "/api/v1/threats/configuration",
+        "attributes": ["action", "excludeZones"]
+    },
+    "network_zones": {
+        "okta_endpoint": "/api/v1/zones",
+        "attributes": ["name", "type", "asns", "gateways", "proxies", "ipServiceCategories", "locations"]
+    },
+    "behavior": {
+        "okta_endpoint": "/api/v1/behaviors",
+        "attributes": ["name", "type", "status", "velocity", "settings"]
+    },
+    "okta_policy_device_assurance_android": {
+        "okta_endpoint": "/api/v1/device-assurances",
+        "attributes": [""]
     }
+    # "roles": {
+    #     "okta_endpoint": "/api/v1/iam/roles",
+    #     "attributes": ["roles"]
+    # }
+    # "orgs": {
+    #     "okta_endpoint": "/api/v1/org",
+    #     "attributes": ["companyName", "website"]
+    # }
 }
 
 ENTITY_UNIQUE_FIELDS = {
     "users": "email",
-    "groups": "name"
+    "groups": "name",
+    "group_memberships": "group_id",
+    "user_types": "name",
+    "brands": "name",
+    "domains": "name",
+    "event_hooks": "name",
+    "identity_providers": "name",
+    "auth_servers": "name",
+    "inline_hooks": "name",
+    "orgs": "company_name",
+    "roles": "label"
 }
 
 def get_unique_field(entity_type):
@@ -42,14 +143,20 @@ def extract_entity_data(entity_type, okta_data):
     :param okta_data: List of JSON records from Okta API response
     :return: Extracted data list
     """
-    if entity_type not in ENTITY_TYPE_MAPPING:
-        return {"error": f"Invalid entity type: {entity_type}"}
+    try:
+        if entity_type not in ENTITY_TYPE_MAPPING:
+            return {"error": f"Invalid entity type: {entity_type}"}
 
-    attributes = ENTITY_TYPE_MAPPING[entity_type]["attributes"]
+        attributes = ENTITY_TYPE_MAPPING[entity_type]["attributes"]
 
-    extracted_data = []
-    for record in okta_data:
-        if isinstance(record, dict):
-            extracted_record = {attr: get_nested_value(record, attr) for attr in attributes}
-            extracted_data.append(extracted_record)
-    return extracted_data
+        extracted_data = []
+        for record in okta_data:
+            if isinstance(record, dict) or isinstance(record, list):
+                extracted_record = {attr: get_nested_value(record, attr) for attr in attributes}
+                extracted_data.append(extracted_record)
+        logger.info(f"Extracted {len(extracted_data)} records for entity type {entity_type}")
+        return extracted_data
+    
+    except Exception as e:
+        logger.error(f"Error extracting data for entity type {entity_type}: {e}")
+        return {"error": f"Error extracting data for entity type {entity_type}: {e}"}
