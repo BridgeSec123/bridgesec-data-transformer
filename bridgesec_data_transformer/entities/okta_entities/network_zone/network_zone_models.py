@@ -16,3 +16,5 @@ class NetworkZone(BaseEntityModel):
     proxies = ListField(required=False)
     status = StringField(required=False)
     usage = StringField(required=False)
+    
+    meta = {"collection": "okta_network_zone"}
