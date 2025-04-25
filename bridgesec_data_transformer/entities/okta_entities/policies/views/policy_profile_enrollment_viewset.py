@@ -1,22 +1,23 @@
 import logging
 
 import requests
-from rest_framework import status
-from rest_framework.response import Response
-from django.conf import settings
-
-from entities.okta_entities.policies.policy_models import PolicyMFA
-from entities.okta_entities.policies.views.policy_base_viewset import BasePolicyViewSet
-from entities.okta_entities.policies.policy_serializers import PolicyMFASerializer
 from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
+from django.conf import settings
+
+from entities.okta_entities.policies.policy_models import PolicyProfileEnrollment
+from entities.okta_entities.policies.policy_serializers import PolicyProfileEnrollmentSerializer
+from entities.okta_entities.policies.views.policy_base_viewset import BasePolicyViewSet
+
+
 logger = logging.getLogger(__name__)
 
-class PolicyMFAViewSet(BasePolicyViewSet):
+
+class PolicyProfileEnrollmentViewSet(BasePolicyViewSet):
     okta_endpoint = "/api/v1/policies"
-    entity_type = "okta_policy_mfa"
-    serializer_class = PolicyMFASerializer
-    model = PolicyMFA
+    entity_type = "okta_policy_profile_enrollment"
+    serializer_class = PolicyProfileEnrollmentSerializer
+    model = PolicyProfileEnrollment
     
     def fetch_from_okta(self):
         """Fetch data from Okta API dynamically."""
@@ -28,7 +29,7 @@ class PolicyMFAViewSet(BasePolicyViewSet):
         headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
         
         params = {
-            "type": "MFA_ENROLL"
+            "type": "PROFILE_ENROLLMENT"
         }
         
         logger.info(f"Fetching data from Okta endpoint: {self.okta_endpoint}")
@@ -63,42 +64,14 @@ class PolicyMFAViewSet(BasePolicyViewSet):
         extracted_data = super().extract_data(okta_data)
 
         formatted_data = []
-        # allowed_fields = set(User._fields.keys())
 
         for record in extracted_data:
-            groups = record.get("conditions", {}).get("people", {}).get("groups", [])
-            factors = record.get("settings", {}).get("factors", [])
-
             formatted_record = {
-                "id": record.get("id"),
+                "id" : record.get("id"),
                 "name": record.get("name"),
-                "description": record.get("description"),
-                "duo": record.get("duo"),
-                "external_idps": record.get("external_idps"),
-                "fido_u2f": record.get("fido_u2f"),
-                "fido_webauthn": record.get("fido_webauthn"),
-                "google_otp": record.get("google_otp"),
-                "groups_included": groups.get("include"),
-                "hotp": record.get("hotp"),
-                "is_oie": record.get("is_oie"),
-                "okta_call": record.get("okta_call"),
-                "okta_email": record.get("okta_email"),
-                "okta_otp": factors.get("okta_otp").get("enroll", {}),
-                "okta_password": factors.get("okta_password").get("enroll", {}),
-                "okta_push": record.get("okta_push"),
-                "okta_question": record.get("okta_question"),
-                "okta_sms": record.get("okta_sms"),
-                "okta_verify": record.get("okta_verify"),
-                "onprem_mfa": record.get("onprem_mfa"),
-                "phone_number": record.get("phone_number"),
-                "priority": record.get("priority"),
-                "rsa_token": record.get("rsa_token"),
-                "security_question": record.get("security_question"),
-                "status": record.get("status"),
-                "symantec_vip": record.get("symantec_vip"),
-                "web_authn": record.get("web_authn"),
-                "yubikey_token": record.get("yubikey_token"),
+                "status": record.get("status")
             }
+
             formatted_data.append(formatted_record)
 
         logger.info("Final extracted %d user records after formatting and filtering", len(formatted_data))

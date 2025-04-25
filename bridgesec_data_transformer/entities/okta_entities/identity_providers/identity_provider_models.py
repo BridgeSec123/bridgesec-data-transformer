@@ -73,3 +73,33 @@ class IdentityProviderSAML(BaseEntityModel):
     username_template = StringField(null = True, required=False)
 
     meta = {"collection": "okta_idp_saml"}
+
+
+class IdentityProviderSocial(BaseEntityModel):
+    name = StringField(required=True)
+    scopes = ListField(StringField(), required=True)
+    type = StringField(required=True)
+    account_link_action = StringField(null = True, required=False)
+    account_link_group_include = ListField(StringField(), null = True, required=False)
+    apple_kid = StringField(null = True, required=False)
+    apple_private_key = StringField(null = True, required=False)
+    apple_team_id = StringField(null = True, required=False)
+    client_id = StringField(null = True, required=False)
+    client_secret = StringField(null = True, required=False)
+    deprovisioned_action = StringField(null = True, required=False)
+    groups_action = StringField(null = True, required=False)
+    groups_assignments = ListField(StringField(), null = True, required=False)
+    groups_attribute = StringField(null = True, required=False)
+    groups_filter = ListField(StringField(), null = True, required=False)
+    issuer_mode = StringField(null = True, required=False)
+    max_clock_skew = StringField(null = True, required=False)
+    profile_master = BooleanField(null = True, required=False)
+    protocol_type = StringField(null = True, required=False)
+    provisioning_action = StringField(null = True, required=False)
+    status = StringField(null = True, required=False)
+    subject_match_attribute = StringField(null = True, required=False)
+    subject_match_type = StringField(null = True, required=False)
+    suspended_action = StringField(null = True, required=False)
+    username_template = StringField(null = True, required=False)
+
+    meta = {"collection": "okta_idp_social"}

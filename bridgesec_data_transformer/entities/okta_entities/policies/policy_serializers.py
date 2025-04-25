@@ -31,6 +31,20 @@ class PolicyMFASerializer(serializers.Serializer):
     yubikey_token = serializers.DictField()
 
 
+class PolicyRuleMFASerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255)
+    policy_id = serializers.CharField(max_length=255)
+    app_exclude = serializers.ListField(child=serializers.DictField())
+    app_include = serializers.ListField(child=serializers.DictField())
+    enroll = serializers.CharField(max_length=255)
+    network_connection = serializers.CharField(max_length=255)
+    network_excludes = serializers.ListField(child=serializers.CharField(max_length=255))
+    network_includes = serializers.ListField(child=serializers.CharField(max_length=255))
+    priority = serializers.IntegerField()
+    status = serializers.CharField(max_length=255)
+    user_excluded = serializers.ListField(child=serializers.CharField(max_length=255))
+
+
 class PolicyPasswordSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
     auth_provider = serializers.CharField(max_length=255)
@@ -71,3 +85,20 @@ class PolicyProfileEnrollmentSerializer(serializers.Serializer):
 class PolicyProfileEnrollmentAppsSerializer(serializers.Serializer):
     policy_id = serializers.CharField(max_length=255)
     apps = serializers.ListField(child=serializers.CharField(max_length=255))
+
+class PolicyRuleIDPDiscoverySerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255)
+    policy_id = serializers.CharField(max_length=255)
+    app_exclude = serializers.ListField(child=serializers.DictField())
+    app_include = serializers.ListField(child=serializers.DictField())
+    idp_id = serializers.CharField(max_length=255)
+    idp_type = serializers.CharField(max_length=255)
+    network_connection = serializers.CharField(max_length=255)
+    network_excludes = serializers.ListField(child=serializers.CharField(max_length=255))
+    network_includes = serializers.ListField(child=serializers.CharField(max_length=255))
+    platform_include = serializers.ListField(child=serializers.DictField())
+    priority = serializers.IntegerField()
+    status = serializers.CharField(max_length=255)
+    user_identifier_attribute = serializers.CharField(max_length=255)
+    user_identifier_patterns = serializers.ListField(child=serializers.DictField())
+    user_identifier_type = serializers.CharField(max_length=255)
