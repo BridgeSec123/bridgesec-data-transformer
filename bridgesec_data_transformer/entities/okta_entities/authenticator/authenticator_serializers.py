@@ -15,3 +15,17 @@ class AuthenticatorSerializer(serializers.Serializer):
     provider_shared_secret = serializers.CharField(required=False, max_length=255)
     provider_user_name_template = serializers.CharField(required=False, max_length=255)
     settings = serializers.CharField(required=False, max_length=255)
+
+
+class OktaFactorSerializer(serializers.Serializer):
+    provider_id = serializers.CharField(max_length=255)
+    active = serializers.BooleanField(required=False)
+
+
+class AuthenticatorOktaFactorTotpSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255)
+    clock_drift_interval = serializers.IntegerField(required=False)
+    hmac_algorithm = serializers.CharField(required=False, max_length=255)
+    otp_length = serializers.IntegerField(required=False)
+    shared_secret_encoding = serializers.CharField(required=False, max_length=255)
+    time_step = serializers.IntegerField(required=False)

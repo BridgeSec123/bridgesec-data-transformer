@@ -135,17 +135,44 @@ ENTITY_TYPE_MAPPING = {
         "okta_endpoint": "/api/v1/policies/{policy_id}/rules",
         "attributes": ["priority", "name", "actions", "conditions", "status"]
     },
+    "okta_factors":{
+        "okta_endpoint": "/api/v1/org/factors",
+        "attributes": ["id", "status"]
+    },
+    "okta_email_notifications":{
+        "okta_endpoint": "/api/internal/org/settings/security-notification-settings",
+        "attributes": [
+            "sendEmailForNewDeviceEnabled","sendEmailForFactorEnrollmentEnabled", "sendEmailForFactorResetEnabled", 
+            "sendEmailForPasswordChangedEnabled","reportSuspiciousActivityEnabled"
+        ]
+    },
+    "okta_email_domain":{
+        "okta_endpoint": "api/v1/email-domains",
+        "attributes": ["displayName", "domain", "userName"]
+    },
+    "okta_theme":{
+        "okta_endpoint": "/api/v1/brands/{{brandId}}/themes",
+        "attributes": [
+            "brandid","backgroundImage","emailTemplateTouchPointVariant","endUserDashboardTouchPointVariant",
+            "errorPageTouchPointVariant","favicon","logo","primaryColorHex","primaryColorContrastHex","secondaryColorContrastHex",
+            "secondaryColorHex","signInPageTouchPointVariant","id"
+        ]
+    },
+    # "email_template_settings":{
+    #     "okta_endpoint": "/api/v1/brands/{brandId}/templates/email",
+    #     "attributes": ["brandId", "template", "recipients"]
+    # },
     # "roles": {
     #     "okta_endpoint": "/api/v1/iam/roles",
     #     "attributes": ["roles"]
     # }
-    # "orgs": {
+    # "orgs": { 
     #     "okta_endpoint": "/api/v1/org",
     #     "attributes": ["companyName", "website"]
-    # }
-}
-
-ENTITY_UNIQUE_FIELDS = {
+    # } 
+} 
+ 
+ENTITY_UNIQUE_FIELDS = { 
     "users": "email",
     "groups": "name",
     "group_memberships": "group_id",

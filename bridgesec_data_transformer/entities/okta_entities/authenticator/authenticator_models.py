@@ -19,3 +19,19 @@ class Authenticator(BaseEntityModel):
     settings = StringField(null=True,required=False)
     
     meta = {"collection" : "okta_authenticator"}
+
+class OktaFactor(BaseEntityModel):
+    provider_id = StringField(required=True)
+    active = BooleanField(required=False)
+
+    meta = {"collection": "okta_factor"}
+
+class AuthenticatorOktaFactorTotp(BaseEntityModel):
+    name = StringField(required=True)
+    clock_drift_interval = IntField(required=False)
+    hmac_algorithm = StringField(required=False)
+    otp_length = IntField(required=False)
+    shared_secret_encoding = StringField(required=False)
+    time_step = IntField(required=False)
+
+    meta = {"collection": "okta_factor_authenticator_totp"}

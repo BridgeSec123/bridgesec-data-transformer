@@ -22,11 +22,18 @@ from entities.okta_entities.auth_server.views.auth_server_viewset import (
 from entities.okta_entities.auth_server.views.auth_trusted_server_viewset import (
     AuthTrustedServerViewSet,
 )
+from entities.okta_entities.authenticator.views.authenticator_base_viewset import (
+    BaseAuthenticatorViewSet,
+)
 from entities.okta_entities.authenticator.views.authenticator_viewset import (
     AuthenticatorViewSet,
 )
+from entities.okta_entities.authenticator.views.okta_factor_viewset import OktaFactorViewSet
 from entities.okta_entities.behavior.views.behavior_viewset import BehaviorViewSet
+from entities.okta_entities.brands.views.brand_base_viewset import BaseBrandViewSet
 from entities.okta_entities.brands.views.brand_viewset import BrandEntityViewSet
+from entities.okta_entities.brands.views.email_domains_viewset import EmailDomainViewset
+from entities.okta_entities.brands.views.okta_theme_viewset import ThemeViewset
 from entities.okta_entities.device_assurance_policies.views.device_android_viewset import (
     DeviceAndroidViewSet,
 )
@@ -41,6 +48,10 @@ from entities.okta_entities.device_assurance_policies.views.device_macos_viewset
 )
 from entities.okta_entities.device_assurance_policies.views.device_windows_viewset import (
     DeviceWindowsViewSet,
+)
+from entities.okta_entities.email.views.email_base_viewset import BaseEmailViewSet
+from entities.okta_entities.email.views.email_security_notifications_viewset import (
+    EmailSecurityNotificationViewset,
 )
 from entities.okta_entities.event_hook.views.event_hook_viewset import EventHookViewSet
 from entities.okta_entities.groups.views.group_base_viewset import BaseGroupViewSet
@@ -121,8 +132,6 @@ from entities.okta_entities.users.views.user_schema_property_viewset import (
 from entities.okta_entities.users.views.user_type_viewset import UserTypeViewSet
 from entities.okta_entities.users.views.user_viewset import UserViewSet
 
-# from entities.okta_entities.groups.views.group_owner_viewset import GroupOwnerViewSet
-
 # Dictionary to register all entity viewsets
 ENTITY_VIEWSETS = {
     "users": BaseUserViewSet,
@@ -131,9 +140,9 @@ ENTITY_VIEWSETS = {
     # "roles": AdministrativeRoleEntityViewSet,
     "behavior": BehaviorViewSet, 
     "orgs": OrgViewSet,
-    "authenticators": AuthenticatorViewSet,
+    "authenticators": BaseAuthenticatorViewSet,
     "groups": BaseGroupViewSet,
-    "brands": BrandEntityViewSet,
+    "brands": BaseBrandViewSet,
     "sms_templates": SmsTemplateViewSet,
     "threat_insights": ThreatInsightViewSet,
     "network_zones": NetworkZoneViewSet,
@@ -167,7 +176,7 @@ AUTH_SERVER_ENTITY_VIEWSETS = {
 USER_ENTITY_VIEWSETS = {
     "users": UserViewSet,
     "user_types": UserTypeViewSet,
-    "user_admin_roles": UserAdminRolesViewSet,
+    # "user_admin_roles": UserAdminRolesViewSet,
     # "user_factors": UserFactorViewSet,
     "user_schema_properties": UserSchemaPropertyViewSet
 }
@@ -196,4 +205,20 @@ POLICY_ENTITY_VIEWSETS = {
     "okta_policy_rule_profile_enrollment": PolicyRuleProfileEnrollmentViewSet,
     "okta_policy_signon": PolicySignOnViewSet,
     "okta_policy_rule_signon": PolicyRuleSignOnViewSet,
+}
+
+EMAIL_ENTITY_VIEWSETS = {
+    # "okta_email_template_Settings": EmailTemplateSettingsViewSet,
+    "okta_email_notifications": EmailSecurityNotificationViewset
+}
+
+BRAND_ENTITY_VIEWSETS = {
+    "brands": BrandEntityViewSet,
+    "okta_email_domain": EmailDomainViewset,
+    "okta_theme": ThemeViewset
+}
+
+AUTHENTICATOR_ENTITY_VIEWSETS = {
+    "authenticators": AuthenticatorViewSet,
+    "okta_factors": OktaFactorViewSet,
 }

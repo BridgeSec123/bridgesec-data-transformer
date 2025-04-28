@@ -14,3 +14,29 @@ class Brand(BaseEntityModel):
     remove_powered_by_okta = BooleanField(required=False)
     
     meta = {"collection": "brands"}
+
+class EmailDomain(BaseEntityModel):
+    brand_id = StringField(required=True)
+    display_name = StringField(required=True)
+    domain = StringField(required=True)
+    user_name = StringField(required=True)
+
+    meta = {"collection": "okta_email_domain"}
+
+
+class OktaTheme(BaseEntityModel):
+    brand_id = StringField(required=True)
+    background_image = StringField(required=False)
+    email_template_touch_point_variant = StringField(required=False)
+    end_user_dashboard_touch_point_variant = StringField(required=False)
+    error_page_touch_point_variant = StringField(required=False)
+    favicon = StringField(required=False)
+    logo = StringField(required=False)
+    primary_color_contrast_hex = StringField(required=False)
+    primary_color_hex = StringField(required=False)
+    secondary_color_contrast_hex = StringField(required=False)
+    secondary_color_hex = StringField(required=False)
+    sign_in_page_touch_point_variant = StringField(required=False)
+    theme_id = StringField(required=False)
+
+    meta = {"collection": "okta_theme"}
