@@ -6,9 +6,10 @@ from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
 
 from entities.okta_entities.policies.policy_models import PolicyProfileEnrollment
-from entities.okta_entities.policies.policy_serializers import PolicyProfileEnrollmentSerializer
+from entities.okta_entities.policies.policy_serializers import (
+    PolicyProfileEnrollmentSerializer,
+)
 from entities.okta_entities.policies.views.policy_base_viewset import BasePolicyViewSet
-
 
 logger = logging.getLogger(__name__)
 

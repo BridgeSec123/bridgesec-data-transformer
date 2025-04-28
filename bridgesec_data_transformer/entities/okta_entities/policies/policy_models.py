@@ -86,7 +86,7 @@ class PolicyPassword(BaseEntityModel):
     skip_unlock = BooleanField(required=False)
     sms_recovery = StringField(required=False)
     status = StringField(required=False)
-    
+
     meta={"collection": "okta_policy_password"}
 
 class PolicyProfileEnrollment(BaseEntityModel):
@@ -129,3 +129,80 @@ class PolicyRuleIDPDiscovery(BaseEntityModel):
     user_identifier_type = StringField(required=False)
 
     meta = {"collection": "okta_policy_rule_idp_discovery"}
+
+class PolicyRulePassword(BaseEntityModel):
+    name = StringField(required=True)
+    policy_id = StringField(required=False)
+    network_connection = StringField(required=False)
+    network_excludes = ListField(StringField(required=False))
+    network_includes = ListField(StringField(required=False))
+    password_change = StringField(required=False)
+    password_reset = StringField(required=False)
+    password_unlock = StringField(required=False)
+    priority = IntField(required=False)
+    status = StringField(required=False)
+    user_excluded = ListField(StringField(required=False))
+
+    meta = {"collection": "okta_policy_rule_password"}
+
+class ProfileAttributes(EmbeddedDocument):
+    label = StringField(required=True)
+    name = StringField(required=False)
+    required = BooleanField(required=True)
+
+class PolicyRuleProfileEnrollment(BaseEntityModel):
+    policy_id = StringField(required=True)
+    unknown_user_action = StringField(required=True)
+    access = StringField(required=False)
+    email_verification = StringField(required=False)
+    enroll_authenticator_types = StringField(required=False)
+    inline_hook_id = StringField(required=False)
+    profile_attributes = EmbeddedDocumentListField(ProfileAttributes, required=False)
+    progressive_profiling_action = StringField(required=False)
+    target_group_id = StringField(required=False)
+    ui_schema_id = StringField(required=False)
+
+    meta = {"collection": "okta_policy_rule_profile_enrollment"}
+
+class PolicySignOn(BaseEntityModel):
+    name = StringField(required=True)
+    description = StringField(required=False)
+    groups_included = ListField(StringField(required=False))
+    priority = IntField(required=False)
+    status = StringField(required=False)
+    
+    meta = {"collection": "okta_policy_sign_on"}
+
+class FactorSequence(EmbeddedDocument):
+    primary_criteria_provider = StringField(required=True)
+    primary_criteria_factor_type = StringField(required=True)
+    secondary_criteria = StringField(required=False)
+    provider = StringField(required=True)
+    factor_type = StringField(required=True)
+
+class PolicyRuleSignOn(BaseEntityModel):
+    name = StringField(required=True)
+    access = StringField(required=False)
+    auth_type = StringField(required=False)
+    behaviors = ListField(StringField(required=False))
+    factor_sequence = EmbeddedDocumentListField(FactorSequence)
+    identity_provider = StringField(required=False)
+    identity_provider_ids = ListField(StringField(required=False))
+    mfa_prompt = StringField(required=False)
+    mfa_lifetime = IntField(required=False)
+    mfa_remember_device = BooleanField(required=False)
+    mfa_required = BooleanField(required=False)
+    policy_id = StringField(required=False)
+    network_connection = StringField(required=False)
+    network_excludes = ListField(StringField(required=False))
+    network_includes = ListField(StringField(required=False))
+    primary_factor = StringField(required=False)
+    priority = IntField(required=False)
+    risk_level = StringField(required=False)
+    session_idle = IntField(required=False)
+    session_lifetime = IntField(required=False)
+    session_persistent = BooleanField(required=False)
+    status = StringField(required=False)
+    users_excluded = ListField(StringField(required=False))
+    
+    meta = {"collection": "okta_policy_rule_sign_on"}

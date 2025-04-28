@@ -5,35 +5,33 @@ from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
 
-from entities.okta_entities.policies.policy_models import PolicyMFA
-from entities.okta_entities.policies.policy_serializers import PolicyMFASerializer
+from entities.okta_entities.policies.policy_models import PolicyRuleSignOn
+from entities.okta_entities.policies.policy_serializers import (
+    PolicyRuleSignOnSerializer,
+)
 from entities.okta_entities.policies.views.policy_base_viewset import BasePolicyViewSet
 
 logger = logging.getLogger(__name__)
 
-class PolicyMFAViewSet(BasePolicyViewSet):
-    okta_endpoint = "/api/v1/policies"
-    entity_type = "okta_policy_mfa"
-    serializer_class = PolicyMFASerializer
-    model = PolicyMFA
+class PolicyRuleSignOnViewSet(BasePolicyViewSet):
+    okta_endpoint = "/api/v1/policies/{policy_id}/rules"
+    entity_type = "okta_policy_rule_signon"
+    serializer_class = PolicyRuleSignOnSerializer
+    model = PolicyRuleSignOn
     
-    def fetch_from_okta(self):
+    def fetch_from_okta(self, policy_id):
         """Fetch data from Okta API dynamically."""
         if not self.okta_endpoint:
             logger.error("Okta endpoint not defined")
             return {"error": "Okta endpoint not defined"}, 500
 
-        okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint}"
+        okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(policy_id=policy_id)}"
         headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
-        
-        params = {
-            "type": "MFA_ENROLL"
-        }
         
         logger.info(f"Fetching data from Okta endpoint: {self.okta_endpoint}")
         
         while True:  # Keep retrying if rate limited
-            response = requests.get(okta_url, headers=headers, params=params)
+            response = requests.get(okta_url, headers=headers)
 
             if handle_rate_limit(response):  # Handle rate limit
                 logger.warning("Rate limit reached. Retrying...")
@@ -53,8 +51,8 @@ class PolicyMFAViewSet(BasePolicyViewSet):
                 return all_data, 200, rate_limit_headers(response)
 
             return response_data, 200, rate_limit_headers(response)
-    
-    def extract_data(self, okta_data):
+
+    def extract_data(self, okta_data, policy_id):
         """
         Override to format the user data by removing the "profile" key.
         """
@@ -62,41 +60,36 @@ class PolicyMFAViewSet(BasePolicyViewSet):
         extracted_data = super().extract_data(okta_data)
 
         formatted_data = []
-        # allowed_fields = set(User._fields.keys())
 
         for record in extracted_data:
-            groups = record.get("conditions", {}).get("people", {}).get("groups", [])
-            factors = record.get("settings", {}).get("factors", [])
-
+            actions = record.get("actions")
+            signon = actions.get("signon")
+            conditions = record.get("conditions")
+            session = signon.get("session")
             formatted_record = {
-                "id": record.get("id"),
                 "name": record.get("name"),
-                "description": record.get("description"),
-                "duo": record.get("duo"),
-                "external_idps": record.get("external_idps"),
-                "fido_u2f": record.get("fido_u2f"),
-                "fido_webauthn": record.get("fido_webauthn"),
-                "google_otp": record.get("google_otp"),
-                "groups_included": groups.get("include"),
-                "hotp": record.get("hotp"),
-                "is_oie": record.get("is_oie"),
-                "okta_call": record.get("okta_call"),
-                "okta_email": record.get("okta_email"),
-                "okta_otp": factors.get("okta_otp").get("enroll", {}),
-                "okta_password": factors.get("okta_password").get("enroll", {}),
-                "okta_push": record.get("okta_push"),
-                "okta_question": record.get("okta_question"),
-                "okta_sms": record.get("okta_sms"),
-                "okta_verify": record.get("okta_verify"),
-                "onprem_mfa": record.get("onprem_mfa"),
-                "phone_number": record.get("phone_number"),
+                "access": signon.get("access"),
+                "auth_type": conditions.get("authContext").get("authType"),
+                "behaviors": conditions.get("behaviors"),
+                "factor_sequence": conditions.get("factorSequence", {}),
+                "identity_provider": conditions.get("identityProvider", {}),
+                "identity_provider_ids": conditions.get("identityProvider", {}).get("id"),
+                "mfa_prompt": signon.get("mfa", {}).get("prompt"),
+                "mfa_lifetime": signon.get("mfa", {}).get("rememberDeviceLifetime"),
+                "mfa_remember_device": signon.get("mfa", {}).get("rememberDevice"),
+                "mfa_required": signon.get("mfa", {}).get("required"),
+                "network_connection": conditions.get("network", {}).get("connection"),
+                "network_excludes": conditions.get("network", {}).get("exclude"),
+                "network_includes": conditions.get("network", {}).get("include"),
+                "policy_id": policy_id,
+                "primary_factor": signon.get("primaryFactor", {}),
                 "priority": record.get("priority"),
-                "rsa_token": record.get("rsa_token"),
-                "security_question": record.get("security_question"),
+                "risk_level": signon.get("risk"),
+                "session_idle": session.get("maxSessionIdleMinutes"),
+                "session_lifetime": session.get("maxSessionLifetimeMinutes"),
+                "session_persistent": session.get("usePersistentCookie"),
                 "status": record.get("status"),
-                "symantec_vip": record.get("symantec_vip"),
-                "web_authn": record.get("web_authn"),
-                "yubikey_token": record.get("yubikey_token"),
+                "users_excluded": conditions.get("people", {}).get("users", {}).get("exclude"),
             }
             formatted_data.append(formatted_record)
 

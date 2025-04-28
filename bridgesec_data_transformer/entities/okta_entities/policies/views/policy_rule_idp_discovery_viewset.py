@@ -1,13 +1,15 @@
 import logging
 
 import requests
+from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
 
 from entities.okta_entities.policies.policy_models import PolicyRuleIDPDiscovery
+from entities.okta_entities.policies.policy_serializers import (
+    PolicyRuleIDPDiscoverySerializer,
+)
 from entities.okta_entities.policies.views.policy_base_viewset import BasePolicyViewSet
-from entities.okta_entities.policies.policy_serializers import PolicyRuleIDPDiscoverySerializer
-from core.utils.pagination import fetch_all_pages
-from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
+
 logger = logging.getLogger(__name__)
 
 class PolicyRuleIDPDiscoveryViewSet(BasePolicyViewSet):
@@ -76,7 +78,6 @@ class PolicyRuleIDPDiscoveryViewSet(BasePolicyViewSet):
         extracted_data = super().extract_data(okta_data)
 
         formatted_data = []
-        # allowed_fields = set(User._fields.keys())
 
         for record in extracted_data:
             conditions = record.get("conditions")

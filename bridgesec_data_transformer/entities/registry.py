@@ -89,6 +89,18 @@ from entities.okta_entities.policies.views.policy_rule_idp_discovery_viewset imp
 from entities.okta_entities.policies.views.policy_rule_mfa_viewset import (
     PolicyRuleMFAViewSet,
 )
+from entities.okta_entities.policies.views.policy_rule_password_viewset import (
+    PolicyRulePasswordViewSet,
+)
+from entities.okta_entities.policies.views.policy_rule_profile_enrollment_viewset import (
+    PolicyRuleProfileEnrollmentViewSet,
+)
+from entities.okta_entities.policies.views.policy_rule_signon_viewset import (
+    PolicyRuleSignOnViewSet,
+)
+from entities.okta_entities.policies.views.policy_signon_viewset import (
+    PolicySignOnViewSet,
+)
 from entities.okta_entities.sms_templates.views.sms_template_viewset import (
     SmsTemplateViewSet,
 )
@@ -156,7 +168,7 @@ USER_ENTITY_VIEWSETS = {
     "users": UserViewSet,
     "user_types": UserTypeViewSet,
     "user_admin_roles": UserAdminRolesViewSet,
-    "user_factors": UserFactorViewSet,
+    # "user_factors": UserFactorViewSet,
     "user_schema_properties": UserSchemaPropertyViewSet
 }
 
@@ -179,5 +191,9 @@ POLICY_ENTITY_VIEWSETS = {
     "okta_policy_password": PolicyPasswordViewSet,
     "okta_policy_profile_enrollment": PolicyProfileEnrollmentViewSet,
     "okta_policy_profile_enrollment_apps": PolicyProfileEnrollmentAppsViewSet,
-    "okta_policy_rule_idp_discovery": PolicyRuleIDPDiscoveryViewSet
+    "okta_policy_rule_idp_discovery": PolicyRuleIDPDiscoveryViewSet,
+    "okta_policy_rule_password": PolicyRulePasswordViewSet,
+    "okta_policy_rule_profile_enrollment": PolicyRuleProfileEnrollmentViewSet,
+    "okta_policy_signon": PolicySignOnViewSet,
+    "okta_policy_rule_signon": PolicyRuleSignOnViewSet,
 }

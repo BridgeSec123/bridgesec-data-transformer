@@ -74,6 +74,7 @@ class PolicyPasswordViewSet(BasePolicyViewSet):
             recovery_question = factors.get("recovery_question", {})
             okta_email = factors.get("okta_email", {})
             formatted_record = {
+                "id": record.get("id"),
                 "name": record.get("name"),
                 "auth_provider": conditions.get("authProvider", {}).get("provider", ""),
                 "call_recovery": factors.get("okta_call", {}).get("status", ""),

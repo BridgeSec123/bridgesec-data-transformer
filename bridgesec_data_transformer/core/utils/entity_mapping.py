@@ -1,6 +1,12 @@
 import logging
 
 logger = logging.getLogger(__name__)
+
+IDP_BASE_CONFIG = {
+    "okta_endpoint": "/api/v1/idps",
+    "attributes": ["name", "protocol", "policy", "type"]
+}
+
 ENTITY_TYPE_MAPPING = {
     "authenticators": {
         "okta_endpoint": "/api/v1/authenticators",
@@ -37,7 +43,7 @@ ENTITY_TYPE_MAPPING = {
     "group_schemas": {
         "okta_endpoint": "/api/v1/meta/schemas/group/default",
         "attributes": ["title", "type", "definitions", "description"]
-        },
+    },
     "user_types" : {
         "okta_endpoint": "/api/v1/meta/types/user",
         "attributes": ["name", "displayName", "description"]
@@ -54,10 +60,9 @@ ENTITY_TYPE_MAPPING = {
         "okta_endpoint": "/api/v1/eventHooks",
         "attributes": ["name", "events", "channel"]
     },
-    "okta_idp_oidc": {
-        "okta_endpoint": "/api/v1/idps",        
-        "attributes" : ["name", "protocol", "policy", "type"]
-    },
+    "okta_idp_oidc": IDP_BASE_CONFIG,
+    "okta_idp_saml": IDP_BASE_CONFIG,
+    "okta_idp_social": IDP_BASE_CONFIG,
     "auth_servers": {
         "okta_endpoint": "/api/v1/authorizationServers",
         "attributes": ["id", "name", "audiences", "description", "issuerMode", "status"]
@@ -89,7 +94,47 @@ ENTITY_TYPE_MAPPING = {
     "okta_policy_device_assurance_android": {
         "okta_endpoint": "/api/v1/device-assurances",
         "attributes": [""]
-    }
+    },
+    "okta_policy_mfa":{
+        "okta_endpoint": "/api/v1/policies",
+        "attributes": ["id", "name", "description", "priority", "conditions", "settings"]
+    },
+    "okta_policy_password": {
+        "okta_endpoint": "/api/v1/policies",
+        "attributes": ["id", "status", "priority", "name", "description", "conditions", "settings"]
+    },
+    "okta_policy_profile_enrollment": {
+        "okta_endpoint": "/api/v1/policies",
+        "attributes": ["id", "name", "status"]
+    },
+    "okta_policy_profile_enrollment_apps": {
+        "okta_endpoint": "/api/v1/policies/{policyProfileEnrollmentId}/app",
+        "attributes": ["id"]
+    },
+    "okta_policy_rule_mfa": {
+        "okta_endpoint": "/api/v1/policies/{policy_id}/rule",
+        "attributes": ["priority", "name", "actions", "conditions", "status"]
+    },
+    "okta_policy_rule_idp_discovery": {
+        "okta_endpoint": "/api/v1/policies/{policy_id}/rules",
+        "attributes": ["priority", "name", "actions", "conditions", "status"]
+    },
+    "okta_policy_rule_password": {
+        "okta_endpoint": "/api/v1/policies/{policy_id}/rules",
+        "attributes": ["priority", "name", "actions", "conditions", "status"]
+    },
+    "okta_policy_rule_profile_enrollment": {
+        "okta_endpoint": "/api/v1/policies/{policy_id}/rules",
+        "attributes": ["actions"]
+    },
+    "okta_policy_sign_on": {
+        "okta_endpoint": "/api/v1/policies",
+        "attributes": ["id", "name", "description", "priority", "conditions", "status"]
+    },
+    "okta_policy_rule_signon": {
+        "okta_endpoint": "/api/v1/policies/{policy_id}/rules",
+        "attributes": ["priority", "name", "actions", "conditions", "status"]
+    },
     # "roles": {
     #     "okta_endpoint": "/api/v1/iam/roles",
     #     "attributes": ["roles"]
@@ -113,6 +158,11 @@ ENTITY_UNIQUE_FIELDS = {
     "inline_hooks": "name",
     "orgs": "company_name",
     "roles": "label"
+}
+
+EXCLUDED_OUTPUT_FIELDS = {
+    "okta_policy_profile_enrollment": ["id"]
+    # Add more entity types as needed
 }
 
 def get_unique_field(entity_type):
@@ -160,3 +210,23 @@ def extract_entity_data(entity_type, okta_data):
     except Exception as e:
         logger.error(f"Error extracting data for entity type {entity_type}: {e}")
         return {"error": f"Error extracting data for entity type {entity_type}: {e}"}
+
+def clean_entity_data(entity_type, data_list):
+    """
+    Remove sensitive/internal fields like `id` before storing or outputting data.
+
+    :param entity_type: The type of entity (used to look up excluded fields)
+    :param data_list: List of dictionaries containing entity data
+    :return: Cleaned list of dictionaries
+    """
+    excluded_fields = EXCLUDED_OUTPUT_FIELDS.get(entity_type, [])
+    cleaned_data = []
+
+    for record in data_list:
+        cleaned_record = {
+            key: value for key, value in record.items()
+            if key not in excluded_fields
+        }
+        cleaned_data.append(cleaned_record)
+
+    return cleaned_data

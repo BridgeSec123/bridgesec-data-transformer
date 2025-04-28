@@ -5,17 +5,20 @@ from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
 
-from entities.okta_entities.policies.policy_models import PolicyRuleMFA
-from entities.okta_entities.policies.policy_serializers import PolicyRuleMFASerializer
+from entities.okta_entities.policies.policy_models import PolicyRuleProfileEnrollment
+from entities.okta_entities.policies.policy_serializers import (
+    PolicyRuleProfileEnrollmentSerializer,
+)
 from entities.okta_entities.policies.views.policy_base_viewset import BasePolicyViewSet
 
 logger = logging.getLogger(__name__)
 
-class PolicyRuleMFAViewSet(BasePolicyViewSet):
+
+class PolicyRuleProfileEnrollmentViewSet(BasePolicyViewSet):
     okta_endpoint = "/api/v1/policies/{policy_id}/rules"
-    entity_type = "okta_policy_rule_mfa"
-    serializer_class = PolicyRuleMFASerializer
-    model = PolicyRuleMFA
+    entity_type = "okta_policy_rule_profile_enrollment"
+    serializer_class = PolicyRuleProfileEnrollmentSerializer
+    model = PolicyRuleProfileEnrollment
     
     def fetch_from_okta(self, policy_id):
         """Fetch data from Okta API dynamically."""
@@ -58,21 +61,27 @@ class PolicyRuleMFAViewSet(BasePolicyViewSet):
         extracted_data = super().extract_data(okta_data)
 
         formatted_data = []
-        # allowed_fields = set(User._fields.keys())
 
         for record in extracted_data:
+            profile_attributes = record.get("actions", {}).get("profileEnrollment", {})
             formatted_record = {
-                "name": record.get("name"),
                 "policy_id": policy_id,
-                "app_exclude": record.get("app_exclude"),
-                "app_include": record.get("app_include"),
-                "enroll": record.get("actions", {}).get("enroll", {}).get("self"),
-                "network_connection": record.get("conditions").get("network").get("connection"),
-                "network_excludes": record.get("network_excludes"),
-                "network_includes": record.get("network_includes"),
-                "priority": record.get("priority"),
-                "status": record.get("status"),
-                "user_excluded": record.get("conditions").get("people").get("users").get("exclude"),
+                "unknown_user_action": profile_attributes.get("unknownUserAction", ""),
+                "access": profile_attributes.get("access", ""),
+                "email_verification": profile_attributes.get("activationRequirements", {}).get("emailVerification"),
+                "enroll_authenticator_types": profile_attributes.get("enrollment", {}).get("authenticatorEnrollments", []),
+                "inline_hook_id": profile_attributes.get("inlineHookId", ""),
+                "profile_attributes": [
+                    {
+                        "name": attr.get("name", ""),
+                        "label": attr.get("label", ""),
+                        "required": attr.get("required", False)
+                    }
+                    for attr in profile_attributes.get("profileAttributes", [])
+                ],
+                "progressive_profiling_action": profile_attributes.get("progressiveProfilingAction", ""),
+                "target_group_id": profile_attributes.get("targetGroupId", ""),
+                "ui_schema_id": profile_attributes.get("uiSchemaId", "")
             }
             formatted_data.append(formatted_record)
 
