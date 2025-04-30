@@ -1,3 +1,10 @@
+
+from entities.okta_entities.apps.views.apps_policy_signon_viewset import AppPolicySignOnViewSet
+from entities.okta_entities.apps.views.apps_acess_policy_assignment_viewset import AppAcessPolicyAssignmentViewSet
+from entities.okta_entities.apps.views.apps_group_assignments_viewset import AppsGroupAssignmentsViewSet
+from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
+from entities.okta_entities.apps.views.apps_oauth_viewset import AppOauthViewSet
+from entities.okta_entities.apps.views.apps_saml_viewset import AppSAMLViewSet
 from entities.okta_entities.auth_server.views.auth_server_base_viewset import (
     BaseAuthServerViewSet,
 )
@@ -50,9 +57,9 @@ from entities.okta_entities.device_assurance_policies.views.device_windows_views
     DeviceWindowsViewSet,
 )
 from entities.okta_entities.email.views.email_base_viewset import BaseEmailViewSet
-from entities.okta_entities.email.views.email_security_notifications_viewset import (
-    EmailSecurityNotificationViewset,
-)
+# from entities.okta_entities.email.views.email_security_notifications_viewset import (
+#     EmailSecurityNotificationViewset,
+# )
 from entities.okta_entities.event_hook.views.event_hook_viewset import EventHookViewSet
 from entities.okta_entities.groups.views.group_base_viewset import BaseGroupViewSet
 from entities.okta_entities.groups.views.group_membership_viewset import (
@@ -132,6 +139,7 @@ from entities.okta_entities.users.views.user_schema_property_viewset import (
 from entities.okta_entities.users.views.user_type_viewset import UserTypeViewSet
 from entities.okta_entities.users.views.user_viewset import UserViewSet
 
+
 # Dictionary to register all entity viewsets
 ENTITY_VIEWSETS = {
     "users": BaseUserViewSet,
@@ -151,7 +159,8 @@ ENTITY_VIEWSETS = {
     "auth_server": BaseAuthServerViewSet,
     "trusted_origins": TrustedOriginViewSet,
     "device_assurance_policy": BaseDeviceAssurancePolicyViewSet,
-    "policies": BasePolicyViewSet
+    "policies": BasePolicyViewSet,
+    "apps": BaseAppViewSet
 }
 
 GROUP_ENTITY_VIEWSETS = {
@@ -209,7 +218,7 @@ POLICY_ENTITY_VIEWSETS = {
 
 EMAIL_ENTITY_VIEWSETS = {
     # "okta_email_template_Settings": EmailTemplateSettingsViewSet,
-    "okta_email_notifications": EmailSecurityNotificationViewset
+    # "okta_email_notifications": EmailSecurityNotificationViewset
 }
 
 BRAND_ENTITY_VIEWSETS = {
@@ -221,4 +230,12 @@ BRAND_ENTITY_VIEWSETS = {
 AUTHENTICATOR_ENTITY_VIEWSETS = {
     "authenticators": AuthenticatorViewSet,
     "okta_factors": OktaFactorViewSet,
+}
+
+APP_ENTITY_VIEWSETS={
+    "okta_app_oauth": AppOauthViewSet,
+    "okta_app_saml": AppSAMLViewSet,
+    "okta_apps_group_assignments": AppsGroupAssignmentsViewSet,
+    "apps_access_policy_assignment": AppAcessPolicyAssignmentViewSet,
+    "okta_app_policy_sign_on": AppPolicySignOnViewSet
 }

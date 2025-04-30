@@ -9,8 +9,6 @@ class BaseIdentityProviderViewSet(BaseEntityViewSet):
     serializer_class = None
     model = None
 
-    def get_filtered_okta_data(self, okta_data, idp_type):
-        return [item for item in okta_data if item.get("type") == idp_type]
 
     def fetch_and_store_data(self, db_name):
         logger.info("Starting fetch and store process for identity providers and sub-entities.")

@@ -29,6 +29,7 @@ class BasePolicyViewSet(BaseEntityViewSet):
                         extracted_data.setdefault(entity_name, []).extend(extracted)
                     else:
                         logger.info(f"No {entity_name} data extracted for POlicy {policy_profile_enrollment_id}. Skipping.")
+                        
             elif entity_name == "okta_policy_rule_mfa":
                 extracted_data[entity_name] = []
                 for policy in extracted_data.get("okta_policy_mfa", []):

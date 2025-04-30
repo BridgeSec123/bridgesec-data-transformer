@@ -158,6 +158,28 @@ ENTITY_TYPE_MAPPING = {
             "secondaryColorHex","signInPageTouchPointVariant","id"
         ]
     },
+    "okta_app_oauth":{
+        "okta_endpoint":"/api/v1/apps",
+        "attributes":[
+            "signOnMode", "label", "type", "accessibility", "visibility", "notes", "settings", "link", "userNameTemplate", "status"
+        ]
+    },
+    "okta_app_saml":{
+        "okta_endpoint":"/api/v1/apps",
+        "attributes":[
+            "signOnMode", "label", "accessibility", "visibility", "notes", "settings",
+            "signon", "hide","userNameTemplate", "status"
+            ]
+    },
+    "okta_apps_group_assignments":{
+        "okta_endpoint":"/api/v1/apps/{{appId}}/groups",
+        "attributes":[ "app_id", "group","timeouts"]
+    },
+    "okta_app_policy_sign_on":{
+        "okta_endpoint": "/api/v1/policies",
+        "attributes": ["name", "description", "priority", "catch_all"]
+    }
+    
     # "email_template_settings":{
     #     "okta_endpoint": "/api/v1/brands/{brandId}/templates/email",
     #     "attributes": ["brandId", "template", "recipients"]
