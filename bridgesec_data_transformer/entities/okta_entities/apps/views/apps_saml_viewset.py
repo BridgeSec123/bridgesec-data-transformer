@@ -1,14 +1,11 @@
 import logging
 
-from rest_framework import status
-from rest_framework.response import Response
-
 from entities.okta_entities.apps.views.apps_base_viewset import  BaseAppViewSet
 from entities.okta_entities.apps.apps_models import (
     AppSAML,
 )
 from entities.okta_entities.apps.apps_serializers import (
-   AppSAMLSerializer,
+    AppSAMLSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,7 +39,7 @@ class AppSAMLViewSet(BaseAppViewSet):
                     "acs_endpoints": signon.get("acsEndpoints",{}),
                     "admin_note": note.get("admin", ""),
                     "app_links_json": visibility.get("appLinks", ""),
-                    "app_settings_json": any(visibility.get("appLinks",{}).values()),
+                    "app_settings_json": any(visibility.get("appLinks", {}).values()),
                     "attribute_statements": record.get("attributeStatements", {}),
                     "audience": signon.get("audienceOverride", ""),
                     "authentication_policy": record.get("authentication_policy", ""),

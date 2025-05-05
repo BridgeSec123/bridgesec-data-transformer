@@ -28,7 +28,8 @@ class AppOauthViewSet(BaseAppViewSet):
                 settings = record.get("settings", {})
                 notes = settings.get("notes", {})
                 link = record.get("_links", {})
-                oauthClient = settings.get("oauthClient", {})
+                credentials = record.get("credentials", {})
+                oauthClient = credentials.get("oauthClient", {})
                 hide = visibility.get("hide", {})
                 idp_initiated_login = oauthClient.get("idp_initiated_login", {})
                 userNameTemplate = record.get("credentials", {}).get("userNameTemplate", {})
@@ -80,8 +81,6 @@ class AppOauthViewSet(BaseAppViewSet):
                     "user_name_template_suffix": record.get("credentials", {}),
                     "user_name_template_type": userNameTemplate.get("type", ""),
                     "wildcard_redirect": oauthClient.get("wildcard_redirect", ""),
-
-                    
                 }
                 formatted_data.append(formatted_record)
         logger.info("Extracted and formatted %d Identity Provider records from Okta", len(formatted_data))

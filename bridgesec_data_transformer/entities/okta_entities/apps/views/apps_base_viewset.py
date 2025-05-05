@@ -47,7 +47,58 @@ class BaseAppViewSet(BaseEntityViewSet):
                         logger.info(f"No {entity_name} data extracted for client_id {client_id}. Skipping.")
 
                 continue  # Skip default logic for this entity since it's handled above
+            elif entity_name == "okta_app_signon_policy_rule":
+                extracted_data[entity_name] = []
+                for app_policy in extracted_data.get("okta_app_policy_sign_on", []):
+                    policy_id = app_policy.get("id")
 
+                    if not policy_id:
+                        logger.warning("Missing policy_id in app_policy entry. Skipping this record.")
+                        continue
+
+                    try:
+                        data, _, _ = viewset_instance.fetch_from_okta(policy_id)
+                    except Exception as e:
+                        logger.error(f"Error fetching data from Okta for policy_id {policy_id}: {e}")
+                        continue
+
+                    try:
+                        extracted = viewset_instance.extract_data(data, policy_id)
+                    except Exception as e:
+                        logger.error(f"Error extracting data for policy_id {policy_id}: {e}")
+                        continue
+
+                    if extracted:
+                        extracted_data[entity_name].extend(extracted)
+                    else:
+                        logger.info(f"No {entity_name} data extracted for policy_id {policy_id}. Skipping.")
+                continue  # Skip default logic for this entity since it's handled above
+            elif entity_name == "okta_app_oauth_role_assignment":
+                extracted_data[entity_name] = []
+                for app_oauth in extracted_data.get("okta_app_oauth", []):
+                    client_id = app_oauth.get("client_id")
+
+                    if not client_id:
+                        logger.warning("Missing client_id in app_oauth entry. Skipping this record.")
+                        continue
+
+                    try:
+                        data, _, _ = viewset_instance.fetch_from_okta(client_id)
+                    except Exception as e:
+                        logger.error(f"Error fetching data from Okta for client_id {client_id}: {e}")
+                        continue
+
+                    try:
+                        extracted = viewset_instance.extract_data(data, client_id)
+                    except Exception as e:
+                        logger.error(f"Error extracting data for client_id {client_id}: {e}")
+                        continue
+
+                    if extracted:
+                        extracted_data[entity_name].extend(extracted)
+                    else:
+                        logger.info(f"No {entity_name} data extracted for client_id {client_id}. Skipping.")
+                continue  # Skip default logic for this entity since it's handled above
             # Default logic for all other entities
             extracted_data[entity_name] = []
             try:
@@ -68,7 +119,3 @@ class BaseAppViewSet(BaseEntityViewSet):
                 logger.error(f"Failed to store data for {entity_name}: {e}")
 
         return extracted_data
-
-    
-    
-        

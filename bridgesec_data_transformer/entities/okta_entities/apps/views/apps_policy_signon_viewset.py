@@ -64,13 +64,13 @@ class AppPolicySignOnViewSet(BaseAppViewSet):
         formatted_data = []
 
         for record in extracted_data:
-           
+        
             formatted_record = {
+                "id": record.get("id"),
                 "name": record.get("name"),
                 "description": record.get("description"),
                 "catch_all": record.get("catch_all"),
                 "priority": record.get("priority"),
-                
             }
             formatted_data.append(formatted_record)
 

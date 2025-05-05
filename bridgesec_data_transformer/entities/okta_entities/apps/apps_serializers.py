@@ -105,7 +105,7 @@ class AppGroupAssignmentsSerializer(serializers.Serializer):
    group = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
    timeouts = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
 
-class AppOuthRoleAssignmentSerializer(serializers.Serializer):
+class AppOAuthRoleAssignmentSerializer(serializers.Serializer):
     client_id = serializers.CharField(required=True)
     type = serializers.CharField(required=True)
     resource_set = serializers.CharField(required=True)
@@ -120,4 +120,35 @@ class AppPolicySignOnSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_null=True)
     catch_all = serializers.BooleanField(required=False, default=False)
     priority = serializers.IntegerField(required=False, allow_null=True)
-    
+
+class AppPolicySignOnRuleSerializer(serializers.Serializer):
+    name = serializers.CharField(required=True)
+    policy_id = serializers.CharField(required=True)
+    access = serializers.CharField(required=False, allow_null=True)
+    constraints = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    custom_expression = serializers.CharField(required=False, allow_null=True)
+    device_assurances_included = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    device_is_managed = serializers.BooleanField(required=False, default=False)
+    device_is_registered = serializers.BooleanField(required=False, default=False)
+    factor_mode = serializers.CharField(required=False, allow_null=True)
+    groups_excluded = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    groups_included = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    inactivity_period = serializers.CharField(required=False, allow_null=True)
+    ip_address = serializers.CharField(required=False, allow_null=True)
+    network_connection = serializers.CharField(required=False, allow_null=True)
+    network_excludes = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    network_includes = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    platform_include = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    priority = serializers.IntegerField(required=False, allow_null=True)
+    re_authentication_frequency = serializers.CharField(required=False, allow_null=True)
+    risk_score = serializers.IntegerField(required=False, allow_null=True)
+    status = serializers.CharField(required=False, allow_null=True)
+    type = serializers.CharField(required=False, allow_null=True)
+    user_types_excluded = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    user_types_included = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    users_excluded = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    users_included = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+
+class AppSAMLSettingsSerializer(serializers.Serializer):
+    app_id = serializers.CharField(required=True)
+    settings = serializers.DictField(required=False, allow_null=True)

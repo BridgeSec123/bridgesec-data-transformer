@@ -19,7 +19,7 @@ class AppAcessPolicyAssignmentViewSet(BaseAppViewSet):
 
         :param apps: list of app dicts from Okta
         :param mode: 'full' = fetch full access policy object,
-                     'id_only' = extract only the access policy ID
+        'id_only' = extract only the access policy ID
         :return: list of extracted dicts
         """
         formatted_data = []

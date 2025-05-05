@@ -145,7 +145,7 @@ class AppGroupAssignments(BaseEntityModel):
 
     meta = {"collection" : "okta_app_group_assignment"}
 
-class AppOuthRoleAssignment(BaseEntityModel):
+class AppOAuthRoleAssignment(BaseEntityModel):
     client_id = StringField(required=True)
     type = StringField(required=True)
     resource_set = StringField(required=False)
@@ -166,3 +166,43 @@ class AppPolicySignOn(BaseEntityModel):
     priority = IntField(required=False)
 
     meta = {"collection" : "okta_app_policy_sign_on"}
+
+class PlatformInclude(EmbeddedDocument):
+    os_expression = StringField(required=False)
+    os_type = StringField(required=False)
+    type = StringField(required=False)
+
+class AppPolicySignOnRule(BaseEntityModel):
+    name = StringField(required=True)
+    policy_id = StringField(required=True)
+    access = StringField(required=False)
+    constraints = ListField(StringField(), required=False)
+    custom_expression = StringField(required=False)
+    device_assurances_included = ListField(StringField(), required=False)
+    device_is_managed = BooleanField(required=False)
+    device_is_registered = BooleanField(required=False)
+    factor_mode = StringField(required=False)
+    groups_excluded = ListField(StringField(), required=False)
+    groups_included = ListField(StringField(), required=False)
+    inactivity_period = StringField(required=False)
+    network_connection = StringField(required=False)
+    network_excludes = ListField(StringField(), required=False)
+    network_includes = ListField(StringField(), required=False)
+    platform_include = EmbeddedDocumentListField(PlatformInclude, required=False)
+    priority = IntField(required=False)
+    re_authentication_frequency = StringField(required=False)
+    risk_score = IntField(required=False)
+    status = StringField(required=False)
+    type = StringField(required=False)
+    user_types_excluded = ListField(StringField(), required=False)
+    user_types_included = ListField(StringField(), required=False)
+    users_excluded = ListField(StringField(), required=False)
+    users_included = ListField(StringField(), required=False)
+    
+    meta = {"collection" : "okta_app_policy_sign_on_rule"}
+
+class AppSAMLSettings(BaseEntityModel):
+    app_id = StringField(required=True)
+    settings = DictField(required=False)
+
+    meta = {"collection" : "okta_app_saml_settings"}

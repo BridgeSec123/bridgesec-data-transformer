@@ -10,7 +10,7 @@ class User(BaseEntityModel):
     mobilePhone = StringField(null=True, required=False)
     secondEmail = StringField(null=True, required=False)
     login = StringField()
-    email = EmailField(unique=True)
+    email = EmailField()
     
     meta = {"collection": "okta_user"}
 
