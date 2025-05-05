@@ -7,19 +7,19 @@ from django.conf import settings
 from rest_framework import status
 from rest_framework.response import Response
 
-from entities.okta_entities.users.user_models import UserAdminRoles
-from entities.okta_entities.users.user_serializers import UserAdminRolesSerializer
+from entities.okta_entities.users.user_models import AdminRoleTargets
+from entities.okta_entities.users.user_serializers import AdminRoleTargetsSerializer
 from entities.okta_entities.users.views.user_base_viewset import BaseUserViewSet
 
 logger = logging.getLogger(__name__)
 
-class UserAdminRolesViewSet(BaseUserViewSet):
-    okta_endpoint = "/api/v1/users/{user_id}/roles"
-    entity_type = "user_admin_roles"
-    serializer_class = UserAdminRolesSerializer
-    model = UserAdminRoles
+class AdminRoleTargetsViewSet(BaseUserViewSet):
+    okta_endpoint = "/api/v1/users/{user_id}/roles/{roleAssignmentId}/targets/catalog/apps"
+    entity_type = "okta_admin_role_targets"
+    serializer_class = AdminRoleTargetsSerializer
+    model = AdminRoleTargets
     
-    def fetch_from_okta(self, user_id):
+    def fetch_from_okta(self, user_id, role_id):
         if not user_id:
             logger.error("User ID is required to fetch memberships.")
             return []
@@ -28,7 +28,7 @@ class UserAdminRolesViewSet(BaseUserViewSet):
             logger.error("Okta endpoint not defined")
             return {"error": "Okta endpoint not defined"}, 500
 
-        okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(user_id=user_id)}"
+        okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(user_id=user_id, roleAssignmentId=role_id)}"
         headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
         
         logger.info(f"Fetching data from Okta endpoint: {self.okta_endpoint}")
@@ -55,21 +55,20 @@ class UserAdminRolesViewSet(BaseUserViewSet):
 
             return response_data
 
-    def extract_data(self, okta_data, user_id):
-        extracted_data = super().extract_data(okta_data)  
-        admin_roles = []
-        role_ids = []
+    def extract_data(self, okta_data, user_id, role_type):
+        extracted_data =super().extract_data(okta_data)
+        formatted_data = []
+        apps = []
+        for record in extracted_data:
+            app_name = record.get("name")
+            if app_name:
+                apps.append(app_name)
 
-        for role in extracted_data:
-            role_type = role.get("type")
-            role_id = role.get("id")
-            if role_type:
-                admin_roles.append(role_type)
-                if role_id:
-                    role_ids.append(role_id)
-
-        return [{
+        formatted_data = [{
+            "role_type": role_type,
             "user_id": user_id,
-            "admin_roles": admin_roles,
-            "role_ids": role_ids
-        }] if admin_roles else None
+            "apps": apps,
+            "groups": []  
+        }]
+
+        return formatted_data

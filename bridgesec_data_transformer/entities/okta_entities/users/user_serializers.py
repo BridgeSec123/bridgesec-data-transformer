@@ -45,3 +45,14 @@ class UserSchemaPropertySerializer(serializers.Serializer):
     permissions = serializers.CharField(allow_null=True, required=False)
     required = serializers.BooleanField(allow_null=True, required=False)
     unique = serializers.CharField(allow_null=True, required=False)
+
+class AdminRoleTargetsSerializer(serializers.Serializer):
+    user_id = serializers.CharField()
+    role_type = serializers.CharField()
+    apps = serializers.ListField(child=serializers.CharField(), allow_null=True, required=False)
+    groups = serializers.ListField(child=serializers.CharField(), allow_null=True, required=False)
+
+class RoleSubscriptionSerializer(serializers.Serializer):
+    notification_type = serializers.CharField()
+    role_type = serializers.CharField()
+    status = serializers.CharField()

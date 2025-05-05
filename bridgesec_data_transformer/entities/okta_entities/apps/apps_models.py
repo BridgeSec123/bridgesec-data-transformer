@@ -206,3 +206,45 @@ class AppSAMLSettings(BaseEntityModel):
     settings = DictField(required=False)
 
     meta = {"collection" : "okta_app_saml_settings"}
+
+
+class AppGroupAssignment(BaseEntityModel):
+    app_id = StringField(required=True)
+    group_id = StringField(required=True)
+    priority = IntField(required=False)
+    profile = DictField(required=False)
+    retain_assignment = BooleanField(required=False)
+    timeouts = EmbeddedDocumentListField(Timeouts, required=False)
+
+    meta = {"collection" : "okta_app_group_assigment"}
+
+class AppSharedCredentials(BaseEntityModel):
+    label = StringField(required=True)
+    accessibility_error_redirect_url = StringField(required=False)
+    accessibility_login_redirect_url = StringField(required=False)
+    accessibility_self_service = BooleanField(required=False)
+    admin_note = StringField(required=False)
+    app_links_json = StringField(required=False)
+    auto_submit_toolbar = BooleanField(required=False)
+    button_field = StringField(required=False)
+    checkbox = StringField(required=False)
+    enduser_note = StringField(required=False)
+    hide_ios = BooleanField(required=False)
+    hide_web = BooleanField(required=False)
+    logo = StringField(required=False)
+    password_field = StringField(required=False)
+    preconfigured_app = StringField(required=False)
+    redirect_url = StringField(required=False)
+    shared_password = StringField(required=False)
+    shared_username = StringField(required=False)
+    status = StringField(required=False)
+    timeouts = EmbeddedDocumentListField(Timeouts, required=False)
+    url = StringField(required=False)
+    url_regex = StringField(required=False)
+    user_name_template = StringField(required=False)
+    user_name_template_push_status = StringField(required=False)
+    user_name_template_suffix = StringField(required=False)
+    user_name_template_type = StringField(required=False)
+    username_field = StringField(required=False)
+
+    meta = {"collection" :"okta_app_shared_credentials"}

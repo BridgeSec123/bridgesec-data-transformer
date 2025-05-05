@@ -59,3 +59,18 @@ class UserSchemaProperty(BaseEntityModel):
     unique = StringField(required=False)
     
     meta = {"collection": "okta_user_schema_property"}
+
+class AdminRoleTargets(BaseEntityModel):
+    user_id = StringField(required=True)
+    role_type = StringField(required=True)
+    apps = ListField(StringField(), required=False)
+    groups = ListField(StringField(), required=False)
+
+    meta = {"collection": "okta_admin_role_targets"}
+
+class RoleSubscription(BaseEntityModel):
+    notification_type = StringField(required=True)
+    role_type = StringField(required=True)
+    status = StringField(required=False)
+
+    meta = {"collection": "okta_role_subscription"}

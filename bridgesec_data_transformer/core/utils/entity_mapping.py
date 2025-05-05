@@ -26,7 +26,7 @@ ENTITY_TYPE_MAPPING = {
     },
     "user_admin_roles": {
         "okta_endpoint": "/api/v1/users/{userId}/roles",
-        "attributes": ["type", "disableNotifications"]
+        "attributes": ["id", "type", "disableNotifications"]
     },
     "groups": {
         "okta_endpoint": "/api/v1/groups",
@@ -135,22 +135,22 @@ ENTITY_TYPE_MAPPING = {
         "okta_endpoint": "/api/v1/policies/{policy_id}/rules",
         "attributes": ["priority", "name", "actions", "conditions", "status"]
     },
-    "okta_factors":{
+    "okta_factors": {
         "okta_endpoint": "/api/v1/org/factors",
         "attributes": ["id", "status"]
     },
-    "okta_email_notifications":{
+    "okta_email_notifications": {
         "okta_endpoint": "/api/internal/org/settings/security-notification-settings",
         "attributes": [
             "sendEmailForNewDeviceEnabled","sendEmailForFactorEnrollmentEnabled", "sendEmailForFactorResetEnabled", 
             "sendEmailForPasswordChangedEnabled","reportSuspiciousActivityEnabled"
         ]
     },
-    "okta_email_domain":{
+    "okta_email_domain": {
         "okta_endpoint": "api/v1/email-domains",
         "attributes": ["displayName", "domain", "userName"]
     },
-    "okta_theme":{
+    "okta_theme": {
         "okta_endpoint": "/api/v1/brands/{{brandId}}/themes",
         "attributes": [
             "brandid","backgroundImage","emailTemplateTouchPointVariant","endUserDashboardTouchPointVariant",
@@ -158,28 +158,55 @@ ENTITY_TYPE_MAPPING = {
             "secondaryColorHex","signInPageTouchPointVariant","id"
         ]
     },
-    "okta_app_oauth":{
-        "okta_endpoint":"/api/v1/apps",
-        "attributes":[
+    "okta_app_oauth": {
+        "okta_endpoint": "/api/v1/apps",
+        "attributes": [
             "signOnMode", "label", "type", "accessibility", "visibility", "notes", "settings", "link", "userNameTemplate", "status"
         ]
     },
-    "okta_app_saml":{
-        "okta_endpoint":"/api/v1/apps",
-        "attributes":[
+    "okta_app_saml": {
+        "okta_endpoint": "/api/v1/apps",
+        "attributes": [
             "signOnMode", "label", "accessibility", "visibility", "notes", "settings",
             "signon", "hide","userNameTemplate", "status"
             ]
     },
-    "okta_apps_group_assignments":{
-        "okta_endpoint":"/api/v1/apps/{{appId}}/groups",
-        "attributes":[ "app_id", "group","timeouts"]
+    "okta_apps_group_assignments": {
+        "okta_endpoint": "/api/v1/apps/{{appId}}/groups",
+        "attributes": [ "app_id", "group","timeouts"]
     },
-    "okta_app_policy_sign_on":{
+    "okta_app_policy_sign_on": {
         "okta_endpoint": "/api/v1/policies",
         "attributes": ["name", "description", "priority", "catch_all"]
-    }
-    
+    },
+    "okta_admin_role_custom": {
+           "okta_endpoint": "/api/v1/iam/roles",
+           "attributes": ["description","label", "permissions"]
+    },
+    "okta_admin_role_targets": {
+        "okta_endpoint": "/api/v1/users/{user_id}/roles/{roleAssignmentId}/targets/catalog/apps",
+        "attributes": ["name"]
+    },
+    "okta_role_subscription": {
+        "okta_endpoint": "api/v1/roles/{role_type}/subscriptions",
+        "attributes": ["notificationType","status"]
+    },
+    "okta_link_definition": {
+        "okta_endpoint": "/api/v1/meta/schemas/user/linkedObjects",
+        "attributes": ["primary","associated"]
+    },
+    "okta_apps_group_assignment": {
+        "okta_endpoint": "/api/v1/apps/{appId}/groups",
+        "attributes": [ "app_id","group","timeouts"]
+    },
+    "okta_app_shared_credentials":{
+        "okta_endpoint": "/api/v1/apps",
+        "attributes":  [
+            "label", "accessibility", "visibility", "settings", "notes","oauthClient","hide","userNameTemplate"
+        ]
+    },
+
+
     # "email_template_settings":{
     #     "okta_endpoint": "/api/v1/brands/{brandId}/templates/email",
     #     "attributes": ["brandId", "template", "recipients"]
@@ -192,7 +219,7 @@ ENTITY_TYPE_MAPPING = {
     #     "okta_endpoint": "/api/v1/org",
     #     "attributes": ["companyName", "website"]
     # } 
-} 
+}
  
 ENTITY_UNIQUE_FIELDS = { 
     "users": "email",
