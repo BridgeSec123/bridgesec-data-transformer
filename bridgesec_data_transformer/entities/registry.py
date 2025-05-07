@@ -1,4 +1,17 @@
-
+from entities.okta_entities.users.views.user_group_memberships_viewset import UserGroupMembershipsViewSet
+from entities.okta_entities.users.views.user_base_schema_property_viewset import UserBaseSchemaPropertyViewSet
+from entities.okta_entities.apps.views.app_shared_credentials_viewset import AppSharedCredentialsViewSet
+from entities.okta_entities.apps.views.apps_group_assignment_viewset import AppsGroupAssignmentViewSet
+from entities.okta_entities.link.views.link_definition_viewset import OktaLinkDefinitionViewSet
+from entities.okta_entities.link.views.link_base_viewset import BaseLinkViewSet
+from entities.okta_entities.users.views.role_subscription_viewset import RoleSubscriptionViewSet
+from entities.okta_entities.users.views.admin_role_targets_viewset import AdminRoleTargetsViewSet
+from entities.okta_entities.administrators.views.administrators_resourceset_viewset import AdminResourcesetViewSet
+from entities.okta_entities.administrators.views.administrators_role_custom_viewset_ import AdminRoleCustomViewSet
+from entities.okta_entities.administrators.views.administrators_base_viewset import BaseAdministratorViewSet
+from entities.okta_entities.apps.views.apps_policy_signon_viewset import AppPolicySignOnViewSet
+from entities.okta_entities.apps.views.apps_acess_policy_assignment_viewset import AppAcessPolicyAssignmentViewSet
+from entities.okta_entities.apps.views.apps_group_assignments_viewset import AppsGroupAssignmentsViewSet
 from entities.okta_entities.administrators.views.administrators_base_viewset import (
     BaseAdministratorViewSet,
 )
@@ -186,10 +199,9 @@ from entities.okta_entities.users.views.user_viewset import UserViewSet
 
 # Dictionary to register all entity viewsets
 ENTITY_VIEWSETS = {
-     "users": BaseUserViewSet,
-    #  "domains": DomainEntityViewSet,
+    "users": BaseUserViewSet,
     "identity_providers": BaseIdentityProviderViewSet,
-    #  "roles": AdministrativeRoleEntityViewSet,
+    #   "roles": AdministrativeRoleEntityViewSet,
     "behavior": BehaviorViewSet, 
     "orgs": OrgViewSet,
     "authenticators": BaseAuthenticatorViewSet,
@@ -206,7 +218,7 @@ ENTITY_VIEWSETS = {
     "policies": BasePolicyViewSet,
     "apps": BaseAppViewSet,
     "administrators": BaseAdministratorViewSet,
-    "links": BaseLinkViewSet
+    "links": BaseLinkViewSet,
 }
 
 GROUP_ENTITY_VIEWSETS = {
@@ -229,14 +241,16 @@ AUTH_SERVER_ENTITY_VIEWSETS = {
 }
 
 USER_ENTITY_VIEWSETS = {
-    # "users": UserViewSet,
-    # "user_types": UserTypeViewSet,
-    # "user_admin_roles": UserAdminRolesViewSet,
-    # "okta_admin_role_targets": AdminRoleTargetsViewSet,
+    "users": UserViewSet,
+    "user_types": UserTypeViewSet,
+    "user_admin_roles": UserAdminRolesViewSet,
+    "okta_admin_role_targets": AdminRoleTargetsViewSet,
     "okta_role_subscription": RoleSubscriptionViewSet,
-    # "user_factors": UserFactorViewSet,
-    # "user_schema_properties": UserSchemaPropertyViewSet
-}
+    "user_factors": UserFactorViewSet,
+    "user_schema_properties": UserSchemaPropertyViewSet,
+    "user_base_schema_property": UserBaseSchemaPropertyViewSet,
+    "okta_user_group_memberships": UserGroupMembershipsViewSet
+ }
 
 IDENTITY_PROVIDER_ENTITY_VIEWSETS = {
     "okta_idp_oidc": IdentityProviderOIDCViewSet,
@@ -290,7 +304,7 @@ APP_ENTITY_VIEWSETS = {
     "okta_app_shared_credentials": AppSharedCredentialsViewSet,
     "okta_app_saml_settings": AppSAMLSettingsViewSet,
     "okta_app_signon_policy_rule": AppPolicyRuleSignOnViewSet,
-    "okta_app_oauth_role_assignment": AppOauthRoleAssignmentViewSet
+    "okta_app_oauth_role_assignment": AppOauthRoleAssignmentViewSet,
 }
 
 

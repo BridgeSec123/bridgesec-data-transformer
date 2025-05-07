@@ -80,6 +80,25 @@ class BaseUserViewSet(BaseEntityViewSet):
                         role_subscriptions_data.extend(extracted)
                 extracted_data[entity_name] = role_subscriptions_data
 
+            elif entity_name == 'okta_user_group_memberships':
+                
+                users_data = extracted_data.get("users", [])
+                group_membership_data = []
+
+                for item in users_data:
+                    user_id = item.get("user_id")
+                    if not user_id:
+                        continue
+
+                    data = viewset_instance.fetch_from_okta(user_id=user_id)
+                    extracted = viewset_instance.extract_data(data, user_id=user_id)
+
+                    if extracted:
+                        group_membership_data.extend(extracted)
+
+                extracted_data[entity_name] = group_membership_data
+
+
             else:
                 data, status_code, rate_limit = viewset_instance.fetch_from_okta()
                 extracted_data[entity_name] = viewset_instance.extract_data(data)

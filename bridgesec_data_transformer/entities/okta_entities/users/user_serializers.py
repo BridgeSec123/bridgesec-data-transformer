@@ -56,3 +56,17 @@ class RoleSubscriptionSerializer(serializers.Serializer):
     notification_type = serializers.CharField()
     role_type = serializers.CharField()
     status = serializers.CharField()
+
+class UserBaseSchemaPropertySerializer(serializers.Serializer):
+    index = serializers.CharField()
+    title = serializers.CharField()
+    type = serializers.CharField()
+    description = serializers.CharField(allow_null=True, required=False)
+    master = serializers.CharField(allow_null=True, required=False)
+    permissions = serializers.CharField(allow_null=True, required=False)
+    required = serializers.BooleanField(allow_null=True, required=False)
+    user_type = serializers.CharField(allow_null=True, required=False)
+
+class UserGroupMembershipsSerializer(serializers.Serializer):
+    user_id = serializers.CharField()
+    groups = serializers.CharField()

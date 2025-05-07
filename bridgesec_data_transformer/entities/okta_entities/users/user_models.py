@@ -74,3 +74,23 @@ class RoleSubscription(BaseEntityModel):
     status = StringField(required=False)
 
     meta = {"collection": "okta_role_subscription"}
+
+class UserBaseSchemaProperty(BaseEntityModel):
+    index = StringField(required=True)
+    title = StringField(required=True)
+    type = StringField(required=True)
+    master = StringField(required=False)
+    pattern = StringField(required=False)
+    permissions = StringField(required=False)
+    required = BooleanField(required=False)
+    user_type = StringField(required=False)
+
+    meta = {"collection": "okta_user_base_schema_property"}
+
+class UserGroupMemberships(BaseEntityModel):
+    user_id = StringField(required=True)
+    groups = ListField(StringField(), required=True)
+
+    meta = {"collection": "okta_user_group_memberships"}
+
+

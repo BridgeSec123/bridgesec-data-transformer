@@ -52,10 +52,6 @@ ENTITY_TYPE_MAPPING = {
         "okta_endpoint": "/api/v1/brands",
         "attributes": ["id", "name", "removePoweredByOkta", "customPrivacyPolicyUrl", "agreeToCustomPrivacyPolicy", "defaultApp", "locale"],
     },
-    "domains": {
-        "okta_endpoint": "/api/v1/domains",
-        "attributes": ["id", "domain", "brandId", "certificateSourceType", "validationStatus"]
-    },
     "event_hooks" : {
         "okta_endpoint": "/api/v1/eventHooks",
         "attributes": ["name", "events", "channel"]
@@ -217,8 +213,25 @@ ENTITY_TYPE_MAPPING = {
             "label", "accessibility", "visibility", "settings", "notes","oauthClient","hide","userNameTemplate"
         ]
     },
-
-
+    "okta_user_group_memberships":{
+        "okta_endpoint": "api/v1/users/{user_id}/groups",
+        "attributes": ["id"]
+    },
+    "okta_app_swa": {
+        "okta_endpoint": "/api/v1/apps",
+        "attributes": [
+            "signOnMode", "label", "accessibility", "visibility", "settings", 
+            "logo", "hide", "userNameTemplate", "status"
+        ]
+    },
+    "okta_domains": {
+        "okta_endpoint": "/api/v1/domains",
+        "attributes": ["domain", "brandId", "certificateSourceType"]
+    },
+    "okta_app_users":{
+        "okta_endpoint": "/api/v1/apps",
+        "attributes": ["id","users"]
+    },
     # "email_template_settings":{
     #     "okta_endpoint": "/api/v1/brands/{brandId}/templates/email",
     #     "attributes": ["brandId", "template", "recipients"]

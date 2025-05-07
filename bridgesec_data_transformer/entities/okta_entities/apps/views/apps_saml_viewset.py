@@ -38,7 +38,7 @@ class AppSAMLViewSet(BaseAppViewSet):
                     "accessibility_self_service": accessibility.get("selfService", ""),
                     "acs_endpoints": signon.get("acsEndpoints",{}),
                     "admin_note": note.get("admin", ""),
-                    "app_links_json": visibility.get("appLinks", ""),
+                    "app_links_json":  any(visibility.get("appLinks",{}).values()),
                     "app_settings_json": any(visibility.get("appLinks", {}).values()),
                     "attribute_statements": record.get("attributeStatements", {}),
                     "audience": signon.get("audienceOverride", ""),
