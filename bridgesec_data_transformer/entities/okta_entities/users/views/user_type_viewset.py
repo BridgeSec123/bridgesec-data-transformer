@@ -39,3 +39,16 @@ class UserTypeViewSet(BaseUserViewSet):
             user_types_data.append(user_type_data)
         logger.info(f"Returning {len(user_types_data)} user types.")
         return Response(user_types_data, status=status.HTTP_200_OK)
+
+    def extract_data(self, okta_data):
+        extracted_data = super().extract_data(okta_data)
+        formatted_data = []
+        for record in extracted_data:
+            formatted_record = {
+                "name": record["name"],
+                "display_name": record["displayName"],
+                "description": record["description"],
+            }
+            formatted_data.append(formatted_record)
+        logger.info(f"Formatted {len(formatted_data)} user types.")
+        return formatted_data

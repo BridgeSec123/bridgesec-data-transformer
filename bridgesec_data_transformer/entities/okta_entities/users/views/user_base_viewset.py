@@ -67,21 +67,18 @@ class BaseUserViewSet(BaseEntityViewSet):
                 extracted_data[entity_name] = role_targets_data
 
             elif entity_name == 'okta_role_subscription':
-                role_targets_data = []
-
-                # if not user_admin_roles_data:
-                #     logger.warning("Skipping okta_admin_role_target due to missing admin roles.")
-                #     continue
-
-                for item in extracted_data.get("user_admin_roles", []):
-                    role_types = item.get("admin_roles", [])
-                    for role_type in role_types:
-                        data = viewset_instance.fetch_from_okta(role_type=role_type)
-                        extracted = viewset_instance.extract_data(data, role_type=role_type)
-                        if extracted:
-                            role_targets_data.extend(extracted)
-
-                extracted_data[entity_name] = role_targets_data
+                role_subscriptions_data = []
+                valid_role_types = [
+                    'API_ADMIN', 'APP_ADMIN', 'CUSTOM', 'GROUP_MEMBERSHIP_ADMIN',
+                    'HELP_DESK_ADMIN', 'MOBILE_ADMIN', 'ORG_ADMIN', 'READ_ONLY_ADMIN',
+                    'REPORT_ADMIN', 'SUPER_ADMIN', 'USER_ADMIN'
+                ]
+                for role_type in valid_role_types:
+                    data = viewset_instance.fetch_from_okta(role_type=role_type)
+                    extracted = viewset_instance.extract_data(data, role_type=role_type)
+                    if extracted:
+                        role_subscriptions_data.extend(extracted)
+                extracted_data[entity_name] = role_subscriptions_data
 
             else:
                 data, status_code, rate_limit = viewset_instance.fetch_from_okta()

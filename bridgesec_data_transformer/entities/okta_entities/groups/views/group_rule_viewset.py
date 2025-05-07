@@ -18,30 +18,8 @@ class GroupRuleViewSet(BaseGroupViewSet):
     entity_type = "group_rules"
     serializer_class = GroupRuleSerializer
     model = GroupRule
-    
-    def fetch_from_okta(self, group_id):
-        """
-        Fetch group rule details for a specific group from Okta.
-        """
-        if not group_id:
-            logger.error("Group ID is required to fetch rules.")
-            return []
 
-        url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(group_id=group_id)}"
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
-
-        logger.info(f"Fetching data from Okta API: {url}")
-        
-        response = requests.get(url, headers=headers)
-
-        if response.status_code == 200:
-            logger.info(f"Successfully fetched rules for group {group_id}")
-            return response.json()
-        else:
-            logger.error(f"Failed to fetch group rules. Status Code: {response.status_code}, Response: {response.text}")
-            return []
-
-    def extract_data(self, okta_data, group_id):
+    def extract_data(self, okta_data):
         """
         Extract and format group rule data from Okta response.
         """
