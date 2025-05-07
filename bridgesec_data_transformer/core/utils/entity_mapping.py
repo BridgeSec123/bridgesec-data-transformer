@@ -161,7 +161,7 @@ ENTITY_TYPE_MAPPING = {
     "okta_app_oauth": {
         "okta_endpoint": "/api/v1/apps",
         "attributes": [
-            "signOnMode", "label", "type", "accessibility", "visibility", "notes", "settings", "link", "userNameTemplate", "status"
+            "signOnMode", "label", "type", "accessibility", "visibility", "notes", "settings", "link", "userNameTemplate", "status", "credentials"
         ]
     },
     "okta_app_saml": {
@@ -177,11 +177,23 @@ ENTITY_TYPE_MAPPING = {
     },
     "okta_app_policy_sign_on": {
         "okta_endpoint": "/api/v1/policies",
-        "attributes": ["name", "description", "priority", "catch_all"]
+        "attributes": ["id", "name", "description", "priority", "catch_all"]
+    },
+    "okta_app_signon_policy_rule": {
+        "okta_endpoint": "/api/v1/policies/{policy_id}/rules",
+        "attributes": ["priority", "name", "actions", "conditions", "status", "type"]
+    },
+    "okta_app_saml_settings": {
+        "okta_endpoint": "/api/v1/apps",
+        "attributes": ["id", "settings", "signOnMode"]
+    },
+    "okta_app_oauth_role_assignment": {
+        "okta_endpoint": "/oauth2/v1/clients/{client_id}/roles",
+        "attributes": ["type", "resource_set", "role"]
     },
     "okta_admin_role_custom": {
-           "okta_endpoint": "/api/v1/iam/roles",
-           "attributes": ["description","label", "permissions"]
+        "okta_endpoint": "/api/v1/iam/roles",
+        "attributes": ["description","label", "permissions"]
     },
     "okta_admin_role_targets": {
         "okta_endpoint": "/api/v1/users/{user_id}/roles/{roleAssignmentId}/targets/catalog/apps",
@@ -220,7 +232,7 @@ ENTITY_TYPE_MAPPING = {
     #     "attributes": ["companyName", "website"]
     # } 
 }
- 
+
 ENTITY_UNIQUE_FIELDS = { 
     "users": "email",
     "groups": "name",
