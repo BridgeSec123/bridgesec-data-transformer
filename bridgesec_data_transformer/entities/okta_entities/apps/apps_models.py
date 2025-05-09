@@ -248,3 +248,71 @@ class AppSharedCredentials(BaseEntityModel):
     username_field = StringField(required=False)
 
     meta = {"collection" :"okta_app_shared_credentials"}
+
+class AppBookMark(BaseEntityModel):
+    label = StringField(required=True)
+    url = StringField(required=True)
+    accessibility_error_redirect_url = StringField(required=False)
+    accessibility_login_redirect_url = StringField(required=False)
+    accessibility_self_service = BooleanField(required=False)
+    admin_note = StringField(required=False)
+    app_links_json = StringField(required=False)
+    authentication_policy = StringField(required=False)
+    auto_submit_toolbar = BooleanField(required=False)
+    enduser_note = StringField(required=False)
+    hide_ios = BooleanField(required=False)
+    hide_web = BooleanField(required=False)
+    logo = StringField(required=False)
+    request_integration = BooleanField(required=False)
+    status = StringField(required=False)
+    timeouts = EmbeddedDocumentListField(Timeouts, required=False)
+    
+    meta = {"collection" : "okta_app_bookmark"}
+
+class AppAutoLogin(BaseEntityModel):
+    label = StringField(required=True)
+    accessibility_error_redirect_url = StringField(required=False)
+    accessibility_login_redirect_url = StringField(required=False)
+    accessibility_self_service = BooleanField(required=False)
+    admin_note = StringField(required=False)
+    app_links_json = StringField(required=False)
+    app_settings_json = StringField(required=False)
+    auto_submit_toolbar = BooleanField(required=False)
+    credentials_scheme = StringField(required=False)
+    enduser_note = StringField(required=False)
+    hide_ios = BooleanField(required=False)
+    hide_web = BooleanField(required=False)
+    logo = StringField(required=False)
+    preconfigured_app = StringField(required=False)
+    reveal_password = BooleanField(required=False)
+    shared_password = StringField(required=False)
+    shared_username = StringField(required=False)
+    sign_on_redirect_url = StringField(required=False)  
+    sign_on_url = StringField(required=False)
+    status = StringField(required=False)
+    timeouts = EmbeddedDocumentListField(Timeouts, required=False)
+    user_name_template = StringField(required=False)
+    user_name_template_push_status = StringField(required=False)
+    user_name_template_suffix = StringField(required=False)
+    user_name_template_type = StringField(required=False)
+    
+    meta = {"collection": "okta_app_auto_login"}
+
+class AppBasicAuth(BaseEntityModel):
+    auth_url = StringField(required=True)
+    label = StringField(required=True)
+    url = StringField(required=True)
+    accessibility_error_redirect_url = StringField(required=False)
+    accessibility_login_redirect_url = StringField(required=False)
+    accessibility_self_service = BooleanField(required=False)
+    admin_note = StringField(required=False)
+    app_links_json = StringField(required=False)
+    auto_submit_toolbar = BooleanField(required=False)
+    enduser_note = StringField(required=False)
+    hide_ios = BooleanField(required=False)
+    hide_web = BooleanField(required=False)
+    logo = StringField(required=False)
+    status = StringField(required=False)
+    timeouts = EmbeddedDocumentListField(Timeouts, required=False)
+    
+    meta = {"collection": "okta_app_basic_auth"}

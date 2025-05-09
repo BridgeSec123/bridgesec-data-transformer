@@ -18,7 +18,7 @@ class User(BaseEntityModel):
 class UserType(BaseEntityModel):
     name = StringField(required=True)
     description = StringField()
-    displayName = StringField()
+    display_name = StringField()
     
     meta = {"collection": "okta_user_type"}
 

@@ -232,6 +232,18 @@ ENTITY_TYPE_MAPPING = {
         "okta_endpoint": "/api/v1/apps",
         "attributes": ["id","users"]
     },
+    "okta_app_bookmark": {
+        "okta_endpoint": "/api/v1/apps",
+        "attributes": ["signOnMode", "label", "accessibility", "visibility", "settings", "status"]
+    },
+    "okta_app_auto_login": {
+        "okta_endpoint": "/api/v1/apps",
+        "attributes": ["signOnMode", "label", "accessibility", "visibility", "settings", "status"]
+    },
+    "okta_app_basic_auth": {
+        "okta_endpoint": "/api/v1/apps",
+        "attributes": ["signOnMode", "label", "accessibility", "visibility", "settings", "status"]
+    }
     # "email_template_settings":{
     #     "okta_endpoint": "/api/v1/brands/{brandId}/templates/email",
     #     "attributes": ["brandId", "template", "recipients"]
