@@ -1,5 +1,6 @@
 import logging
 
+from core.utils.entity_mapping import clean_entity_data
 from entities.views.base_view import BaseEntityViewSet
 
 logger = logging.getLogger(__name__)
@@ -74,8 +75,8 @@ class BaseUserViewSet(BaseEntityViewSet):
                     'REPORT_ADMIN', 'SUPER_ADMIN', 'USER_ADMIN'
                 ]
                 for role_type in valid_role_types:
-                    data = viewset_instance.fetch_from_okta(role_type=role_type)
-                    extracted = viewset_instance.extract_data(data, role_type=role_type)
+                    data = viewset_instance.fetch_from_okta(role_type = role_type)
+                    extracted = viewset_instance.extract_data(data, role_type = role_type)
                     if extracted:
                         role_subscriptions_data.extend(extracted)
                 extracted_data[entity_name] = role_subscriptions_data
@@ -105,12 +106,15 @@ class BaseUserViewSet(BaseEntityViewSet):
 
             logger.info(f"Extracted {len(extracted_data[entity_name])} records for {entity_name}.")
 
-        for entity_name, data in extracted_data.items():
+        extracted_data_cleaned = {
+            entity: clean_entity_data(entity, data)
+            for entity, data in extracted_data.items()
+        }
+
+        logger.info(f"Extracted {len(extracted_data[entity_name])} records for {entity_name}.")
+
+        for entity_name, data in extracted_data_cleaned.items():
             viewset_instance = USER_ENTITY_VIEWSETS[entity_name]()
-            if entity_name == "user_admin_roles":
-                # Remove 'role_ids' from each record
-                for record in data:
-                    record.pop("role_ids", None)
             viewset_instance.store_data(data, db_name)
 
-        return extracted_data
+        return extracted_data_cleaned

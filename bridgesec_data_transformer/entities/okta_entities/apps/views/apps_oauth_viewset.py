@@ -34,6 +34,7 @@ class AppOauthViewSet(BaseAppViewSet):
                 idp_initiated_login = oauthClient.get("idp_initiated_login", {})
                 userNameTemplate = record.get("credentials", {}).get("userNameTemplate", {})
                 formatted_record = {
+                    "app_id":record.get("id", ""),
                     "label": record.get("label", ""),
                     "type": (oauthClient.get("application_type") or "service"),
                     "accessibility_error_redirect_url": accessibility.get("errorRedirectUrl", ""),

@@ -1,5 +1,6 @@
 import logging
 
+from core.utils.entity_mapping import clean_entity_data
 from entities.views.base_view import BaseEntityViewSet
 
 logger = logging.getLogger(__name__)
@@ -50,8 +51,16 @@ class BaseAuthServerViewSet(BaseEntityViewSet):
 
             logger.info(f"Extracted {len(extracted_data[entity_name])} records for {entity_name}.")
 
-        for entity_name, data in extracted_data.items():
+        extracted_data_cleaned = {
+            entity: clean_entity_data(entity, data)
+            for entity, data in extracted_data.items()
+        }
+
+        logger.info(f"Extracted {len(extracted_data[entity_name])} records for {entity_name}.")
+
+        for entity_name, data in extracted_data_cleaned.items():
             viewset_instance = AUTH_SERVER_ENTITY_VIEWSETS[entity_name]()
             viewset_instance.store_data(data, db_name)
 
-        return extracted_data
+        return extracted_data_cleaned
+

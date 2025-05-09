@@ -316,3 +316,55 @@ class AppBasicAuth(BaseEntityModel):
     timeouts = EmbeddedDocumentListField(Timeouts, required=False)
     
     meta = {"collection": "okta_app_basic_auth"}
+    
+class AppSwa(BaseEntityModel):
+    label = StringField(required=True)
+    accessibility_error_redirect_url = StringField(null=True,required=False)
+    accessibility_login_redirect_url = StringField(null=True,required=False)
+    accessibility_self_service = StringField(null=True,required=False)
+    admin_note = StringField(null=True,required=False)
+    app_links_json = StringField(null=True,required=False)
+    auto_submit_toolbar = BooleanField(null=True,required=False)
+    button_field = StringField(null=True,required=False)
+    checkbox = StringField(null=True,required=False)
+    enduser_note = StringField(null=True,required=False)
+    hide_ios = BooleanField(null=True,required=False)
+    hide_web = BooleanField(null=True,required=False)
+    logo = StringField(null=True,required=False)
+    password_field = StringField(null=True,required=False)
+    preconfigured_app = StringField(null=True,required=False)
+    redirect_url = StringField(null=True,required=False)
+    status = StringField(null=True,required=False)
+    timeouts = EmbeddedDocumentListField(Timeouts, required=False)
+    url = StringField(null=True,required=False)
+    url_regex = StringField(null=True,required=False)
+    user_name_template = StringField(null=True,required=False)
+    user_name_template_push_status = StringField(null=True,required=False)
+    user_name_template_suffix = StringField(null=True,required=False)
+    user_name_template_type = StringField(null=True,required=False)
+    username_field = StringField(null=True,required=False)
+  
+    meta = {"collection" : "okta_app_swa"}
+
+class AppUser(BaseEntityModel):
+    app_id = StringField(required=True)
+    user_id = StringField(required=True)
+    password = StringField(required=False)
+    profile = DictField(required=False)
+    retain_assignment = BooleanField(required=False)
+    username = StringField(required=False)
+
+    meta = {"collection" : "okta_app_user"}
+
+class AppOauthApiScope(BaseEntityModel):
+    app_id = StringField(required=True)
+    issuer = StringField(required=True)
+    scopes = ListField(StringField(), required=False)
+
+    meta = {"collection" : "okta_app_oauth_api_scope"}
+
+class AppOauthPostRedirectUri(BaseEntityModel):
+    app_id = StringField(required=True)
+    uri = StringField(required=True)
+
+    meta = {"collection" : "okta_app_oauth_post_logout_redirect_uri"}

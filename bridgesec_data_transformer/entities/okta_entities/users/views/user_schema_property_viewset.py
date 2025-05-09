@@ -46,11 +46,6 @@ class UserSchemaPropertyViewSet(BaseUserViewSet):
         user_type_id = user_type.rsplit("/", 1)[-1] if user_type else ""
 
 
-        for prop in okta_data.get("definitions").get("base").get("properties"):
-            if prop == "login":
-                continue
-
-
         formatted_data = [{
             "index": okta_data.get("name"),
             "title": okta_data.get("title"),

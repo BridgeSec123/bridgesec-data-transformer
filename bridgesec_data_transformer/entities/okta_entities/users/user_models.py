@@ -4,13 +4,12 @@ from entities.models.base import BaseEntityModel
 
 
 class User(BaseEntityModel):
-    user_id = StringField()
-    firstName = StringField()
-    lastName = StringField()
-    mobilePhone = StringField(null=True, required=False)
-    secondEmail = StringField(null=True, required=False)
-    login = StringField()
-    email = EmailField()
+    email = StringField(null=True, required=True)
+    first_name = StringField(required=True)
+    last_name = StringField(required=True)
+    mobile_phone = StringField(null=True, required=False)
+    second_email  = StringField(null=True, required=False)
+    login = StringField(null=True, required=False)
     
     meta = {"collection": "okta_user"}
 
@@ -92,5 +91,3 @@ class UserGroupMemberships(BaseEntityModel):
     groups = ListField(StringField(), required=True)
 
     meta = {"collection": "okta_user_group_memberships"}
-
-

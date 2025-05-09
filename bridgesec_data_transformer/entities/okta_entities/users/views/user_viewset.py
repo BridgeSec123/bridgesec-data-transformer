@@ -12,38 +12,10 @@ logger = logging.getLogger(__name__)
 class UserViewSet(BaseUserViewSet):
     # queryset = UserEntity.objects.all()
     okta_endpoint = "/api/v1/users"
-    entity_type = "users"
+    entity_type = "okta_users"
     serializer_class = UserSerializer
     model = User
     
-    def list(self, request, *args, **kwargs):
-        """Retrieve all records from MongoDB and return the users data."""
-        start_date, end_date = super().list(request, *args, **kwargs)
-
-        if not start_date or not end_date:
-            users = self.model.objects() # Fetch all documents using MongoEngine
-            logger.info("Retrieved %d user records from MongoDB", len(users))
-
-        else:
-            users = self.filter_by_date(start_date, end_date)
-            logger.info(f"Retrieved {len(users)} users between {start_date} and {end_date}")
-
-        users_data = []
-        for user in users:
-            users_data.append(
-                {
-                    "user_id": user.id,
-                    "first_name": user.firstName,
-                    "last_name": user.lastName,
-                    "mobile_phone": user.mobilePhone,
-                    "second_email": user.secondEmail,
-                    "login": user.login,
-                    "email": user.email,
-                }
-            )
-            
-        logger.info("Returning %d users", len(users_data))
-        return Response(users_data, status=status.HTTP_200_OK)
 
     def extract_data(self, okta_data):
         """
@@ -53,16 +25,20 @@ class UserViewSet(BaseUserViewSet):
         extracted_data = super().extract_data(okta_data)
 
         formatted_data = []
-        allowed_fields = set(User._fields.keys())
-
+    
         for record in extracted_data:
-            if "profile" in record and "id" in record:
-                profile_data = record["profile"]
-                profile_data["user_id"] = record["id"]
+            profile = record.get("profile", {})
 
-                # Filter only allowed fields + user_id
-                filtered = {key: value for key, value in profile_data.items() if key in allowed_fields or key == "user_id"}
-                formatted_data.append(filtered)
+            formatted_record={
+                "id": record.get("id"),
+                "first_name": profile.get("firstName", ""),
+                "last_name": profile.get("lastName", ""),
+                "mobile_phone": profile.get("mobilePhone", ""),
+                "second_email": profile.get("secondEmail", ""),
+                "login": profile.get("login", ""),
+                "email": profile.get("email", ""),
+            }
+            formatted_data.append(formatted_record)
+        logger.info("Extracted and formatted %d user records from Okta", len(formatted_data))  
 
-        logger.info("Final extracted %d user records after formatting and filtering", len(formatted_data))
         return formatted_data

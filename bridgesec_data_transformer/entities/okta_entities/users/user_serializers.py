@@ -2,12 +2,15 @@ from rest_framework import serializers
 
 
 class UserSerializer(serializers.Serializer):
-    firstName = serializers.CharField()
-    lastName = serializers.CharField()
-    mobilePhone = serializers.CharField(allow_null=True, required=False)
-    secondEmail = serializers.EmailField(allow_null=True, required=False)
-    login = serializers.EmailField()
-    email = serializers.EmailField()
+    email = serializers.CharField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    login = serializers.CharField()
+    mobile_phone = serializers.CharField(allow_null=True, required=False)
+    second_email = serializers.CharField(allow_null=True, required=False)
+
+    
+    
 
 class UserTypeSerializer(serializers.Serializer):
     name = serializers.CharField()

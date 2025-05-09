@@ -16,7 +16,7 @@ ENTITY_TYPE_MAPPING = {
         "okta_endpoint": "/api/v1/trustedOrigins",
         "attributes": ["name", "origin", "scopes", "status"]
     },
-    "users": {
+    "okta_users": {
         "okta_endpoint": "/api/v1/users",
         "attributes": ["id", "profile"],
     },
@@ -157,13 +157,13 @@ ENTITY_TYPE_MAPPING = {
     "okta_app_oauth": {
         "okta_endpoint": "/api/v1/apps",
         "attributes": [
-            "signOnMode", "label", "type", "accessibility", "visibility", "notes", "settings", "link", "userNameTemplate", "status", "credentials"
+            "id", "signOnMode", "label", "type", "accessibility", "visibility", "notes", "settings", "link", "userNameTemplate", "status", "credentials"
         ]
     },
     "okta_app_saml": {
         "okta_endpoint": "/api/v1/apps",
         "attributes": [
-            "signOnMode", "label", "accessibility", "visibility", "notes", "settings",
+            "id", "signOnMode", "label", "accessibility", "visibility", "notes", "settings",
             "signon", "hide","userNameTemplate", "status"
             ]
     },
@@ -243,7 +243,15 @@ ENTITY_TYPE_MAPPING = {
     "okta_app_basic_auth": {
         "okta_endpoint": "/api/v1/apps",
         "attributes": ["signOnMode", "label", "accessibility", "visibility", "settings", "status"]
-    }
+    },
+    "okta_apps_oauth_api_scope":{
+        "okta_endpoint": "/api/v1/apps/{app_id}/grants",
+        "attributes": ["issuer","scopeId"]
+    },
+    "okta_apps_oauth_post_redirect_uri":{
+        "okta_endpoint": "/api/v1/apps",
+        "attributes": ["id", "settings", "signOnMode"]
+    },
     # "email_template_settings":{
     #     "okta_endpoint": "/api/v1/brands/{brandId}/templates/email",
     #     "attributes": ["brandId", "template", "recipients"]
@@ -274,7 +282,15 @@ ENTITY_UNIQUE_FIELDS = {
 }
 
 EXCLUDED_OUTPUT_FIELDS = {
-    "okta_policy_profile_enrollment": ["id"]
+    "okta_policy_profile_enrollment": ["id"],
+    "okta_app_oauth": ["app_id"],
+    "okta_app_policy_sign_on" : ["id"],
+    "auth_server_policy": ["policy_id"],
+    "auth_servers": ["auth_server_id"],
+    "groups": ["group_id"],
+    "okta_policy_mfa": ["id"],
+    "okta_policy_password": ["id"],
+    "okta_users": ["id"]
     # Add more entity types as needed
 }
 

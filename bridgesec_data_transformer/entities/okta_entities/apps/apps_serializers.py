@@ -252,3 +252,48 @@ class AppBasicAuthSerializer(serializers.Serializer):
     logo = serializers.CharField(required=False, allow_null=True)
     status = serializers.CharField(required=False, allow_null=True, default="ACTIVE")
     timeouts = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+
+
+class AppSwaSerializer(serializers.Serializer):
+    label = serializers.CharField(required=True)
+    accessibility_error_redirect_url = serializers.CharField(required=False, allow_null=True)
+    accessibility_login_redirect_url = serializers.CharField(required=False, allow_null=True)
+    accessibility_self_service = serializers.BooleanField(required=False, default=False)
+    admin_note = serializers.CharField(required=False, allow_null=True)
+    app_links_json = serializers.CharField(required=False, allow_null=True)
+    auto_submit_toolbar = serializers.BooleanField(required=False, default=False)
+    button_field = serializers.CharField(required=False, allow_null=True)
+    checkbox = serializers.BooleanField(required=False, default=False)
+    enduser_note = serializers.CharField(required=False, allow_null=True)
+    hide_ios = serializers.BooleanField(required=False, allow_null=True)
+    hide_web = serializers.BooleanField(required=False, allow_null=True)
+    logo = serializers.CharField(required=False, allow_null=True)
+    password_field = serializers.CharField(required=False, default=False)
+    preconfigured_app = serializers.CharField(required=False, allow_null=True)
+    redirect_url = serializers.CharField(required=False, allow_null=True)
+    status = serializers.CharField(required=False, allow_null=True, default="ACTIVE")
+    timeouts = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    url = serializers.CharField(required=False, allow_null=True)
+    url_regex = serializers.CharField(required=False, allow_null=True)
+    user_name_template = serializers.CharField(required=False, allow_null=True)
+    user_name_template_push_status = serializers.CharField(required=False, allow_null=True)
+    user_name_template_suffix = serializers.CharField(required=False, allow_null=True)
+    user_name_template_type = serializers.CharField(required=False, allow_null=True)
+    username_field =  serializers.CharField(required=False, allow_null=True)
+
+class AppUserSerializer(serializers.Serializer):
+    app_id = serializers.CharField(required=True)
+    user_id = serializers.CharField(required=True)
+    password = serializers.CharField(required=False, allow_null=True)
+    profile = serializers.CharField(required=False, allow_null=True)
+    retain_assignment = serializers.BooleanField(required=False, allow_null=True)
+    username = serializers.CharField(required=False, allow_null=True)
+
+class AppOauthApiScopeSerializer(serializers.Serializer):
+    app_id = serializers.CharField(required=True)
+    issuer = serializers.CharField(required=True)
+    scopes = serializers.ListField(child=serializers.CharField(), required=True)
+
+class AppOauthPostRedirectUriSerializer(serializers.Serializer):
+    app_id = serializers.CharField(required=True)
+    uri = serializers.CharField(required=True)

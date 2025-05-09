@@ -1,5 +1,6 @@
 import logging
 from entities.views.base_view import BaseEntityViewSet
+from core.utils.entity_mapping import clean_entity_data
 
 logger = logging.getLogger(__name__)
 
@@ -98,8 +99,21 @@ class BaseAppViewSet(BaseEntityViewSet):
                         extracted_data[entity_name].extend(extracted)
                     else:
                         logger.info(f"No {entity_name} data extracted for client_id {client_id}. Skipping.")
+                continue  
+
+            elif entity_name == "okta_apps_oauth_api_scope":
+                extracted_data[entity_name] = []
+                for app_oauth in extracted_data.get("okta_app_oauth", []):
+                    app_id = app_oauth.get("app_id")
+                    data, _, _ = viewset_instance.fetch_from_okta(app_id)
+                    
+                    extracted = viewset_instance.extract_data(data, app_id)         
+                    if extracted:
+                        extracted_data[entity_name].extend(extracted)
+                    else:
+                        logger.info(f"No {entity_name} data extracted for app_id {app_id}. Skipping.")
+
                 continue  # Skip default logic for this entity since it's handled above
-            # Default logic for all other entities
             extracted_data[entity_name] = []
             try:
                 okta_response, _, _ = viewset_instance.fetch_from_okta()
@@ -109,13 +123,16 @@ class BaseAppViewSet(BaseEntityViewSet):
                 logger.error(f"Error processing {entity_name}: {e}")
                 continue
 
-        # Store all extracted data in DB
-        for entity_name, data in extracted_data.items():
-            viewset_instance = APP_ENTITY_VIEWSETS[entity_name]()
-            try:
-                viewset_instance.store_data(data, db_name)
-                logger.info(f"Stored {len(data)} records for {entity_name}")
-            except Exception as e:
-                logger.error(f"Failed to store data for {entity_name}: {e}")
+        # Store data in database
+        extracted_data_cleaned = {
+            entity: clean_entity_data(entity, data)
+            for entity, data in extracted_data.items()
+        }
 
-        return extracted_data
+        logger.info(f"Extracted {len(extracted_data[entity_name])} records for {entity_name}.")
+
+        for entity_name, data in extracted_data_cleaned.items():
+            viewset_instance = APP_ENTITY_VIEWSETS[entity_name]()
+            viewset_instance.store_data(data, db_name)
+
+        return extracted_data_cleaned
