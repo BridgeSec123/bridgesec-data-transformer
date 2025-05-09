@@ -310,7 +310,7 @@ APP_ENTITY_VIEWSETS = {
 }
 
 
-ADMINISTARTORS_ENTITY_VIEWSETS = {
+ADMINISTRATORS_ENTITY_VIEWSETS = {
     "okta_admin_role_custom": AdminRoleCustomViewSet,
     "okta_resource_set": AdminResourcesetViewSet
 }

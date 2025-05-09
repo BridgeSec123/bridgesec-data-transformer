@@ -1,8 +1,10 @@
 import logging
 
-from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 from entities.okta_entities.apps.apps_models import AppAcessPolicyAssignment
-from entities.okta_entities.apps.apps_serializers import AppAcessPolicyAssignmentSerializer
+from entities.okta_entities.apps.apps_serializers import (
+    AppAcessPolicyAssignmentSerializer,
+)
+from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 
 logger = logging.getLogger(__name__)
 

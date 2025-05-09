@@ -1,14 +1,12 @@
 import logging
+
 import requests
-
-from django.conf import settings
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
+from django.conf import settings
 
-
-
-from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 from entities.okta_entities.apps.apps_models import AppGroupAssignments
 from entities.okta_entities.apps.apps_serializers import AppGroupAssignmentsSerializer
+from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 
 logger = logging.getLogger(__name__)
 

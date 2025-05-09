@@ -40,7 +40,7 @@ class BaseBrandViewSet(BaseEntityViewSet):
                     else:
                         logger.info(f"No {entity_name} data extracted for brand {brand_id}. Skipping.")
             else:
-                  for brand in extracted_data.get("brands", []):
+                for brand in extracted_data.get("brands", []):
                     brand_id = brand.get("brand_id")
                     if not brand_id:
                         logger.warning("Missing brand_id in brands data, skipping.")

@@ -1,12 +1,12 @@
 import logging
 
-from entities.okta_entities.apps.views.apps_base_viewset import  BaseAppViewSet
 from entities.okta_entities.apps.apps_models import (
     AppBookMark,
 )
 from entities.okta_entities.apps.apps_serializers import (
     AppBookMarkSerializer,
 )
+from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 
 logger = logging.getLogger(__name__)
 

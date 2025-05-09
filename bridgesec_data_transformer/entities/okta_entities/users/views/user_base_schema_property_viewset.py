@@ -1,8 +1,5 @@
 import logging
 
-from rest_framework import status
-from rest_framework.response import Response
-
 from entities.okta_entities.users.user_models import UserBaseSchemaProperty
 from entities.okta_entities.users.user_serializers import UserBaseSchemaPropertySerializer
 from entities.okta_entities.users.views.user_base_viewset import BaseUserViewSet

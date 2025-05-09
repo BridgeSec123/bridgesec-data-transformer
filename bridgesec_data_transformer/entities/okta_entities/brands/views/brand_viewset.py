@@ -52,28 +52,6 @@ class BrandEntityViewSet(BaseEntityViewSet):
 
             return response_data, 200, rate_limit_headers(response)
     
-    def list(self, request, *args, **kwargs):
-        """Retrieve all records from MongoDB and return serialized data."""
-        start_date, end_date = super().list(request, *args, **kwargs)
-
-        if not start_date or not end_date:
-            brands = self.model.objects()  # Fetch all documents using MongoEngine
-            logger.info("Retrieved %d brand records from MongoDB", len(brands))
-            
-        else:
-            brands = self.filter_by_date(start_date, end_date)
-            logger.info(f"Retrieved {len(brands)} brands between {start_date} and {end_date}")
-
-        brands_data = []
-        for brand in brands:
-            brand_data = {
-                "name": brand.name,
-            }
-            brands_data.append(brand_data)
-
-        logger.info(f"Returning {len(brands_data)} brands.")
-        return Response(brands_data, status=status.HTTP_200_OK)
-    
     def extract_data(self, okta_data):
         extracted_data = super().extract_data(okta_data)
         formatted_data = []

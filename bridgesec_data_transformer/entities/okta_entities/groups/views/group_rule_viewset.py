@@ -1,7 +1,5 @@
 import logging
 
-import requests
-from django.conf import settings
 from entities.okta_entities.groups.group_models import GroupRule
 from entities.okta_entities.groups.group_serializers import GroupRuleSerializer
 from entities.okta_entities.groups.views.group_base_viewset import BaseGroupViewSet

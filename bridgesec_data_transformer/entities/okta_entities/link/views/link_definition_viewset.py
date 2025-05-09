@@ -1,10 +1,8 @@
 import logging
 
-
-
-from entities.okta_entities.link.views.link_base_viewset import BaseLinkViewSet
 from entities.okta_entities.link.link_models import OktaLinkDefinition
 from entities.okta_entities.link.link_serializers import OktaLinkDefinitionSerializer
+from entities.okta_entities.link.views.link_base_viewset import BaseLinkViewSet
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +16,7 @@ class OktaLinkDefinitionViewSet(BaseLinkViewSet):
         """
         Override to format the user data by removing the "profile" key.
         """
-       
+        
         extracted_data = super().extract_data(okta_data)
 
         logger.info("Extracting data from Okta response")

@@ -20,8 +20,8 @@ class BaseAdministratorViewSet(BaseEntityViewSet):
         extracted_data = {}
 
         # Lazy import to avoid circular import issues
-        from entities.registry import ADMINISTARTORS_ENTITY_VIEWSETS
-        for entity_name, viewset_class in ADMINISTARTORS_ENTITY_VIEWSETS.items():
+        from entities.registry import ADMINISTRATORS_ENTITY_VIEWSETS
+        for entity_name, viewset_class in ADMINISTRATORS_ENTITY_VIEWSETS.items():
             logger.info(f"Processing entity: {entity_name}")
             viewset_instance = viewset_class()
             extracted_data[entity_name] = []
@@ -31,7 +31,7 @@ class BaseAdministratorViewSet(BaseEntityViewSet):
             extracted_data.setdefault(entity_name, []).extend(entity_data) # Append to a flat list (not nested by type)
 
         for entity_name, data in extracted_data.items():
-                viewset_instance = ADMINISTARTORS_ENTITY_VIEWSETS[entity_name]()
+                viewset_instance = ADMINISTRATORS_ENTITY_VIEWSETS[entity_name]()
                 viewset_instance.store_data(data, db_name)
                 
                 logger.info(f"Stored {len(entity_data)} records for {entity_name}")

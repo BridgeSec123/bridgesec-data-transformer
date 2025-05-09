@@ -8,8 +8,6 @@ from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from entities.okta_entities.groups.group_models import GroupSchemaProperty
 from entities.okta_entities.groups.group_serializers import GroupSchemaPropertySerializer
 from entities.okta_entities.groups.views.group_base_viewset import BaseGroupViewSet
-from rest_framework import status
-from rest_framework.response import Response
 
 logger = logging.getLogger(__name__)
 
@@ -18,32 +16,6 @@ class GroupSchemaPropertyViewSet(BaseGroupViewSet):
     entity_type = "group_schemas"
     serializer_class = GroupSchemaPropertySerializer
     model = GroupSchemaProperty
-    
-    def list(self, request, *args, **kwargs):
-        """Retrieve all records from MongoDB and return serialized data."""
-        start_date, end_date = super().list(request, *args, **kwargs)
-
-        if not start_date or not end_date:
-            groups = self.model.objects()  # Fetch all documents using MongoEngine
-            logger.info("Retrieved %d groups records from MongoDB", len(groups))
-
-        else:
-            groups = self.filter_by_date(start_date, end_date)
-            logger.info(f"Retrieved {len(groups)} groups between {start_date} and {end_date}")
-
-        groups_data = []
-        for group in groups:
-            group_data = {
-                "name": group.name,
-                "description": group.description,
-            }
-            if group.custom_profile_attributes:
-                group_data["custom_profile_attributes"] = group.custom_profile_attributes
-
-            groups_data.append(group_data)
-
-        logger.info(f"Returning {len(groups_data)} groups.")
-        return Response(groups_data, status=status.HTTP_200_OK)
     
     def fetch_from_okta(self):
         """Fetch data from Okta API dynamically."""

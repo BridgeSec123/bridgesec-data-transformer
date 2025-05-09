@@ -4,8 +4,6 @@ import requests
 from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
-from rest_framework import status
-from rest_framework.response import Response
 
 from entities.okta_entities.users.user_models import UserAdminRoles
 from entities.okta_entities.users.user_serializers import UserAdminRolesSerializer

@@ -1,5 +1,3 @@
-# entities/okta_entities/sms_templates/sms_template_views.py
-
 import logging
 from rest_framework import status
 from rest_framework.response import Response

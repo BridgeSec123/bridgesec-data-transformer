@@ -1,12 +1,8 @@
 import logging
 
-from entities.okta_entities.apps.views.apps_base_viewset import  BaseAppViewSet
-from entities.okta_entities.apps.apps_models import (
-    AppAutoLogin
-)
-from entities.okta_entities.apps.apps_serializers import (
-    AppAutoLoginSerializer
-)
+from entities.okta_entities.apps.apps_models import AppAutoLogin
+from entities.okta_entities.apps.apps_serializers import AppAutoLoginSerializer
+from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 
 logger = logging.getLogger(__name__)
 

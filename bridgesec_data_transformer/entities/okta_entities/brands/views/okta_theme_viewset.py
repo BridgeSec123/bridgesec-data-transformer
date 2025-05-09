@@ -1,13 +1,13 @@
 import logging
-import requests
-from django.conf import settings
 
-from entities.okta_entities.brands.views.brand_base_viewset import BaseBrandViewSet
+import requests
 from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
+from django.conf import settings
+
 from entities.okta_entities.brands.brand_models import OktaTheme
 from entities.okta_entities.brands.brand_serializers import OktaThemeSerializer
-
+from entities.okta_entities.brands.views.brand_base_viewset import BaseBrandViewSet
 
 logger = logging.getLogger(__name__)
 

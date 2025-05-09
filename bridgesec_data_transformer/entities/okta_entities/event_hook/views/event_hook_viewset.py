@@ -15,42 +15,6 @@ class EventHookViewSet(BaseEntityViewSet):
     serializer_class = EventHookSerializer
     model = EventHook
     
-    def list(self, request, *args, **kwargs):
-        """Retrieve all records from MongoDB and return serialized data."""
-        start_date, end_date = super().list(request, *args, **kwargs)
-
-        if not start_date or not end_date:
-            event_hooks = self.model.objects()  # Fetch all documents using MongoEngine
-            logger.info("Retrieved %d event hooks records from MongoDB", len(event_hooks))
-            
-        else:
-            event_hooks = self.filter_by_date(start_date, end_date)
-            logger.info(f"Retrieved {len(event_hooks)} event hooks between {start_date} and {end_date}")
-
-        event_hooks_data = []
-        for event_hook in event_hooks:
-            event_hook_data = {
-                "name": event_hook.name,
-                "events": event_hook.events,
-                "channel": {
-                    "type": event_hook.channel.get("type"),
-                    "version": event_hook.channel.get("version"),
-                    "uri": event_hook.channel.get("uri"),
-                }
-            }
-            
-            # Check if "auth" exists before adding it
-            if event_hook.auth:
-                event_hook_data["auth"] = {
-                    "type": event_hook.auth.get("type"),
-                    "key": event_hook.auth.get("key"),
-                    "value": event_hook.auth.get("value"),
-                }
-            event_hooks_data.append(event_hook_data)
-
-        logger.info(f"Returning {len(event_hooks_data)} event hooks.")
-        return Response(event_hooks_data, status=status.HTTP_200_OK)
-
     def extract_data(self, okta_data):
         """
         Override to format the event hook data.
