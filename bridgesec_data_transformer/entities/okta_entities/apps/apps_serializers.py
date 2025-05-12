@@ -1,6 +1,5 @@
 from rest_framework import serializers
 
-
 class AppOauthSerializer(serializers.Serializer):
     label = serializers.CharField(required=True)
     type = serializers.CharField(required=True)
@@ -111,7 +110,7 @@ class AppOAuthRoleAssignmentSerializer(serializers.Serializer):
     resource_set = serializers.CharField(required=True)
     role = serializers.CharField(required=True)
 
-class AppAcessPolicyAssignmentSerializer(serializers.Serializer):
+class AppAccessPolicyAssignmentSerializer(serializers.Serializer):
     app_id = serializers.CharField(required=True)
     policy_id = serializers.CharField(required=True)
 
@@ -295,5 +294,9 @@ class AppOauthApiScopeSerializer(serializers.Serializer):
     scopes = serializers.ListField(child=serializers.CharField(), required=True)
 
 class AppOauthPostRedirectUriSerializer(serializers.Serializer):
+    app_id = serializers.CharField(required=True)
+    uri = serializers.CharField(required=True)
+
+class AppOauthRedirectUriSerializer(serializers.Serializer):
     app_id = serializers.CharField(required=True)
     uri = serializers.CharField(required=True)

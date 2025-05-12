@@ -1,4 +1,4 @@
-from mongoengine import BooleanField, IntField, ListField, StringField
+from mongoengine import ListField, StringField
 
 from entities.models.base import BaseEntityModel
 
@@ -8,9 +8,8 @@ class AdminRoleCustom(BaseEntityModel):
     permissions = ListField(StringField(required=False))
 
     meta={'collection': 'administrators_custom_roles'}
-    
 
-class AdminResourseset(BaseEntityModel):
+class AdminResourceSet(BaseEntityModel):
     description = StringField(required=True)
     label = StringField(required=True)
     resources = ListField(StringField(required=False))

@@ -1,13 +1,13 @@
 import logging
-import requests
 
-from django.conf import settings
+import requests
 from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
+from django.conf import settings
 
-from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 from entities.okta_entities.apps.apps_models import AppOauthApiScope
 from entities.okta_entities.apps.apps_serializers import AppOauthApiScopeSerializer
+from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,6 @@ class AppOauthApiScopeViewSet(BaseAppViewSet):
                 return all_data, 200, rate_limit_headers(response)
 
             return response_data, 200, rate_limit_headers(response)
-
 
     def extract_data(self, okta_data, app_id):
         extracted_data = super().extract_data(okta_data)

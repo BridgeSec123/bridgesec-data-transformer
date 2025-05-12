@@ -48,6 +48,6 @@ class AppBasicAuthViewSet(BaseAppViewSet):
                     "status": record.get("status", "")
                 }
                 formatted_data.append(formatted_record)
-        logger.info("Extracted and formatted %d Identity Provider records from Okta", len(formatted_data))
+        logger.info("Extracted and formatted %d basic auth records from Okta", len(formatted_data))
         
         return formatted_data

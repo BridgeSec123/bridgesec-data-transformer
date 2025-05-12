@@ -252,6 +252,14 @@ ENTITY_TYPE_MAPPING = {
         "okta_endpoint": "/api/v1/apps",
         "attributes": ["id", "settings", "signOnMode"]
     },
+    "okta_apps_oauth_redirect_uri": {
+        "okta_endpoint": "/api/v1/apps",
+        "attributes": ["id", "settings", "signOnMode"]
+    },
+    "okta_captcha": {
+        "okta_endpoint": "/api/v1/captchas",
+        "attributes": ["name", "type", "siteKey"]
+    },
     # "email_template_settings":{
     #     "okta_endpoint": "/api/v1/brands/{brandId}/templates/email",
     #     "attributes": ["brandId", "template", "recipients"]
@@ -290,7 +298,8 @@ EXCLUDED_OUTPUT_FIELDS = {
     "groups": ["group_id"],
     "okta_policy_mfa": ["id"],
     "okta_policy_password": ["id"],
-    "okta_users": ["id"]
+    "okta_users": ["id"],
+    "user_admin_roles": ["role_ids"]
     # Add more entity types as needed
 }
 

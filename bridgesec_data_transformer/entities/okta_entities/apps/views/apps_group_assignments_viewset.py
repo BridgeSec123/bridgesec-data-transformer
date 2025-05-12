@@ -10,9 +10,8 @@ from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 
 logger = logging.getLogger(__name__)
 
-
 class AppsGroupAssignmentsViewSet(BaseAppViewSet):  
-    okta_endpoint = "/api/v1/apps/{{appId}}/groups"
+    okta_endpoint = "/api/v1/apps/{appId}/groups"
     entity_type = "okta_apps_group_assignments"
     serializer_class = AppGroupAssignmentsSerializer
     model = AppGroupAssignments

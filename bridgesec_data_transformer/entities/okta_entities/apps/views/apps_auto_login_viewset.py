@@ -11,7 +11,6 @@ class AppAutoLoginViewSet(BaseAppViewSet):
     serializer_class =  AppAutoLoginSerializer
     model = AppAutoLogin
 
-
     def extract_data(self, okta_data):
         logger.info("Extracting data from Okta response")
         extracted_data = super().extract_data(okta_data)
@@ -61,6 +60,6 @@ class AppAutoLoginViewSet(BaseAppViewSet):
                 # Add the formatted record to the list
                 formatted_data.append(formatted_record)
 
-        logger.info("Extracted and formatted %d app auth login records from Okta", len(formatted_data))
+        logger.info("Extracted and formatted %d app auto login records from Okta", len(formatted_data))
 
         return formatted_data

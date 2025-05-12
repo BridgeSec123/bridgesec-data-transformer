@@ -1,10 +1,13 @@
 import logging
 
 from core.utils.okta_helpers import get_permissions
-
-from entities.okta_entities.administrators.views.administrators_base_viewset import BaseAdministratorViewSet
 from entities.okta_entities.administrators.administrators_models import AdminRoleCustom
-from entities.okta_entities.administrators.administrators_serializers import AdminRoleCustomSerializer
+from entities.okta_entities.administrators.administrators_serializers import (
+    AdminRoleCustomSerializer,
+)
+from entities.okta_entities.administrators.views.administrators_base_viewset import (
+    BaseAdministratorViewSet,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +19,7 @@ class AdminRoleCustomViewSet(BaseAdministratorViewSet):
 
     def extract_data(self, okta_data):
         """
-        Override to format the user data by removing the "profile" key.
+        Format the admin role data from Okta response.
         """
         logger.info("Extracting data from Okta response")
         formatted_data = []
@@ -34,6 +37,6 @@ class AdminRoleCustomViewSet(BaseAdministratorViewSet):
                     "permissions": permission
                 }
             )
-        logger.info("Extracted and formatted %d user records from Okta", len(formatted_data))
+        logger.info("Extracted and formatted %d admin role custom records from Okta", len(formatted_data))
 
         return formatted_data

@@ -1,12 +1,13 @@
 import logging
+
 import requests
-
+from core.utils.rate_limit import handle_rate_limit
 from django.conf import settings
-from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 
-from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 from entities.okta_entities.apps.apps_models import AppUser
 from entities.okta_entities.apps.apps_serializers import AppUserSerializer
+from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
+
 logger = logging.getLogger(__name__)
 
 class AppUserViewSet(BaseAppViewSet):  
@@ -57,5 +58,5 @@ class AppUserViewSet(BaseAppViewSet):
                     }
                     formatted_data.append(formatted_record)
 
-        logger.info("Final extracted %d group assignment records after formatting and flattening", len(formatted_data))
+        logger.info("Final extracted %d app user records after formatting and flattening", len(formatted_data))
         return formatted_data

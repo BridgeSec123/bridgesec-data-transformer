@@ -1,28 +1,23 @@
 import logging
 
-from entities.okta_entities.apps.apps_models import AppAcessPolicyAssignment
+from entities.okta_entities.apps.apps_models import AppAccessPolicyAssignment
 from entities.okta_entities.apps.apps_serializers import (
-    AppAcessPolicyAssignmentSerializer,
+    AppAccessPolicyAssignmentSerializer,
 )
 from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 
 logger = logging.getLogger(__name__)
 
 
-class AppAcessPolicyAssignmentViewSet(BaseAppViewSet):
+class AppAccessPolicyAssignmentViewSet(BaseAppViewSet):
     okta_endpoint = "/api/v1/apps"
     entity_type = "apps_access_policy_assignment"
-    serializer_class = AppAcessPolicyAssignmentSerializer
-    model = AppAcessPolicyAssignment
+    serializer_class = AppAccessPolicyAssignmentSerializer
+    model = AppAccessPolicyAssignment
 
     def extract_data(self, okta_data):
         """
         Extract access policy info from apps.
-
-        :param apps: list of app dicts from Okta
-        :param mode: 'full' = fetch full access policy object,
-        'id_only' = extract only the access policy ID
-        :return: list of extracted dicts
         """
         formatted_data = []
 
@@ -49,12 +44,3 @@ class AppAcessPolicyAssignmentViewSet(BaseAppViewSet):
 
         logger.info("Final extracted %d policy assignment records", len(formatted_data))
         return formatted_data
-
-
-
-
-
-
-
-
-

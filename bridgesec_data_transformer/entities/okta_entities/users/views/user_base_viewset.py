@@ -23,7 +23,7 @@ class BaseUserViewSet(BaseEntityViewSet):
                 users_data = viewset_instance.extract_data(data)
                 extracted_data[entity_name] = users_data
 
-                user_ids = [user.get("user_id") for user in users_data]
+                user_ids = [user.get("id") for user in users_data]
                 logger.info(f"Fetched {len(user_ids)} user IDs for user_factors.")
 
             elif entity_name == 'user_factors':

@@ -10,7 +10,6 @@ from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 
 logger = logging.getLogger(__name__)
 
-
 class AppsGroupAssignmentViewSet(BaseAppViewSet):  
     okta_endpoint = "/api/v1/apps/{appId}/groups"
     entity_type = "okta_apps_group_assignment"
@@ -96,5 +95,5 @@ class AppsGroupAssignmentViewSet(BaseAppViewSet):
 
                 formatted_data.append(formatted_record)
 
-        logger.info("Final extracted %d group assignment records after formatting and flattening", len(formatted_data))
+        logger.info("Final extracted %d apps group assignment records after formatting and flattening", len(formatted_data))
         return formatted_data

@@ -153,7 +153,7 @@ class AppOAuthRoleAssignment(BaseEntityModel):
 
     meta = {"collection" : "okta_app_oauth_role_assignment"}
 
-class AppAcessPolicyAssignment(BaseEntityModel):
+class AppAccessPolicyAssignment(BaseEntityModel):
     app_id = StringField(required=True)
     policy_id = StringField(required=True)
     
@@ -316,7 +316,7 @@ class AppBasicAuth(BaseEntityModel):
     timeouts = EmbeddedDocumentListField(Timeouts, required=False)
     
     meta = {"collection": "okta_app_basic_auth"}
-    
+
 class AppSwa(BaseEntityModel):
     label = StringField(required=True)
     accessibility_error_redirect_url = StringField(null=True,required=False)
@@ -343,7 +343,7 @@ class AppSwa(BaseEntityModel):
     user_name_template_suffix = StringField(null=True,required=False)
     user_name_template_type = StringField(null=True,required=False)
     username_field = StringField(null=True,required=False)
-  
+    
     meta = {"collection" : "okta_app_swa"}
 
 class AppUser(BaseEntityModel):
@@ -368,3 +368,9 @@ class AppOauthPostRedirectUri(BaseEntityModel):
     uri = StringField(required=True)
 
     meta = {"collection" : "okta_app_oauth_post_logout_redirect_uri"}
+
+class AppOauthRedirectUri(BaseEntityModel):
+    app_id = StringField(required=True)
+    uri = StringField(required=True)
+    
+    meta = {"collection" : "okta_app_oauth_redirect_uri"}

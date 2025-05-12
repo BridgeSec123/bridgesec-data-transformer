@@ -1,23 +1,22 @@
 import logging
 
-from core.utils.okta_helpers import get_permissions
-
-from entities.okta_entities.administrators.views.administrators_base_viewset import BaseAdministratorViewSet
-from entities.okta_entities.administrators.administrators_models import AdminResourseset
-from entities.okta_entities.administrators.administrators_serializers import AdminResoursesetSerializer
+from entities.okta_entities.administrators.administrators_models import AdminResourceSet
+from entities.okta_entities.administrators.administrators_serializers import (
+    AdminResourceSetSerializer,
+)
+from entities.okta_entities.administrators.views.administrators_base_viewset import (
+    BaseAdministratorViewSet,
+)
 
 logger = logging.getLogger(__name__)
 
-class AdminResourcesetViewSet(BaseAdministratorViewSet):
+class AdminResourceSetViewSet(BaseAdministratorViewSet):
     okta_endpoint = "/api/v1/iam/resource-sets"
     entity_type = "okta_resource_set"
-    serializer_class = AdminResoursesetSerializer
-    model = AdminResourseset
+    serializer_class = AdminResourceSetSerializer
+    model = AdminResourceSet
 
     def extract_data(self, okta_data):
-        """
-        Override to format the user data by removing the "profile" key.
-        """
         logger.info("Extracting data from Okta response")
         formatted_data = []
         for record in okta_data.get("resource-sets", []):
@@ -32,6 +31,6 @@ class AdminResourcesetViewSet(BaseAdministratorViewSet):
                     "resources": [resources]
                 }
             )
-        logger.info("Extracted and formatted %d user records from Okta", len(formatted_data))
+        logger.info("Extracted and formatted %d admin resource set records from Okta", len(formatted_data))
 
         return formatted_data

@@ -70,5 +70,5 @@ class AppOauthRoleAssignmentViewSet(BaseAppViewSet):
                 }
                 formatted_data.append(formatted_record)
 
-            logger.info("Final extracted %d user records after formatting and filtering", len(formatted_data))
+            logger.info("Final extracted %d app oauth role assignment records after formatting and filtering", len(formatted_data))
             return formatted_data

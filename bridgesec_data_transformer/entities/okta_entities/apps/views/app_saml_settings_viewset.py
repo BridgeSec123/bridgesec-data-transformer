@@ -28,6 +28,6 @@ class AppSAMLSettingsViewSet(BaseAppViewSet):
                     "settings": record.get("settings", {})
                 }
                 formatted_data.append(formatted_record)
-        logger.info("Extracted and formatted %d Identity Provider records from Okta", len(formatted_data))
+        logger.info("Extracted and formatted %d app saml settings records from Okta", len(formatted_data))
         
         return formatted_data
