@@ -300,3 +300,14 @@ class AppOauthPostRedirectUriSerializer(serializers.Serializer):
 class AppOauthRedirectUriSerializer(serializers.Serializer):
     app_id = serializers.CharField(required=True)
     uri = serializers.CharField(required=True)
+
+class AppUserBaseSchemaPropertySerializer(serializers.Serializer):
+    ap_id = serializers.CharField(required=True)
+    index = serializers.IntegerField(required=True)
+    title = serializers.CharField(required=True)
+    type = serializers.CharField(required=True)
+    master = serializers.CharField(required=False, allow_null=True)
+    pattern = serializers.CharField(required=False, allow_null=True)
+    permissions = serializers.CharField(required=False, allow_null=True)
+    required = serializers.CharField(required=False, allow_null=True)
+    user_type = serializers.CharField(required=False, allow_null=True)

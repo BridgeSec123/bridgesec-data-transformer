@@ -374,3 +374,16 @@ class AppOauthRedirectUri(BaseEntityModel):
     uri = StringField(required=True)
     
     meta = {"collection" : "okta_app_oauth_redirect_uri"}
+
+class AppUserBaseSchemaProperty(BaseEntityModel):
+    app_id = StringField(required=True)
+    index = StringField(required=True)
+    title = StringField(required=True)
+    type = StringField(required=True)
+    master = StringField(required=False)
+    pattern = StringField(required=False)
+    permissions = StringField(required=False)
+    required = BooleanField(required=False)
+    user_type = StringField(required=False)
+    
+    meta = {"collection": "okta_app_user_base_schema_property"}
