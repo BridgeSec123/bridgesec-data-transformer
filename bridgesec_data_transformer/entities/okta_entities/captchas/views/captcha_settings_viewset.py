@@ -1,8 +1,12 @@
 import logging
 
 from entities.okta_entities.captchas.captcha_models import CaptchaOrgWideSettings
-from entities.okta_entities.captchas.captcha_serializers import CaptchaOrgWideSettingsSerializer
-from entities.okta_entities.captchas.views.captcha_base_viewset import BaseCaptchaViewSet
+from entities.okta_entities.captchas.captcha_serializers import (
+    CaptchaOrgWideSettingsSerializer,
+)
+from entities.okta_entities.captchas.views.captcha_base_viewset import (
+    BaseCaptchaViewSet,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -4,7 +4,9 @@ from rest_framework import status
 from rest_framework.response import Response
 
 from entities.okta_entities.inline_hooks.inline_hook_models import InlineHook
-from entities.okta_entities.inline_hooks.inline_hook_serializer import InlineHookSerializer
+from entities.okta_entities.inline_hooks.inline_hook_serializer import (
+    InlineHookSerializer,
+)
 from entities.views.base_view import BaseEntityViewSet
 
 logger = logging.getLogger(__name__)

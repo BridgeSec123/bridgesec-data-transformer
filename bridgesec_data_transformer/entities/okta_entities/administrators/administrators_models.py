@@ -7,7 +7,7 @@ class AdminRoleCustom(BaseEntityModel):
     label = StringField(required=True)
     permissions = ListField(StringField(required=False))
 
-    meta={'collection': 'administrators_custom_roles'}
+    meta={'collection': 'okta_admin_role_custom'}
 
 class AdminResourceSet(BaseEntityModel):
     description = StringField(required=True)

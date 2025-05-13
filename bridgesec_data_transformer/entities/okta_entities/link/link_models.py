@@ -11,4 +11,4 @@ class OktaLinkDefinition(BaseEntityModel):
    primary_name = StringField(required=True)
    primary_title = StringField(required=True)
 
-   meta = {'collection': 'okta_link_definitions'}
+   meta = {'collection': 'okta_link_definition'}

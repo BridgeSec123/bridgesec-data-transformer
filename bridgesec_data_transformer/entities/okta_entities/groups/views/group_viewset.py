@@ -3,9 +3,6 @@ import logging
 from entities.okta_entities.groups.group_models import Group
 from entities.okta_entities.groups.group_serializers import GroupSerializer
 from entities.okta_entities.groups.views.group_base_viewset import BaseGroupViewSet
-from rest_framework import status
-from rest_framework.response import Response
-
 logger = logging.getLogger(__name__)
 
 class GroupEntityViewSet(BaseGroupViewSet):

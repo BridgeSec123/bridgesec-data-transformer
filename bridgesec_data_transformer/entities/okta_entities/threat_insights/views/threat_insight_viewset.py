@@ -1,5 +1,3 @@
-# entities/okta_entities/sms_templates/sms_template_views.py
-
 import logging
 from rest_framework import status
 from rest_framework.response import Response
@@ -15,19 +13,6 @@ class ThreatInsightViewSet(BaseEntityViewSet):
     entity_type = "threat_insights"
     serializer_class = ThreatInsightSerializer
     model = ThreatInsight
-
-    def list(self, request, *args, **kwargs):
-        start_date, end_date = super().list(request, *args, **kwargs)
-
-        if not start_date or not end_date:
-            templates = self.model.objects()
-            logger.info("Retrieved %d Threat InSights", len(templates))
-        else:
-            templates = self.filter_by_date(start_date, end_date)
-            logger.info("Retrieved %d Threat InSights between %s and %s", len(templates), start_date, end_date)
-
-        serializer = self.serializer_class(templates, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def extract_data(self, okta_data):
         # extracted_data = super().extract_data(okta_data)

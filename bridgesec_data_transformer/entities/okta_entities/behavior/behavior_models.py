@@ -12,4 +12,4 @@ class Behavior(BaseEntityModel):
     status = StringField(required=False)
     velocity = IntField(required=False)
     
-    meta = {"collection": "behavior"}
+    meta = {"collection": "okta_behavior"}

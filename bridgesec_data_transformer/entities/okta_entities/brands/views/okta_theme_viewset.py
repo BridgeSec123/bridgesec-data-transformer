@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class ThemeViewset(BaseBrandViewSet):
     """
-    ViewSet for managing EmailDomain entities fetched from Okta and stored in MongoDB.
+    ViewSet for managing theme entities fetched from Okta and stored in MongoDB.
     """
     okta_endpoint = "/api/v1/brands/{brandId}/themes"
     entity_type = "okta_theme"
@@ -58,13 +58,13 @@ class ThemeViewset(BaseBrandViewSet):
     
     def extract_data(self, okta_data, brand_id=None):
         """
-        Extract and format the email domain records from Okta response.
+        Extract and format the theme records from Okta response.
         """
         if not brand_id:
             logger.warning("No brand ID provided, skipping theme fetch")
             return []
         
-        logger.info("Extracting and formatting customization domain  data.")
+        logger.info("Extracting and formatting customization theme data.")
         extracted_data = super().extract_data(okta_data)
 
         formatted_data = []

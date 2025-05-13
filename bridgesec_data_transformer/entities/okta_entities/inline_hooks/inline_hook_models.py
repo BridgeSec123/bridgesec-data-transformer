@@ -12,4 +12,4 @@ class InlineHook(BaseEntityModel):
     status = StringField(null=True, required=False)
     auth = DictField(null=True, required=False)
     
-    meta = {"collection": "inline_hooks"}
+    meta = {"collection": "okta_inline_hook"}

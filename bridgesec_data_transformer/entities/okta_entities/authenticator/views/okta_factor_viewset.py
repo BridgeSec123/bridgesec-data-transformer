@@ -1,9 +1,11 @@
 import logging
 
-from entities.okta_entities.authenticator.views.authenticator_base_viewset import BaseAuthenticatorViewSet
 from entities.okta_entities.authenticator.authenticator_models import OktaFactor
 from entities.okta_entities.authenticator.authenticator_serializers import (
     OktaFactorSerializer,
+)
+from entities.okta_entities.authenticator.views.authenticator_base_viewset import (
+    BaseAuthenticatorViewSet,
 )
 
 logger = logging.getLogger(__name__)

@@ -34,4 +34,4 @@ class AuthenticatorOktaFactorTotp(BaseEntityModel):
     shared_secret_encoding = StringField(required=False)
     time_step = IntField(required=False)
 
-    meta = {"collection": "okta_factor_authenticator_totp"}
+    meta = {"collection": "okta_factor_totp"}

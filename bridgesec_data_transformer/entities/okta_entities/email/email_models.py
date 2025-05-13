@@ -1,4 +1,4 @@
-from mongoengine import ListField, StringField, DictField, BooleanField, IntField
+from mongoengine import BooleanField, StringField
 
 from entities.models.base import BaseEntityModel
 
@@ -27,4 +27,4 @@ class EmailSecurityNotification(BaseEntityModel):
     send_email_for_new_device_enabled = BooleanField(required=False)
     send_email_for_password_changed_enabled = BooleanField(required=False)
 
-    meta = {"collection": "okta_email_notifications"}
+    meta = {"collection": "okta_security_notification_emails"}

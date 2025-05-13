@@ -1,4 +1,5 @@
 import logging
+
 from entities.views.base_view import BaseEntityViewSet
 
 logger = logging.getLogger(__name__)

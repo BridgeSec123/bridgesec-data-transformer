@@ -1,6 +1,8 @@
 import logging
 
-from entities.okta_entities.auth_server.auth_server_models import AuthorizationServerDefault
+from entities.okta_entities.auth_server.auth_server_models import (
+    AuthorizationServerDefault,
+)
 from entities.okta_entities.auth_server.auth_server_serializers import (
     AuthorizationServerDefaultSerializer,
 )

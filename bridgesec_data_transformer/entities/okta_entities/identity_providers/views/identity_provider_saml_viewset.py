@@ -1,11 +1,13 @@
 import logging
 
-from entities.okta_entities.identity_providers.views.identity_provider_base_viewset import BaseIdentityProviderViewSet
 from entities.okta_entities.identity_providers.identity_provider_models import (
     IdentityProviderSAML,
 )
 from entities.okta_entities.identity_providers.identity_provider_serializers import (
     IdentityProviderSAMLSerializer,
+)
+from entities.okta_entities.identity_providers.views.identity_provider_base_viewset import (
+    BaseIdentityProviderViewSet,
 )
 
 logger = logging.getLogger(__name__)

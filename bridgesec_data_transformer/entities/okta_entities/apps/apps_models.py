@@ -71,7 +71,7 @@ class AppOauth(BaseEntityModel):
     user_name_template_type = StringField(null=True,required=False)
     wildcard_redirect = StringField(null=True,required=False)
 
-    meta = {"collection" : "okta_oauth_app"}
+    meta = {"collection" : "okta_app_oauth"}
 
 class AttributeStatement(EmbeddedDocument):
     name = StringField(required=True)
@@ -131,7 +131,7 @@ class AppSAML(BaseEntityModel):
     user_name_template_type = StringField(null=True, required=False)
     acs_endpoints_indices = ListField(null=True, required=False)
 
-    meta = {"collection" : "okta_saml_app"}
+    meta = {"collection" : "okta_app_saml"}
 
 class GroupsClaim(EmbeddedDocument):
     id = StringField(required=True)
@@ -143,7 +143,7 @@ class AppGroupAssignments(BaseEntityModel):
     group =  EmbeddedDocumentListField(GroupsClaim, required=False)
     timeouts = EmbeddedDocumentListField(Timeouts, required=False)
 
-    meta = {"collection" : "okta_app_group_assignment"}
+    meta = {"collection" : "okta_app_group_assignments"}
 
 class AppOAuthRoleAssignment(BaseEntityModel):
     client_id = StringField(required=True)
@@ -165,7 +165,7 @@ class AppPolicySignOn(BaseEntityModel):
     catch_all = BooleanField(required=False)
     priority = IntField(required=False)
 
-    meta = {"collection" : "okta_app_policy_sign_on"}
+    meta = {"collection" : "okta_app_signon_policy"}
 
 class PlatformInclude(EmbeddedDocument):
     os_expression = StringField(required=False)
@@ -199,13 +199,13 @@ class AppPolicySignOnRule(BaseEntityModel):
     users_excluded = ListField(StringField(), required=False)
     users_included = ListField(StringField(), required=False)
     
-    meta = {"collection" : "okta_app_policy_sign_on_rule"}
+    meta = {"collection" : "okta_app_signon_policy_rule"}
 
 class AppSAMLSettings(BaseEntityModel):
     app_id = StringField(required=True)
     settings = DictField(required=False)
 
-    meta = {"collection" : "okta_app_saml_settings"}
+    meta = {"collection" : "okta_app_saml_app_settings"}
 
 
 class AppGroupAssignment(BaseEntityModel):
@@ -216,7 +216,7 @@ class AppGroupAssignment(BaseEntityModel):
     retain_assignment = BooleanField(required=False)
     timeouts = EmbeddedDocumentListField(Timeouts, required=False)
 
-    meta = {"collection" : "okta_app_group_assigment"}
+    meta = {"collection" : "okta_app_group_assignment"}
 
 class AppSharedCredentials(BaseEntityModel):
     label = StringField(required=True)

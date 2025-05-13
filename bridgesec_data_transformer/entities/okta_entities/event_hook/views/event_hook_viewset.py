@@ -1,8 +1,5 @@
 import logging
 
-from rest_framework import status
-from rest_framework.response import Response
-
 from entities.okta_entities.event_hook.event_hook_models import EventHook
 from entities.okta_entities.event_hook.event_hook_serializer import EventHookSerializer
 from entities.views.base_view import BaseEntityViewSet

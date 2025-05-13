@@ -1,10 +1,13 @@
 import logging
+
 from rest_framework import status
 from rest_framework.response import Response
 
-from entities.views.base_view import BaseEntityViewSet
 from entities.okta_entities.network_zone.network_zone_models import NetworkZone
-from entities.okta_entities.network_zone.network_zone_serializer import NetworkZoneSerializer
+from entities.okta_entities.network_zone.network_zone_serializer import (
+    NetworkZoneSerializer,
+)
+from entities.views.base_view import BaseEntityViewSet
 
 logger = logging.getLogger(__name__)
 

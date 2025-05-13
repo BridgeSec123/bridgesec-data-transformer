@@ -1,4 +1,4 @@
-from mongoengine import BooleanField, EmailField, StringField, ListField, DictField
+from mongoengine import BooleanField, DictField, ListField, StringField
 
 from entities.models.base import BaseEntityModel
 

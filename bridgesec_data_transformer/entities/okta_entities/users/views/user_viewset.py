@@ -1,8 +1,5 @@
 import logging
 
-from rest_framework import status
-from rest_framework.response import Response
-
 from entities.okta_entities.users.user_models import User
 from entities.okta_entities.users.views.user_base_viewset import BaseUserViewSet
 from entities.okta_entities.users.user_serializers import UserSerializer
@@ -10,7 +7,6 @@ from entities.okta_entities.users.user_serializers import UserSerializer
 logger = logging.getLogger(__name__)
 
 class UserViewSet(BaseUserViewSet):
-    # queryset = UserEntity.objects.all()
     okta_endpoint = "/api/v1/users"
     entity_type = "okta_users"
     serializer_class = UserSerializer

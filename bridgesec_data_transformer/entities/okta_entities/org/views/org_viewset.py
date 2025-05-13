@@ -15,26 +15,6 @@ class OrgViewSet(BaseEntityViewSet):
     serializer_class = OrgSerializer
     model = Org
     
-    def list(self, request, *args, **kwargs):
-        """Retrieve all records from MongoDB and return serialized data."""
-        start_date, end_date = super().list(request, *args, **kwargs)
-
-        if not start_date or not end_date:
-            orgs = self.model.objects()  # Fetch all documents using MongoEngine
-            logger.info("Retrieved %d org records from MongoDB", len(orgs))
-            
-        else:
-            orgs = self.filter_by_date(start_date, end_date)
-            logger.info(f"Retrieved {len(orgs)} orgs between {start_date} and {end_date}")
-
-        orgs_data = []
-        for org in orgs:    
-            serializer = self.serializer_class(org)
-            orgs_data.append(serializer.data)
-
-        logger.info(f"Returning {len(orgs_data)} orgs.")
-        return Response(orgs_data, status=status.HTTP_200_OK)
-    
     def extract_data(self, okta_data):
         """ Extract data from Okta API response. """
         logger.info("extracting data from Okta API response for entity type orgs")

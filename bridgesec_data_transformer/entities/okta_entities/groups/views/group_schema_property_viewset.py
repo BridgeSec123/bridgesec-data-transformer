@@ -3,7 +3,6 @@ import logging
 from django.conf import settings
 import requests
 
-from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from entities.okta_entities.groups.group_models import GroupSchemaProperty
 from entities.okta_entities.groups.group_serializers import GroupSchemaPropertySerializer

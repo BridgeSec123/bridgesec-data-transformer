@@ -7,4 +7,4 @@ class ThreatInsight(BaseEntityModel):
     action = StringField(required=True)
     network_excludes = ListField(required=False)
     
-    meta = {"collection": "threat_insights"}
+    meta = {"collection": "okta_threat_insight_settings"}

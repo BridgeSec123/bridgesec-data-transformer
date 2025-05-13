@@ -13,7 +13,7 @@ class Brand(BaseEntityModel):
     locale = StringField(required=False)
     remove_powered_by_okta = BooleanField(required=False)
     
-    meta = {"collection": "brands"}
+    meta = {"collection": "okta_brand"}
 
 class EmailDomain(BaseEntityModel):
     brand_id = StringField(required=True)
