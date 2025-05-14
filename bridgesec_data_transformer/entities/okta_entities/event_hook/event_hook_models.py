@@ -9,4 +9,4 @@ class EventHook(BaseEntityModel):
     channel = DictField(required=True)
     auth = DictField(null = True, required=False)
     
-    meta = {"collection": "event_hooks"}
+    meta = {"collection": "okta_event_hook"}

@@ -17,51 +17,6 @@ class InlineHookEntityViewSet(BaseEntityViewSet):
     entity_type = "inline_hooks"
     serializer_class = InlineHookSerializer
     model = InlineHook
-    
-    def list(self, request, *args, **kwargs):
-        """Retrieve all records from MongoDB and return serialized data."""
-        start_date, end_date = super().list(request, *args, **kwargs)
-
-        if not start_date or not end_date:
-            inline_hooks = self.model.objects()  # Fetch all documents using MongoEngine
-            logger.info("Retrieved %d inline hooks records from MongoDB", len(inline_hooks))
-            
-        else:
-            inline_hooks = self.filter_by_date(start_date, end_date)
-            logger.info(f"Retrieved {len(inline_hooks)} inline hooks between {start_date} and {end_date}")
-
-        inline_hooks_data = []
-        for inline_hook in inline_hooks:
-            hook_type = ""
-            if inline_hook.channel_json:
-                hook_type = inline_hook.channel_json.get("type")
-            
-            if hook_type == "OAUTH":
-                inline_hook_data = {
-                    "name": inline_hook.name,
-                    "version": inline_hook.version,
-                    "type": inline_hook.type,
-                    "status": inline_hook.status,
-                    "channel_json": inline_hook.channel_json,
-                }
-            
-            else:
-                inline_hook_data = {
-                    "name": inline_hook.name,
-                    "version": inline_hook.version,
-                    "type": inline_hook.type,
-                    "channel": {
-                        "version": inline_hook.channel.get("version"),
-                        "uri": inline_hook.channel.get("config", {}).get("uri"),
-                        "method": inline_hook.channel.get("config", {}).get("method"),
-                    },
-                    "auth": inline_hook.auth,
-                }
-                
-            inline_hooks_data.append(inline_hook_data)
-
-        logger.info(f"Returning {len(inline_hooks_data)} inline hooks.")
-        return Response(inline_hooks_data, status=status.HTTP_200_OK)
 
     def extract_data(self, okta_data):
         try:

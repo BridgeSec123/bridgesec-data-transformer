@@ -119,10 +119,6 @@ from entities.okta_entities.device_assurance_policies.views.device_windows_views
     DeviceWindowsViewSet,
 )
 from entities.okta_entities.email.views.email_base_viewset import BaseEmailViewSet
-
-# from entities.okta_entities.email.views.email_security_notifications_viewset import (
-#     EmailSecurityNotificationViewset,
-# )
 from entities.okta_entities.event_hook.views.event_hook_viewset import EventHookViewSet
 from entities.okta_entities.groups.views.group_base_viewset import BaseGroupViewSet
 from entities.okta_entities.groups.views.group_membership_viewset import (
@@ -195,8 +191,6 @@ from entities.okta_entities.threat_insights.views.threat_insight_viewset import 
 from entities.okta_entities.trusted_origins.views.trusted_origin_viewset import (
     TrustedOriginViewSet,
 )
-
-# from entities.okta_entities.users.views.role_subscription_viewset import RoleSubscriptionViewSet
 from entities.okta_entities.users.views.admin_role_targets_viewset import (
     AdminRoleTargetsViewSet,
 )
@@ -241,7 +235,8 @@ ENTITY_VIEWSETS = {
     "apps": BaseAppViewSet,
     "administrators": BaseAdministratorViewSet,
     "links": BaseLinkViewSet,
-    "captchas": BaseCaptchaViewSet
+    "captchas": BaseCaptchaViewSet,
+    # "emails": BaseEmailViewSet
 }
 
 GROUP_ENTITY_VIEWSETS = {

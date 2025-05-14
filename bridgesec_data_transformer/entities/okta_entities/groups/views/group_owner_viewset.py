@@ -41,30 +41,6 @@ class GroupOwnerViewSet(BaseGroupViewSet):
             logger.error(f"Failed to fetch group owners. Status Code: {response.status_code}, Response: {response.text}")
             return []
     
-
-    def list(self, request, *args, **kwargs):
-        """Retrieve all records from MongoDB and return serialized data."""
-        start_date, end_date = super().list(request, *args, **kwargs)
-
-        if not start_date or not end_date:
-            memberships = self.model.objects()
-            logger.info("Retrieved %d group owner records from MongoDB", len(memberships))
-        else:
-            memberships = self.filter_by_date(start_date, end_date)      
-            logger.info(f"Retrieved {len(memberships)} group owners between {start_date} and {end_date}")
-
-        memberships_data = [
-            {
-                "group_id": membership.group_id,
-                "user_id": membership.user_id,
-                "user_email": membership.user_email,
-            }
-            for membership in memberships
-        ]
-
-        logger.info(f"Returning {len(memberships_data)} group owners.")
-        return Response(memberships_data, status=status.HTTP_200_OK)
-
     def extract_data(self, okta_data, group_id):
         """
         Extract and format group owner data from Okta response.

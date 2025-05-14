@@ -17,19 +17,6 @@ class NetworkZoneViewSet(BaseEntityViewSet):
     serializer_class = NetworkZoneSerializer
     model = NetworkZone
 
-    def list(self, request, *args, **kwargs):
-        start_date, end_date = super().list(request, *args, **kwargs)
-
-        if not start_date or not end_date:
-            templates = self.model.objects()
-            logger.info("Retrieved %d network zones", len(templates))
-        else:
-            templates = self.filter_by_date(start_date, end_date)
-            logger.info("Retrieved %d network zones between %s and %s", len(templates), start_date, end_date)
-
-        serializer = self.serializer_class(templates, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
     def extract_data(self, okta_data):
         extracted_data = super().extract_data(okta_data)
         formatted_data = []

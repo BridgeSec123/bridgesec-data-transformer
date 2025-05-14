@@ -19,26 +19,6 @@ class IdentityProviderOIDCViewSet(BaseIdentityProviderViewSet):
     entity_type = "okta_idp_oidc"
     serializer_class = IdentityProviderOIDCSerializer
     model = IdentityProviderOIDC
-    
-    def list(self, request, *args, **kwargs):
-        """Retrieve all records from MongoDB and return serialized data."""
-        start_date, end_date = super().list(request, *args, **kwargs)
-
-        if not start_date or not end_date:
-            identity_providers = self.model.objects()  # Fetch all documents using MongoEngine
-            logger.info("Retrieved %d Identity Providers records from MongoDB", len(identity_providers))
-            
-        else:
-            identity_providers = self.filter_by_date(start_date, end_date)
-            logger.info(f"Retrieved {len(identity_providers)} Identity Providers between {start_date} and {end_date}")
-
-        identity_providers_data = []
-        for identity_provider in identity_providers:
-            serializer = self.serializer_class(identity_provider)
-            identity_providers_data.append(serializer.data)
-
-        logger.info(f"Returning {len(identity_providers_data)} Identity Providers.")
-        return Response(identity_providers_data, status=status.HTTP_200_OK)
 
     def extract_data(self, okta_data):
         logger.info("Extracting data from Okta response")

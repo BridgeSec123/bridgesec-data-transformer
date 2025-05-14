@@ -38,26 +38,3 @@ class GroupRuleViewSet(BaseGroupViewSet):
 
         logger.info(f"Extracted {len(extracted_rules)} group rule entries.")
         return extracted_rules
-
-    def list(self, request, *args, **kwargs):
-        """Retrieve all records from MongoDB and return serialized data."""
-        start_date, end_date = super().list(request, *args, **kwargs)
-
-        if not start_date or not end_date:
-            rules = self.model.objects()
-            logger.info("Retrieved %d group rule records from MongoDB", len(rules))
-        else:
-            memberships = self.filter_by_date(start_date, end_date)      
-            logger.info(f"Retrieved {len(memberships)} group rules between {start_date} and {end_date}")
-
-        memberships_data = [
-            {
-                "group_id": membership.group_id,
-                "user_id": membership.user_id,
-                "user_email": membership.user_email,
-            }
-            for membership in memberships
-        ]
-
-        logger.info(f"Returning {len(memberships_data)} group rules.")
-        return Response(memberships_data, status=status.HTTP_200_OK)
