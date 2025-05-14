@@ -1,14 +1,33 @@
 RESOURCE_COLLECTION_MAP = {
     "user": ["okta_user"],
     "user_type": ["okta_user_type"],
+    "user_base_schema_property": ["okta_user_base_schema_property"],
+    "user_schema_property": ["okta_user_schema_property"],
+    "user_group_membership": ["okta_user_group_memberships"],
+    "user_admin_roles": ["okta_user_admin_roles"],
+    "group": ["okta_group"],
+    "group_memberships": ["okta_group_memberships"],
     "group_roles": ["okta_group_role"],
     "group_rules": ["okta_group_rule"],
-    "group_memberships": ["okta_group_memberships"],
-    "group": ["okta_group"],
+    "group_schema_property": ["okta_group_schema_property"],
+    "device_assurance_policies": [
+        "okta_policy_device_assurance_android", "okta_policy_device_assurance_ios", 
+        "okta_policy_device_assurance_macos", "okta_policy_device_assurance_windows"
+    ],
+    "theme": ["okta_theme"],
+    "brand": ["okta_brand"],
+    "email_domain": ["okta_email_domain"],
+    "sms_template": ["okta_template_sms"],
+    "captcha": ["okta_captcha"],
+    "captcha_settings": ["okta_captcha_org_wide_settings"],
+    "org_security": ["okta_org_configuration"],
+    "threat_insights": ["okta_threat_insight_settings"],
+    "authenticator": ["okta_authenticator"],
+    "factors": ["okta_factor"],
     "authorization_server": [
         "okta_auth_server", "okta_auth_server_claim", "okta_auth_server_policy",
         "okta_auth_server_policy_rule", "okta_auth_server_scope"
-    ], # Add more logical groupings as needed
+    ],
     "authorization_server_policy": ["okta_auth_server_policy", "okta_auth_server_policy_rule"],
     "identity_providers": [
         "okta_idp_oidc", "okta_idp_saml", "okta_idp_social"
@@ -17,4 +36,18 @@ RESOURCE_COLLECTION_MAP = {
     "policy_password": ["okta_policy_password", "okta_policy_rule_password"],
     "policy_profile_enrollment": ["okta_policy_profile_enrollment", "okta_policy_rule_profile_enrollment"],
     "policy_sign_on": ["okta_policy_sign_on", "okta_policy_rule_sign_on"],
+    "policy_profile_enrollment_apps": ["okta_policy_profile_enrollment_apps"],
+    "policy_idp_discovery": ["okta_policy_rule_idp_discovery"],
+    "network_zone": ["okta_network_zone"],
+    "behavior": ["okta_behavior"],
+    "admin_role_custom": ["okta_admin_role_custom"],
+    "admin_role_targets": ["okta_admin_role_targets"],
+    "role_subscription": ["okta_role_subscription"],
+    "resource_sets": ["okta_resource_set"],
+    "trusted_origins": ["okta_trusted_origin"],
+    "trusted_servers": ["okta_trusted_server"],
+    "inline_hook": ["okta_inline_hook"],
+    "event_hook": ["okta_event_hook"],
+    "domains": ["okta_domain"],
+    "link_definition": ["okta_link_definition"]
 }
