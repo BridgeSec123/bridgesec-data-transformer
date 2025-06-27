@@ -23,6 +23,7 @@ class Timeouts(EmbeddedDocument):
     update = StringField(required=False)
 
 class AppOauth(BaseEntityModel):
+    app_id = StringField(required=True)
     label = StringField(required=True)
     type = StringField(required=True)
     accessibility_error_redirect_url = StringField(null=True,required=False)

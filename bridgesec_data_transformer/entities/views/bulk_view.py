@@ -12,14 +12,14 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-# from rest_framework.permissions import IsAuthenticated
-# from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from entities.registry import ENTITY_VIEWSETS
 
 
 class BulkEntityViewSet(viewsets.ViewSet):
-    # authentication_classes = [JWTAuthentication]
-    # permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
     """Viewset for bulk entity data import."""
     @swagger_auto_schema(
         operation_description="Fetch data from all registered entity APIs and store them in MongoDB",

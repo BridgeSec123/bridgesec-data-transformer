@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 class AppOauthSerializer(serializers.Serializer):
+    app_id = serializers.CharField(required=True)
     label = serializers.CharField(required=True)
     type = serializers.CharField(required=True)
     accessibility_error_redirect_url = serializers.CharField(required=False, allow_null=True)

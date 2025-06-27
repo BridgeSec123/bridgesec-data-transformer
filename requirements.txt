@@ -6,3 +6,4 @@ drf-yasg
 requests
 django-environ
 colorlog
+djangorestframework-simplejwt

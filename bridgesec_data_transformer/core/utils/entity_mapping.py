@@ -291,7 +291,6 @@ ENTITY_UNIQUE_FIELDS = {
 
 EXCLUDED_OUTPUT_FIELDS = {
     "okta_policy_profile_enrollment": ["id"],
-    "okta_app_oauth": ["app_id"],
     "okta_app_policy_sign_on" : ["id"],
     "auth_server_policy": ["policy_id"],
     "auth_servers": ["auth_server_id"],
