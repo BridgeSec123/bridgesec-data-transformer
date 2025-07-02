@@ -27,7 +27,7 @@ class UserSchemaPropertyViewSet(BaseUserViewSet):
             "title": okta_data.get("title"),
             "type": okta_data.get("type"),
             "master": login.get("master").get("type"),
-            "permissions": login.get("permissions"),
+            "permissions": login.get("permissions", [{}])[0].get("action", ""),
             "scope": login.get("scope"),
             "user_type": user_type_id,
             "array_enum": okta_data.get("arrayEnum"),

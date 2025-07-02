@@ -1,0 +1,8 @@
+from .group_base_viewset import BaseGroupViewSet
+from .group_role_viewset import GroupRoleViewSet
+from .group_rule_viewset import GroupRuleViewSet
+from .group_schema_property_viewset import GroupSchemaPropertyViewSet
+from .group_viewset import GroupEntityViewSet
+from .group_membership_viewset import GroupMembershipViewSet
+from .group_owner_viewset import GroupOwnerViewSet
+

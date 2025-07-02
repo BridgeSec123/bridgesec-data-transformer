@@ -18,6 +18,7 @@ import environ
 from core.utils.mongo_utils import connect_to_mongo
 from mongoengine import connect
 
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -151,6 +152,8 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
 
+    
+
     'formatters': {
         'verbose': {
             'format': '{asctime} | {levelname} | {module}.{funcName}:{lineno} | {message}',
@@ -181,13 +184,14 @@ LOGGING = {
             'filename': os.path.join(LOG_DIR, 'app.log'),
             'formatter': 'verbose',
             'level': 'DEBUG',
+            
         },
         'error_file': {
             'class': 'logging.FileHandler',
             'filename': os.path.join(LOG_DIR, 'error.log'),
             'formatter': 'verbose',
             'level': 'ERROR',
-        },
+        },   
     },
 
     'loggers': {
@@ -197,6 +201,21 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
+         "celery": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "pika": {
+            "handlers": ["file"],
+            "level": "WARNING",  # suppress INFO logs from pika
+            "propagate": False,
+        },
+        "urllib3": {
+            "handlers": ["file"],
+            "level": "WARNING",  # suppress verbose HTTP logs
+            "propagate": False,
+        },
     },
 }
 
@@ -205,6 +224,7 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     )
 }
+
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
@@ -229,3 +249,9 @@ SWAGGER_SETTINGS = {
         }
     }
 }
+
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL")
+CELERY_RESULT_BACKEND = "rpc://"  # or another backend like MongoDB or Redis
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+

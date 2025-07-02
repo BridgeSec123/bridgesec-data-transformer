@@ -1,16 +1,57 @@
-from mongoengine import BooleanField, DictField, ListField, StringField
+from mongoengine import BooleanField, DictField, ListField, StringField, EmbeddedDocument, EmbeddedDocumentListField
 
 from entities.models.base import BaseEntityModel
-
+ 
+class PasswordHash(EmbeddedDocument):
+    algorithm = StringField(required=True)
+    hash = StringField(required=True)
+    salt = StringField(required= False)
+    salt_order = StringField(required=False)
+    work_factor = StringField(required=False)
 
 class User(BaseEntityModel):
     email = StringField(null=True, required=True)
     first_name = StringField(required=True)
     last_name = StringField(required=True)
+    login = StringField(null=True, required=True)
+    city = StringField(null=True, required=False)
+    cost_center = StringField(null=True, required=False)
+    country_code = StringField(null=True, required=False)
+    custom_profile_properties = DictField(null=True, required=False)
+    custom_profile_properties_to_ignore = ListField(StringField(), null=True, required=False)
+    department = StringField(null=True, required=False)
+    display_name = StringField(null=True, required=False)
+    division = StringField(null=True, required=False)
+    employee_number = StringField(null=True, required=False)
+    expire_password_on_create = BooleanField(null=True, required=False)
+    honorofix_prefix = StringField(null=True, required=False)
+    honorofix_suffix = StringField(null=True, required=False)
+    locale = StringField(null=True, required=False)
+    manager = StringField(null=True, required=False)
+    manager_id = StringField(null=True, required=False)
+    middle_name = StringField(null=True, required=False)
     mobile_phone = StringField(null=True, required=False)
-    second_email  = StringField(null=True, required=False)
-    login = StringField(null=True, required=False)
-    
+    nick_name = StringField(null=True, required=False)
+    old_password = StringField(null=True, required=False)
+    organization = StringField(null=True, required=False)
+    password = StringField(null=True, required=False)
+    password_inline_hook = StringField(null=True, required=False)
+    password_hash =  EmbeddedDocumentListField(PasswordHash, required=False)
+    postal_address = StringField(null=True, required=False)
+    preferred_language = StringField(null=True, required=False)
+    primary_phone = StringField(null=True, required=False)
+    profile_url = StringField(null=True, required=False)
+    recovery_answer = StringField(null=True, required=False)
+    recovery_question = StringField(null=True, required=False)
+    second_email = StringField(null=True, required=False)
+    state = StringField(null=True, required=False)
+    status = StringField(null=True, required=False)
+    street_address = StringField(null=True, required=False)
+    timezone = StringField(null=True, required=False)
+    title = StringField(null=True, required=False)
+    user_type = StringField(null=True, required=False)
+    zip_code = StringField(null=True, required=False)
+  
     meta = {"collection": "okta_user"}
 
 

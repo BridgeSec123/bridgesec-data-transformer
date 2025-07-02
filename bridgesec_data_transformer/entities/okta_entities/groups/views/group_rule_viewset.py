@@ -22,17 +22,23 @@ class GroupRuleViewSet(BaseGroupViewSet):
         Extract and format group rule data from Okta response.
         """
         logger.info("Extracting group rule data from Okta response.")
+        extracted_data = super().extract_data(okta_data)
 
         extracted_rules = []
-        for rule in okta_data:
+        for rule in extracted_data: 
+            group_ids = rule.get("actions",{}).get("assignUserToGroups", {}).get("groupIds",[])
+            conditions = rule.get("conditions", {})
+            expression = conditions.get("expression", {})
+            users_excluded = conditions.get("people",{}).get("users", {}).get("exclude", [])
+
             rule_entry = {
                 "name": rule.get("name"),
                 "status": rule.get("status"),
-                "group_assignments": rule.get("groupAssignments"),
-                "expression_type": rule.get("expressionType"),
-                "expression_value": rule.get("expressionValue"),
+                "group_assignments": group_ids,
+                "expression_type": expression.get("type", ""),
+                "expression_value": expression.get("value", ""),
                 "remove_assigned_users": rule.get("removeAssignedUsers"),
-                "users_excluded": rule.get("usersExcluded"),
+                "users_excluded": users_excluded,
             }
             extracted_rules.append(rule_entry)
 

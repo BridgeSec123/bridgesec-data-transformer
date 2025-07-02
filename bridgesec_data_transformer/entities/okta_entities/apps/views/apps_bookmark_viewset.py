@@ -44,7 +44,7 @@ class AppBookmarkViewSet(BaseAppViewSet):
                     "hide_web": hide.get("web", ""),
                     "logo" : record.get("logo", ""),
                     "request_integration": settings.get("app", {}).get("requestIntegration", True),
-                    "timeouts": record.get("timeouts", ""),
+                    "timeouts": record.get("timeouts", []),
                     "status": record.get("status", "")
                 }
                 formatted_data.append(formatted_record)

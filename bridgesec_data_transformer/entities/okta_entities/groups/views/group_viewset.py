@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 class GroupEntityViewSet(BaseGroupViewSet):
     okta_endpoint = "/api/v1/groups"
-    entity_type = "groups"
+    entity_type = "group"
     serializer_class = GroupSerializer
     model = Group
     

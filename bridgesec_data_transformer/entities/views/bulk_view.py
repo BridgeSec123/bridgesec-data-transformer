@@ -1,7 +1,9 @@
 import json
 import os
+import re
 from datetime import datetime
 
+from core.tasks.bulk_tasks import run_bulk_entity_task
 from core.utils.collection_mapping import RESOURCE_COLLECTION_MAP
 from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
 from django.conf import settings
@@ -11,6 +13,7 @@ from pymongo import MongoClient
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from core.tasks.bulk_tasks import run_bulk_entity_task
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -21,38 +24,13 @@ class BulkEntityViewSet(viewsets.ViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     """Viewset for bulk entity data import."""
-    @swagger_auto_schema(
-        operation_description="Fetch data from all registered entity APIs and store them in MongoDB",
-        responses={201: openapi.Response("Data fetched and stored successfully")},
-    )
     def post(self, request):
-        # extracted_data_dict = {}
         db_name = get_dynamic_db()
         ensure_mongo_connection(db_name)
-
-        # Loop through all registered entity viewsets dynamically
-        for entity_name, viewset_class in ENTITY_VIEWSETS.items():
-            viewset_instance = viewset_class()
-            
-            # Fetch and extract data using the base class methods
-            extracted_data = viewset_instance.fetch_and_store_data(db_name)
-            if not extracted_data:  # If no data returned
-                return Response(
-                    {"error": f"Failed to fetch {entity_name} data"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-            # Setup output directory
-            output_dir = os.path.join(settings.BASE_DIR, "output", db_name)
-            os.makedirs(output_dir, exist_ok=True)
-
-            for sub_entity_name, sub_entity_data in extracted_data.items():
-                file_name = f"{sub_entity_name}.json"
-                file_path = os.path.join(output_dir, file_name)
-
-                with open(file_path, "w", encoding="utf-8") as f:
-                    json.dump(sub_entity_data, f, ensure_ascii=False, indent=4)
+        run_bulk_entity_task.delay(db_name)
+       
         return Response({
-            "message": "Data fetched and stored successfully",
+            "message": "Task Triggered",
             "db_name": db_name
         }, status=status.HTTP_201_CREATED)
     
@@ -111,37 +89,70 @@ class BulkEntityViewSet(viewsets.ViewSet):
         """
         Fetch all database names, optionally filtered by a given date (YYYY-MM-DD).
         """
-        date_str = request.query_params.get("date")
+        selected_date = request.query_params.get("date")  # e.g., "2024-06-05"
+        if not selected_date:
+            return Response({"error": "date is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            mongo_client = MongoClient(settings.MONGO_URI)
-            all_dbs = mongo_client.list_database_names()
+            
+            db_date_pattern = selected_date.replace("-", "_")
 
-            if date_str:
-                try:
-                    datetime.strptime(date_str, "%Y-%m-%d")  # validate format
-                    date_prefix = f"{settings.MONGO_DB_NAME}_{date_str}"
-                    all_dbs = [db for db in all_dbs if db.startswith(date_prefix)]
-                except ValueError:
-                    return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=status.HTTP_400_BAD_REQUEST)
+            client = MongoClient(settings.MONGO_URI)
+            db_names = client.list_database_names()
 
-            return Response({"databases": all_dbs}, status=status.HTTP_200_OK)
+            time_list = []
+            pattern = re.compile(rf"bridgesec_{db_date_pattern}T(\d{{4}})")
+            for db_name in db_names:
+                match = pattern.match(db_name)
+                if match:
+                    raw_time = match.group(1)  # e.g., '2000'
+                    formatted_time = f"{raw_time[:2]}:{raw_time[2:]}"  # -> '20:00'
+                    time_list.append(formatted_time)
 
+            return Response((sorted(time_list)))
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                'entity_type',
+                openapi.IN_QUERY,
+                description="Optional. If provided, returns sub-entities for this entity type.",
+                type=openapi.TYPE_STRING
+            )
+        ]
+    )
 
     @action(detail=False, methods=["get"], url_path="resource-names")
     def get_resource_names(self, request):
         """
-        Fetch all available resource names (logical entities) dynamically from RESOURCE_COLLECTION_MAP.
+        - If `entity_type` is provided in query params, return its sub-entities.
+        - Else return all available resource names (main entity types).
         """
         try:
-            # Extract keys from the RESOURCE_COLLECTION_MAP
+            entity_type = request.query_params.get("entity_type")
+
+            if entity_type:
+                entity_type = entity_type.title()
+                sub_entities = RESOURCE_COLLECTION_MAP.get(entity_type)
+
+                if not sub_entities:
+                    return Response(
+                        {"detail": f"No sub-entities found for entity type '{entity_type}'"},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+
+                display_names = [entry["label"] for entry in sub_entities]
+                return Response((display_names), status=status.HTTP_200_OK)
+
+            # No query param provided, return all entity types
             resource_names = sorted(RESOURCE_COLLECTION_MAP.keys())
-            return Response({"resource_names": resource_names}, status=status.HTTP_200_OK)
+            return Response({"entity_types": resource_names}, status=status.HTTP_200_OK)
+
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+    
     @action(detail=False, methods=["get"], url_path=r"data/(?P<db_name>[^/.]+)/(?P<resource_name>[^/.]+)")
     def get_resource_data(self, request, db_name, resource_name):
         """

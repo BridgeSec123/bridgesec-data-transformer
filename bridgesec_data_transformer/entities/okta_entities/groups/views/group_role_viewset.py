@@ -46,17 +46,18 @@ class GroupRoleViewSet(BaseGroupViewSet):
         Extract and format group role data from Okta response.
         """
         logger.info("Extracting group role data from Okta response.")
+        extracted_data = super().extract_data(okta_data)
 
         extracted_roles = []
-        for role in okta_data:
+        for role in extracted_data:
             role_type = role.get("type") or role.get("roleType")  # "type" is for standard roles, "roleType" for custom
             role_entry = {
                 "group_id": group_id,
                 "role_type": role_type,
                 "disable_notifications": role.get("disableNotifications", False),
                 "resource_set_id": role.get("resourceSetId"),
-                "role_id": role.get("roleId"),
-                "target_app_list": role.get("targetAppInstanceIds", []),
+                "role_id": role.get("id"),
+                "target_app_list": role.get("targetAppInstanceIds", []),    
                 "target_group_list": role.get("targetGroupIds", []),
             }
             extracted_roles.append(role_entry)
