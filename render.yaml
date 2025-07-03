@@ -7,5 +7,5 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn bridgesec_data_transformer.wsgi:application
     envVars:
-      -fromGroup: Bridgesec
+       - fromGroup: Bridgesec
 
