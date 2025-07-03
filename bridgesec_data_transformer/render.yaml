@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: bridgesec-data-transformer-dev
+    env: python
+    plan: free  # or 'starter', 'standard', etc.
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn bridgesec_data_transformer.wsgi:application
+    envVars:
+      - key: DEBUG
+        value: true
+      - key: OKTA_API_URL
+        value: https://dev-86760463-admin.okta.com
+      - key: OKTA_API_TOKEN
+        value: 00hjGthLn-9V8KZ5zdpnautv5Wd1XZdK5Hl8FAM80G
+      - key: MONGO_DB_NAME
+        value: bridgesec
+      - key: MONGO_URI
+        value: mongodb+srv://palaniselvam:adjecti@bridgesec-cluster.kiigrzg.mongodb.net/?retryWrites=true&w=majority&appName=bridgesec-cluster
+      - key: CELERY_BROKER_URL
+        value: amqps://xgrrsimc:e1NOHWSMLtxi-LAM-ctC0AxVXj4Irb1F@leopard.lmq.cloudamqp.com/xgrrsimc
