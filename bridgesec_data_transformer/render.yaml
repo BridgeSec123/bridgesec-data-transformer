@@ -5,9 +5,6 @@ services:
     plan: free  # or 'starter', 'standard', etc.
     branch: main
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn bridgesec_data_transformer.bridgesec_data_transformer.wsgi:application
+    startCommand: PYTHONPATH=./bridgesec_data_transformer gunicorn bridgesec_data_transformer.bridgesec_data_transformer.wsgi:application
     envVars:
-      - key: PORT
-        value: 10000
       - fromGroup: Bridgesec
-
