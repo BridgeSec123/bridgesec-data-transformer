@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: bridgesec-data-transformer
+    name: bridgesec_data_transformer
     env: python
     plan: free  # or 'starter', 'standard', etc.
     branch: main
