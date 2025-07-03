@@ -7,11 +7,4 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn bridgesec_data_transformer.wsgi:application
     envVars:
-      - key: OKTA_DOMAIN
-        value: ""
-      - key: OKTA_TOKEN
-        value: ""
-      - key: MONGO_DB_NAME
-        value: ""
-      - key: MONGO_URI
-        Value: ""
+      -fromGroup
