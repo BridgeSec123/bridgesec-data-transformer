@@ -11,6 +11,6 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bridgesec_data_transformer.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bridgesec_data_transformer.bridgesec_data_transformer.settings')
 
 application = get_wsgi_application()
