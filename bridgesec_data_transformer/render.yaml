@@ -2,9 +2,9 @@ services:
   - type: web
     name: bridgesec_data_transformer
     env: python
-    plan: free  # or 'starter', 'standard', etc.
+    plan: free
     branch: main
     buildCommand: pip install -r requirements.txt
-    startCommand: PYTHONPATH=./bridgesec_data_transformer gunicorn bridgesec_data_transformer.bridgesec_data_transformer.wsgi:application
+    startCommand: gunicorn bridgesec_data_transformer.wsgi:application --chdir bridgesec_data_transformer
     envVars:
       - fromGroup: Bridgesec
