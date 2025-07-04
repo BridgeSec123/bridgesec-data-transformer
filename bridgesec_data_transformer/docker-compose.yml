@@ -13,7 +13,7 @@ services:
       - .:/app
       - ./output:/app/output
     command: >
-      gunicorn bridgesec_data_transformer.wsgi:application --bind 0.0.0.0:8000
+      python manage.py runserver 0.0.0.0:8000
     restart: always
 
   celery_worker:

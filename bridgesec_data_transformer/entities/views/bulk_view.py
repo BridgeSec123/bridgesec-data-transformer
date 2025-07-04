@@ -21,8 +21,8 @@ from entities.registry import ENTITY_VIEWSETS
 
 
 class BulkEntityViewSet(viewsets.ViewSet):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    # authentication_classes = [JWTAuthentication]
+    # permission_classes = [IsAuthenticated]
     """Viewset for bulk entity data import."""
     def post(self, request):
         db_name = get_dynamic_db()
