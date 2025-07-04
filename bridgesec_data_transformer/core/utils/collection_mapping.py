@@ -6,8 +6,8 @@ RESOURCE_COLLECTION_MAP = {
                 {"key": "user_base_schema_properties", "label": "User Base Schema Properties"},
                 {"key": "user_admin_roles", "label": "User Admin Roles"},
             ],
-    "User types": [
-                {"key": "okta_user_type", "label":"user type"}
+    "User Types": [
+                {"key": "okta_user_type", "label":"User Type"}
     ],
     "Groups": [
            {"key": "okta_groups", "label": "Groups"},
@@ -31,18 +31,18 @@ RESOURCE_COLLECTION_MAP = {
     "Email": [
              {"key":"okta_email_domain", "label": "Email"}
     ],
-    "Sms_Template": [
-        {"key": "okta_template_sms"}
+    "Sms Template": [
+        {"key": "okta_template_sms", "label":"Sms Template"}
     ],
     "Captcha": [
         {"key": "okta_captcha", "label":"Captcha"},
         {"key": "okta_captcha_org_wide_settings", "label":"Captacha Wide Org Settings"}
     ],
     "Organization Security": [
-          {"key":"okta_org_configuration", "label":"Organization_Security"}
+          {"key":"okta_org_configuration", "label":"Organization Security"}
     ],
-    "Threat_Insights": [
-        {"key":"okta_threat_insight_settings", "label":"Threat_Insights"}
+    "Threat Insights": [
+        {"key":"okta_threat_insight_settings", "label":"Threat Insights"}
     ],
     "Authenticator": [
         {"key": "okta_authenticator", "label": "Authenticator"},
