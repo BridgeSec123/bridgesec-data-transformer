@@ -89,27 +89,22 @@ class BulkEntityViewSet(viewsets.ViewSet):
         """
         Fetch all database names, optionally filtered by a given date (YYYY-MM-DD).
         """
-        selected_date = request.query_params.get("date")  # e.g., "2024-06-05"
-        if not selected_date:
-            return Response({"error": "date is required"}, status=status.HTTP_400_BAD_REQUEST)
+        date_str = request.query_params.get("date")
 
         try:
-            
-            db_date_pattern = selected_date.replace("-", "_")
+            mongo_client = MongoClient(settings.MONGO_URI)
+            all_dbs = mongo_client.list_database_names()
 
-            client = MongoClient(settings.MONGO_URI)
-            db_names = client.list_database_names()
+            if date_str:
+                try:
+                    datetime.strptime(date_str, "%Y-%m-%d")  # validate format
+                    date_prefix = f"{settings.MONGO_DB_NAME}_{date_str}"
+                    all_dbs = [db for db in all_dbs if db.startswith(date_prefix)]
+                except ValueError:
+                    return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=status.HTTP_400_BAD_REQUEST)
 
-            time_list = []
-            pattern = re.compile(rf"bridgesec_{db_date_pattern}T(\d{{4}})")
-            for db_name in db_names:
-                match = pattern.match(db_name)
-                if match:
-                    raw_time = match.group(1)  # e.g., '2000'
-                    formatted_time = f"{raw_time[:2]}:{raw_time[2:]}"  # -> '20:00'
-                    time_list.append(formatted_time)
+            return Response({"databases": all_dbs}, status=status.HTTP_200_OK)
 
-            return Response((sorted(time_list)))
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     

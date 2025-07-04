@@ -7,7 +7,7 @@ RESOURCE_COLLECTION_MAP = {
                 {"key": "user_admin_roles", "label": "User Admin Roles"},
             ],
     "User types": [
-                {"key": "okta_user_type", "label":"user_type"}
+                {"key": "okta_user_type", "label":"user type"}
     ],
     "Groups": [
            {"key": "okta_groups", "label": "Groups"},
