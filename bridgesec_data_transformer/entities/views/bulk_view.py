@@ -130,15 +130,43 @@ class BulkEntityViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                'entity_type',
+                openapi.IN_QUERY,
+                description="Optional. If provided, returns sub-entities for this entity type.",
+                type=openapi.TYPE_STRING
+            )
+        ]
+    )
+
     @action(detail=False, methods=["get"], url_path="resource-names")
     def get_resource_names(self, request):
         """
-        Fetch all available resource names (logical entities) dynamically from RESOURCE_COLLECTION_MAP.
+        - If `entity_type` is provided in query params, return its sub-entities.
+        - Else return all available resource names (main entity types).
         """
         try:
-            # Extract keys from the RESOURCE_COLLECTION_MAP
+            entity_type = request.query_params.get("entity_type")
+
+            if entity_type:
+                entity_type = entity_type.title()
+                sub_entities = RESOURCE_COLLECTION_MAP.get(entity_type)
+
+                if not sub_entities:
+                    return Response(
+                        {"detail": f"No sub-entities found for entity type '{entity_type}'"},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+
+                display_names = [entry["label"] for entry in sub_entities]
+                return Response({"data":display_names}, status=status.HTTP_200_OK)
+
+            # No query param provided, return all entity types
             resource_names = sorted(RESOURCE_COLLECTION_MAP.keys())
-            return Response({"resource_names": resource_names}, status=status.HTTP_200_OK)
+            return Response({"data": resource_names}, status=status.HTTP_200_OK)
+
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

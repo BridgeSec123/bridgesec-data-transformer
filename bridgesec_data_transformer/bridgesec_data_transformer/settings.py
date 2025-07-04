@@ -22,6 +22,8 @@ from mongoengine import connect
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
 
 OKTA_API_URL = env("OKTA_API_URL")
 OKTA_API_TOKEN = env("OKTA_API_TOKEN")
