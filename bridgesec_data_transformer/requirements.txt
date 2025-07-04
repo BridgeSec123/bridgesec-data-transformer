@@ -12,3 +12,4 @@ debugpy
 celery
 redis
 pika
+gunicorn

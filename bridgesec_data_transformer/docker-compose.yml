@@ -13,7 +13,7 @@ services:
       - .:/app
       - ./output:/app/output
     command: >
-      python manage.py runserver 0.0.0.0:8000 
+      gunicorn bridgesec_data_transformer.wsgi:application --bind 0.0.0.0:8000
     restart: always
 
   celery_worker:
@@ -23,14 +23,11 @@ services:
       - .env
     environment:
       - CELERY_LOG_FILE=/app/logs/app.log
-      - CELERY_LOG_FILE=/app/logs/error.log
     depends_on:
       - web
     volumes:
-      - .:/app
       - ./output:/app/output
       - ./logs:/app/logs
-      - ./logs:/error/logs
     command: /bin/sh -c 'celery -A bridgesec_data_transformer worker --loglevel=INFO 2>&1 | tee -a /app/logs/app.log'
     restart: always
 
