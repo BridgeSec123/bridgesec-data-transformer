@@ -107,7 +107,8 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
+
     @swagger_auto_schema(
         manual_parameters=[
             openapi.Parameter(
@@ -143,7 +144,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
             # No query param provided, return all entity types
             resource_names = sorted(RESOURCE_COLLECTION_MAP.keys())
-            return Response({"entity_types": resource_names}, status=status.HTTP_200_OK)
+            return Response({"data": resource_names}, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

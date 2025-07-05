@@ -23,7 +23,8 @@ from mongoengine import connect
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
-environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
 
 OKTA_API_URL = env("OKTA_API_URL")
 OKTA_API_TOKEN = env("OKTA_API_TOKEN")
@@ -37,7 +38,7 @@ SECRET_KEY = 'django-insecure-)4ss^pa5^7q_fgz45^1^*s(x870j(slt8zmon3pzi0a%(vk9c%
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
