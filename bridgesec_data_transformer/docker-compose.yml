@@ -1,0 +1,47 @@
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bridgesec_django
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - ./output:/app/output
+    command: >
+      python manage.py runserver 0.0.0.0:8000
+    restart: always
+
+  celery_worker:
+    build: .
+    container_name: bridgesec_celery
+    env_file:
+      - .env
+    environment:
+      - CELERY_LOG_FILE=/app/logs/app.log
+    depends_on:
+      - web
+    volumes:
+      - ./output:/app/output
+      - ./logs:/app/logs
+    command: /bin/sh -c 'celery -A bridgesec_data_transformer worker --loglevel=INFO 2>&1 | tee -a /app/logs/app.log'
+    restart: always
+
+  consumer:
+    build: .
+    env_file:
+      - .env
+    container_name: bridgesec_consumer
+    command: python core/rabbitmq_consumer.py
+    restart: always
+    depends_on:
+      - web
+    volumes:
+      - .:/app
+    
+volumes:
+  mongo_data:

@@ -18,7 +18,7 @@ ENTITY_TYPE_MAPPING = {
     },
     "okta_users": {
         "okta_endpoint": "/api/v1/users",
-        "attributes": ["id", "profile"],
+        "attributes": ["id", "profile"]
     },
     "user_factors":{
         "okta_endpoint": "/api/v1/users/{userId}/factors",
@@ -43,6 +43,14 @@ ENTITY_TYPE_MAPPING = {
     "group_schemas": {
         "okta_endpoint": "/api/v1/meta/schemas/group/default",
         "attributes": ["title", "type", "definitions", "description"]
+    },
+    "group_rules":{
+        "okta_endpoint":"api/v1/groups/rules",
+        "attributes":["id", "name", "actions", "conditions", "status"]
+    },
+    "group_roles":{
+        "okta_endpoint":"api/v1/groups/{group_id}/roles",
+        "attributes":["id", "type", "description", "status","targetGroupIds","targetAppInstanceIds","disableNotifications"]
     },
     "user_types" : {
         "okta_endpoint": "/api/v1/meta/types/user",
@@ -157,7 +165,7 @@ ENTITY_TYPE_MAPPING = {
     "okta_app_oauth": {
         "okta_endpoint": "/api/v1/apps",
         "attributes": [
-            "id", "signOnMode", "label", "type", "accessibility", "visibility", "notes", "settings", "link", "userNameTemplate", "status", "credentials"
+            "id", "signOnMode", "label", "type", "accessibility", "visibility", "notes", "settings", "_links", "userNameTemplate", "status", "credentials","idp_initiated_login",
         ]
     },
     "okta_app_saml": {
@@ -238,7 +246,7 @@ ENTITY_TYPE_MAPPING = {
     },
     "okta_app_auto_login": {
         "okta_endpoint": "/api/v1/apps",
-        "attributes": ["signOnMode", "label", "accessibility", "visibility", "settings", "status"]
+        "attributes": ["signOnMode", "label", "accessibility", "visibility", "settings", "status", "credentials",],
     },
     "okta_app_basic_auth": {
         "okta_endpoint": "/api/v1/apps",

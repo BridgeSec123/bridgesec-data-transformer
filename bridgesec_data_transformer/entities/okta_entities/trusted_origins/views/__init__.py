@@ -1,0 +1,1 @@
+from .trusted_origin_viewset import TrustedOriginViewSet

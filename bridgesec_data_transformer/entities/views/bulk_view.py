@@ -1,7 +1,9 @@
 import json
 import os
+import re
 from datetime import datetime
 
+from core.tasks.bulk_tasks import run_bulk_entity_task
 from core.utils.collection_mapping import RESOURCE_COLLECTION_MAP
 from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
 from django.conf import settings
@@ -11,6 +13,7 @@ from pymongo import MongoClient
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from core.tasks.bulk_tasks import run_bulk_entity_task
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -18,41 +21,16 @@ from entities.registry import ENTITY_VIEWSETS
 
 
 class BulkEntityViewSet(viewsets.ViewSet):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    # authentication_classes = [JWTAuthentication]
+    # permission_classes = [IsAuthenticated]
     """Viewset for bulk entity data import."""
-    @swagger_auto_schema(
-        operation_description="Fetch data from all registered entity APIs and store them in MongoDB",
-        responses={201: openapi.Response("Data fetched and stored successfully")},
-    )
     def post(self, request):
-        # extracted_data_dict = {}
         db_name = get_dynamic_db()
         ensure_mongo_connection(db_name)
-
-        # Loop through all registered entity viewsets dynamically
-        for entity_name, viewset_class in ENTITY_VIEWSETS.items():
-            viewset_instance = viewset_class()
-            
-            # Fetch and extract data using the base class methods
-            extracted_data = viewset_instance.fetch_and_store_data(db_name)
-            if not extracted_data:  # If no data returned
-                return Response(
-                    {"error": f"Failed to fetch {entity_name} data"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-            # Setup output directory
-            output_dir = os.path.join(settings.BASE_DIR, "output", db_name)
-            os.makedirs(output_dir, exist_ok=True)
-
-            for sub_entity_name, sub_entity_data in extracted_data.items():
-                file_name = f"{sub_entity_name}.json"
-                file_path = os.path.join(output_dir, file_name)
-
-                with open(file_path, "w", encoding="utf-8") as f:
-                    json.dump(sub_entity_data, f, ensure_ascii=False, indent=4)
+        run_bulk_entity_task.delay(db_name)
+       
         return Response({
-            "message": "Data fetched and stored successfully",
+            "message": "Task Triggered",
             "db_name": db_name
         }, status=status.HTTP_201_CREATED)
     
@@ -130,6 +108,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
     @swagger_auto_schema(
         manual_parameters=[
             openapi.Parameter(
@@ -161,7 +140,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     )
 
                 display_names = [entry["label"] for entry in sub_entities]
-                return Response({"data":display_names}, status=status.HTTP_200_OK)
+                return Response((display_names), status=status.HTTP_200_OK)
 
             # No query param provided, return all entity types
             resource_names = sorted(RESOURCE_COLLECTION_MAP.keys())
@@ -169,7 +148,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+    
     @action(detail=False, methods=["get"], url_path=r"data/(?P<db_name>[^/.]+)/(?P<resource_name>[^/.]+)")
     def get_resource_data(self, request, db_name, resource_name):
         """

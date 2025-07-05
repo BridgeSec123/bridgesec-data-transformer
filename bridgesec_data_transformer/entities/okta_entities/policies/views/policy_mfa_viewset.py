@@ -64,9 +64,9 @@ class PolicyMFAViewSet(BasePolicyViewSet):
         formatted_data = []
         # allowed_fields = set(User._fields.keys())
 
-        for record in extracted_data:
+        for record in extracted_data:   
             groups = record.get("conditions", {}).get("people", {}).get("groups", [])
-            factors = record.get("settings", {}).get("factors", [])
+            factors = record.get("settings", {}).get("factors", {})
 
             formatted_record = {
                 "id": record.get("id"),
@@ -82,8 +82,8 @@ class PolicyMFAViewSet(BasePolicyViewSet):
                 "is_oie": record.get("is_oie"),
                 "okta_call": record.get("okta_call"),
                 "okta_email": record.get("okta_email"),
-                "okta_otp": factors.get("okta_otp").get("enroll", {}),
-                "okta_password": factors.get("okta_password").get("enroll", {}),
+                "okta_otp": factors.get("okta_otp", {}).get("enroll", {}),
+                "okta_password": factors.get("okta_password", {}).get("enroll", {}),
                 "okta_push": record.get("okta_push"),
                 "okta_question": record.get("okta_question"),
                 "okta_sms": record.get("okta_sms"),

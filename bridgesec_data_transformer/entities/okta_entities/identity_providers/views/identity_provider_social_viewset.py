@@ -46,7 +46,7 @@ class IdentityProviderSocialViewSet(BaseIdentityProviderViewSet):
                     "groups_assignments": provisioning.get("groups", {}).get("assignments", []),
                     "groups_attribute": provisioning.get("groups", {}).get("attribute", ""),
                     "groups_filter": provisioning.get("groups", {}).get("filter", []),
-                    "issuer_mode": provisioning.get("issuer", {}).get("mode", ""),
+                    "issuer_mode": provisioning.get("issuer", {}).get("mode", ""),  
                     "max_clock_skew": policy.get("maxClockSkew", ""),
                     "profile_master": provisioning.get("profileMaster", ""),
                     "protocol_type": protocol.get("type", ""),

@@ -7,4 +7,9 @@ requests
 django-environ
 colorlog
 djangorestframework-simplejwt
+dnspython
+debugpy
+celery
+redis
+pika
 gunicorn

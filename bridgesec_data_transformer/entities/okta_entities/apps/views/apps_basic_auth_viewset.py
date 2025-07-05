@@ -44,7 +44,7 @@ class AppBasicAuthViewSet(BaseAppViewSet):
                     "hide_ios": hide.get("iOS", ""),
                     "hide_web": hide.get("web", ""),
                     "logo" : record.get("logo", ""),
-                    "timeouts": record.get("timeouts", ""),
+                    "timeouts": record.get("timeouts", []),
                     "status": record.get("status", "")
                 }
                 formatted_data.append(formatted_record)
