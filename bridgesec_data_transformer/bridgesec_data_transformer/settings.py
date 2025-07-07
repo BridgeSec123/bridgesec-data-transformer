@@ -53,10 +53,12 @@ INSTALLED_APPS = [
     'drf_yasg',
     'core',
     'entities',
-    'rest_framework_simplejwt'
+    'rest_framework_simplejwt',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -148,6 +150,15 @@ LOG_DIR = os.path.join(PROJECT_ROOT, 'logs')
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
 
+
+# CLIENT_ID = env("CLIENT_ID")
+# ISSUER_URL = env("ISSUER_URL")
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "https://bridgesec-fe.vercel.app"
+]
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -201,9 +212,14 @@ LOGGING = {
     },
 }
 
+# REST_FRAMEWORK = {
+#     'DEFAULT_AUTHENTICATION_CLASSES': (
+#         'rest_framework_simplejwt.authentication.JWTAuthentication',
+#     )
+# }
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "core.authentication.CustomJWTAuthentication",
     )
 }
 
