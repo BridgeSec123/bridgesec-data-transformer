@@ -27,6 +27,9 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 OKTA_API_URL = env("OKTA_API_URL")
 OKTA_API_TOKEN = env("OKTA_API_TOKEN")
+OKTA_CLIENT_ID = env("OKTA_CLIENT_ID")
+OKTA_REDIRECT_URI = env("OKTA_REDIRECT_URI")
+OKTA_ISSUER = env("OKTA_ISSUER")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
