@@ -5,7 +5,7 @@ from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 
 
-from core.views.okta_login_viewset import OktaLoginViewSet
+# from core.views.okta_login_viewset import OktaLoginViewSet
 from core.views.user_views import UserCreateView
 from core.views.auth_views import CustomTokenObtainPairView, CustomTokenObtainView, CustomTokenRefreshView
 
