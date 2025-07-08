@@ -8,4 +8,5 @@ django-environ
 colorlog
 djangorestframework-simplejwt
 gunicorn
+jose
 django-cors-headers
