@@ -26,7 +26,7 @@ def extract_time(db_name):
     
 class BulkEntityViewSet(viewsets.ViewSet):
     authentication_classes = [CustomJWTAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     """Viewset for bulk entity data import."""
     @swagger_auto_schema(
         operation_description="Fetch data from all registered entity APIs and store them in MongoDB",
