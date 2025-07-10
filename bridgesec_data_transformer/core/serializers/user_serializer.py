@@ -6,6 +6,7 @@ class UserCreateSerializer(serializers.Serializer):
     username = serializers.CharField()
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
+    role = serializers.ChoiceField(choices=['admin', 'user'], required=False, default='user')
 
     def validate(self, attrs):
         if User.objects(username=attrs['username']).first():
@@ -22,7 +23,7 @@ class UserCreateSerializer(serializers.Serializer):
             username=validated_data['username'],
             email=validated_data["email"],
             password=hashed_password,
-            role="user"
+            role=validated_data.get("role", "user")
         )
         user.save()
         return user

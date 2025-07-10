@@ -30,6 +30,7 @@ OKTA_API_TOKEN = env("OKTA_API_TOKEN")
 OKTA_CLIENT_ID = env("OKTA_CLIENT_ID")
 OKTA_REDIRECT_URI = env("OKTA_REDIRECT_URI")
 OKTA_ISSUER = env("OKTA_ISSUER")
+OKTA_SECRET_KEY = env("OKTA_SECRET_KEY")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
