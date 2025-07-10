@@ -1,5 +1,4 @@
-import requests, jwt
-from jwt.algorithms import RSAAlgorithm
+import requests
 from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -7,7 +6,7 @@ from rest_framework import status
 from core.utils.jwt_utils import generate_jwt_token
 from core.models.user import User
 from bson import ObjectId
-
+from jose import jwt
 
 class OktaCallbackView(APIView):
     def get(self, request):
@@ -24,21 +23,29 @@ class OktaCallbackView(APIView):
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         token_resp = requests.post(token_url, data=data, headers=headers)
         token_data = token_resp.json()
-
         id_token = token_data.get("id_token")
-        if not id_token:
-            return Response({"error": "Token not received"}, status=400)
+        access_token = token_data.get("access_token")
 
+        if not id_token or not access_token:
+            return Response({"error": "Token not received"}, status=400)
+        
         # Decode token
         jwks_url = f"{settings.OKTA_ISSUER}/v1/keys"
         jwks = requests.get(jwks_url).json()
         unverified_header = jwt.get_unverified_header(id_token)
-        key = next(k for k in jwks["keys"] if k["kid"] == unverified_header["kid"])
-        public_key = RSAAlgorithm.from_jwk(key)
-        
+        kid = unverified_header["kid"]
+
+        key = next(k for k in jwks["keys"] if k["kid"] == kid)
+
         payload = jwt.decode(
-            id_token, public_key, algorithms=["RS256"], audience=settings.OKTA_CLIENT_ID
+            id_token,
+            key,
+            algorithms=["RS256"],
+            audience=settings.OKTA_CLIENT_ID,
+            issuer=settings.OKTA_ISSUER,
+            access_token=access_token 
         )
+
         email = payload.get("email") or payload.get("sub")
         username = email  # or however you want to define username
 
@@ -47,7 +54,7 @@ class OktaCallbackView(APIView):
 
         user = User.objects(email=email).first()
         if not user:
-            user = User(email=email, username=username)
+            user = User(email=email, username=username, role="admin")
             user.save()
 
         # Generate custom access token
@@ -56,5 +63,6 @@ class OktaCallbackView(APIView):
         user_data = {
             "id": str(user.id),     # This is likely an ObjectId
             "username": user.username,
+            "role": user.role,
           }
         return Response({"access_token": jwt_token, "user":user_data}, status=status.HTTP_200_OK)

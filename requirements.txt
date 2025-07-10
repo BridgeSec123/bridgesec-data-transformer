@@ -8,5 +8,6 @@ django-environ
 colorlog
 djangorestframework-simplejwt
 gunicorn
-jose
+python-jose
 django-cors-headers
+PyJWT==1.7.1
