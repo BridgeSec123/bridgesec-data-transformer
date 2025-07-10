@@ -31,6 +31,7 @@ OKTA_CLIENT_ID = env("OKTA_CLIENT_ID")
 OKTA_REDIRECT_URI = env("OKTA_REDIRECT_URI")
 OKTA_ISSUER = env("OKTA_ISSUER")
 OKTA_SECRET_KEY = env("OKTA_SECRET_KEY")
+FRONTEND_URL = env("FRONTEND_URL")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
@@ -42,7 +43,6 @@ SECRET_KEY = 'django-insecure-)4ss^pa5^7q_fgz45^1^*s(x870j(slt8zmon3pzi0a%(vk9c%
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
-
 
 # Application definition
 

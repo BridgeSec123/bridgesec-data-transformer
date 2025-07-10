@@ -7,6 +7,7 @@ from core.utils.jwt_utils import generate_jwt_token
 from core.models.user import User
 from bson import ObjectId
 from jose import jwt
+from django.http import HttpResponseRedirect
 
 class OktaCallbackView(APIView):
     def get(self, request):
@@ -60,9 +61,6 @@ class OktaCallbackView(APIView):
         # Generate custom access token
         jwt_token = generate_jwt_token(user)
 
-        user_data = {
-            "id": str(user.id),     # This is likely an ObjectId
-            "username": user.username,
-            "role": user.role,
-          }
-        return Response({"access_token": jwt_token, "user":user_data}, status=status.HTTP_200_OK)
+        response = HttpResponseRedirect(settings.FRONTEND_URL)
+        response.set_cookie("access_token", jwt_token, httponly=True, secure=False, samesite="Lax")
+        return response
