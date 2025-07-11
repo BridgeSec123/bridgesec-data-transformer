@@ -61,6 +61,14 @@ class OktaCallbackView(APIView):
         # Generate custom access token
         jwt_token = generate_jwt_token(user)
 
+        session = request.session
+        session["user_id"] = str(user.id)
+        session["username"] = user.username
+        session["email"] = user.email
+        session["role"] = user.role
+        session.set_expiry(3600)  
+        session.save()
+
         response = HttpResponseRedirect(settings.FRONTEND_URL)
-        response.set_cookie("access_token", jwt_token, httponly=True, secure=False, samesite="Lax")
+        response.set_cookie("access_token", jwt_token, httponly=False, secure=False, samesite="Lax")
         return response
