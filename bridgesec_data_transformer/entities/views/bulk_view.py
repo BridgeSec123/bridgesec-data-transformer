@@ -2,6 +2,7 @@ import json
 import os
 from datetime import datetime
 
+from entities.serializers.restore_serializer import RestoreDataSerializer
 from core.utils.collection_mapping import RESOURCE_COLLECTION_MAP
 from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
 from django.conf import settings
@@ -22,11 +23,13 @@ def extract_time(db_name):
         time_part = db_name.split('T')[1]
         return f"{time_part[:2]}:{time_part[2:]}"
     except Exception:
-        return None  
+        return None 
     
 class BulkEntityViewSet(viewsets.ViewSet):
     authentication_classes = [CustomJWTAuthentication]
     permission_classes = [IsAuthenticated]
+    serializer_class = RestoreDataSerializer
+    
     """Viewset for bulk entity data import."""
     @swagger_auto_schema(
         operation_description="Fetch data from all registered entity APIs and store them in MongoDB",
@@ -258,3 +261,72 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @swagger_auto_schema(
+        method="post",
+        request_body=RestoreDataSerializer,
+        responses={201: "Success", 400: "Bad Request"}
+    )
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path=r"restore/(?P<date_str>\d{4}-\d{2}-\d{2})/(?P<entity_name>[^/.]+)"
+    )
+    def restore_modified_data(self, request, date_str, entity_name):
+        try:
+            serializer = RestoreDataSerializer(data=request.data)  
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=400)
+
+            modified_data = serializer.validated_data["data"]
+
+            collection_name = None
+            for group in RESOURCE_COLLECTION_MAP.values():
+                for mapping in group:
+                    if entity_name in mapping:
+                        collection_name = mapping[entity_name]
+                        break
+                if collection_name:
+                    break
+
+            if not collection_name:
+                return Response(
+                  {
+                    "message": f"Entity type '{entity_name}' not found in resource map.You are entering a wrong entity_type",
+                    "data": []
+                  },
+                status=status.HTTP_200_OK
+            )
+
+            new_db_name = get_dynamic_db()
+            ensure_mongo_connection(new_db_name)
+
+            # Connect and insert modified data
+            mongo_client = MongoClient(settings.MONGO_URI)
+            target_collection = mongo_client[new_db_name][collection_name]
+
+            for doc in modified_data:
+                doc.pop("_id", None)
+
+            target_collection.insert_many(modified_data)
+
+            return Response({
+                "message": "Modified data restored successfully.",
+                "restored_db": new_db_name,
+                "collection": collection_name,
+                "record_count": len(modified_data)
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({"error": str(e)}, status=500)
+
+
+
+
+
+
+
+
+
