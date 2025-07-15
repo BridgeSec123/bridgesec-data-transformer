@@ -68,7 +68,7 @@ class OktaCallbackView(APIView):
         session["role"] = user.role
         session.set_expiry(3600)  
         session.save()
-
-        response = HttpResponseRedirect(settings.FRONTEND_URL)
+        
+        response = HttpResponseRedirect(settings.FRONTEND_REDIRECT_URL)
         response.set_cookie("access_token", jwt_token, httponly=False, secure=False, samesite="Lax")
         return response

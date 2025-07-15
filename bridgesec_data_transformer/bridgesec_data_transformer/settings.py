@@ -31,6 +31,7 @@ OKTA_CLIENT_ID = env("OKTA_CLIENT_ID")
 OKTA_REDIRECT_URI = env("OKTA_REDIRECT_URI")
 OKTA_ISSUER = env("OKTA_ISSUER")
 OKTA_SECRET_KEY = env("OKTA_SECRET_KEY")
+FRONTEND_REDIRECT_URL = env("FRONTEND_REDIRECT_URL")
 FRONTEND_URL = env("FRONTEND_URL")
 
 # Quick-start development settings - unsuitable for production
