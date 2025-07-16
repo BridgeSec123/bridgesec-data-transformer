@@ -9,7 +9,8 @@ class OktaLoginView(APIView):
             f"client_id={settings.OKTA_CLIENT_ID}&"
             f"response_type=code&scope=openid email profile&"
             f"redirect_uri={settings.OKTA_REDIRECT_URI}&"
-            f"state=xyz&nonce=abc"
+            f"state=xyz&nonce=abc&"
+            f"prompt=login"
         )
         return redirect(authorize_url)
 
