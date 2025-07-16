@@ -66,6 +66,7 @@ class OktaCallbackView(APIView):
         session["username"] = user.username
         session["email"] = user.email
         session["role"] = user.role
+        session["id_token"] = id_token
         session.set_expiry(3600)  
         session.save()
         

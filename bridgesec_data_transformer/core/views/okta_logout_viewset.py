@@ -8,19 +8,30 @@ logger = logging.getLogger(__name__)
 class OktaLogoutView(APIView):
     def get(self, request):
         user_email = request.session.get("email")
+        id_token = request.session.get("id_token")
+        
         logger.info(f"Logging out user: {user_email}")
 
-        # Clear the session
-        request.session.flush()
-        logger.info("Session flushed successfully.")
-
-        # Build frontend redirect URL
+        # Build redirect fallback
         redirect_url = f"{settings.FRONTEND_URL}/sign-in"
-        
 
-        # Prepare response and delete cookie
-        response = HttpResponseRedirect(redirect_url)
+        # If no id_token found (already expired), just do soft logout
+        if not id_token:
+            logger.warning("No id_token in session; performing soft logout.")
+            request.session.flush()
+            response = HttpResponseRedirect(redirect_url)
+            response.delete_cookie("access_token")
+            return response
+
+        # Okta logout URL
+        logout_url = (
+            f"{settings.OKTA_ISSUER}/v1/logout?"
+            f"id_token_hint={id_token}&"
+            f"post_logout_redirect_uri={redirect_url}"
+        )
+
+        # Clear local session + cookie
+        request.session.flush()
+        response = HttpResponseRedirect(logout_url)
         response.delete_cookie("access_token")
-        logger.info("access_token cookie deleted. Redirecting...")
-
         return response
