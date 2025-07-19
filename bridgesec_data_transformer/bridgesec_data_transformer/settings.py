@@ -41,7 +41,7 @@ FRONTEND_URL = env("FRONTEND_URL")
 SECRET_KEY = 'django-insecure-)4ss^pa5^7q_fgz45^1^*s(x870j(slt8zmon3pzi0a%(vk9c%'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 
