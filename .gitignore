@@ -9,3 +9,5 @@ output/
 logs/
 docs/
 venv
+ven
+staticfiles

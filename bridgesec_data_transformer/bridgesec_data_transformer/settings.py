@@ -23,22 +23,31 @@ from mongoengine import connect
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
-environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
 
 OKTA_API_URL = env("OKTA_API_URL")
 OKTA_API_TOKEN = env("OKTA_API_TOKEN")
+OKTA_CLIENT_ID = env("OKTA_CLIENT_ID")
+OKTA_REDIRECT_URI = env("OKTA_REDIRECT_URI")
+OKTA_ISSUER = env("OKTA_ISSUER")
+OKTA_SECRET_KEY = env("OKTA_SECRET_KEY")
+FRONTEND_REDIRECT_URL = env("FRONTEND_REDIRECT_URL")
+FRONTEND_URL = env("FRONTEND_URL")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-)4ss^pa5^7q_fgz45^1^*s(x870j(slt8zmon3pzi0a%(vk9c%'
+SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = [
+    '.onrender.com',
+    '127.0.0.1'
+]
 
 # Application definition
 
@@ -53,10 +62,12 @@ INSTALLED_APPS = [
     'drf_yasg',
     'core',
     'entities',
-    'rest_framework_simplejwt'
+    'rest_framework_simplejwt',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -64,6 +75,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware'
 ]
 
 ROOT_URLCONF = 'bridgesec_data_transformer.urls'
@@ -122,11 +134,16 @@ USE_I18N = True
 
 USE_TZ = True
 
+SESSION_COOKIE_HTTPONLY = False
+SESSION_COOKIE_SECURE = False          # Only if using HTTPS
+SESSION_COOKIE_SAMESITE = "Lax" 
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -147,6 +164,17 @@ LOG_DIR = os.path.join(PROJECT_ROOT, 'logs')
 
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
+
+
+# CLIENT_ID = env("CLIENT_ID")
+# ISSUER_URL = env("ISSUER_URL")
+
+CORS_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:3000",
+    "https://bridgesec-fe.vercel.app"
+]
+
+CORS_ALLOW_CREDENTIALS = True
 
 LOGGING = {
     'version': 1,
@@ -219,9 +247,14 @@ LOGGING = {
     },
 }
 
+# REST_FRAMEWORK = {
+#     'DEFAULT_AUTHENTICATION_CLASSES': (
+#         'rest_framework_simplejwt.authentication.JWTAuthentication',
+#     )
+# }
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "core.authentication.CustomJWTAuthentication",
     )
 }
 

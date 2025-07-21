@@ -1,125 +1,125 @@
 RESOURCE_COLLECTION_MAP = {
     "Users": [
-                {"key": "okta_users", "label": "Users"},
-                {"key": "okta_user_schema_properties", "label": "User Schema Properties"},
-                {"key": "okta_user_group_memberships", "label": "User Group Memberships"},
-                {"key": "user_base_schema_properties", "label": "User Base Schema Properties"},
-                {"key": "user_admin_roles", "label": "User Admin Roles"},
-            ],
-    "User types": [
-                {"key": "okta_user_type", "label":"user type"}
+        {"User": "okta_user"},
+        {"User Schema Properties": "okta_user_schema_properties"},
+        {"User Group Memberships": "okta_user_group_memberships"},
+        {"User Base Schema Properties": "user_base_schema_properties"},
+        {"User Admin Roles": "user_admin_roles"},
+    ],
+    "User Types": [
+        {"User Type": "okta_user_type"}
     ],
     "Groups": [
-           {"key": "okta_groups", "label": "Groups"},
-           {"key": "okta_group_schemas", "label": "Group Schema Property"},
-           {"key": "okta_group_rules", "label": "Group Rules"},
-           {"key": "okta_group_roles", "label": "Group Roles"},
-           {"key": "okta_group_memberships", "label": "Group Memberships"}
+        {"Groups": "okta_groups"},
+        {"Group Schema Property": "okta_group_schemas"},
+        {"Group Rules": "okta_group_rules"},
+        {"Group Roles": "okta_group_roles"},
+        {"Group Memberships": "okta_group_memberships"},
     ],
     "Brands": [
-           {"key": "okta_brand", "label": "Brand"}
+        {"Brand": "okta_brand"}
     ],
     "Device": [
-                {"key": "okta_policy_device_assurance_android", "label": "Policy Device Assurance Android"},
-                {"Key": "okta_policy_device_assurance_ios", "label": "Policy Device Assurance IOS"},
-                {"Key": "okta_policy_device_assurance_macos", "label": "Policy Device Assurance Macos"},
-                {"Key": "okta_policy_device_assurance_windows", "label": "Policy Device Assurance Windows"}
+        {"Policy Device Assurance Android": "okta_policy_device_assurance_android"},
+        {"Policy Device Assurance IOS": "okta_policy_device_assurance_ios"},
+        {"Policy Device Assurance Macos": "okta_policy_device_assurance_macos"},
+        {"Policy Device Assurance Windows": "okta_policy_device_assurance_windows"},
     ],
     "Theme": [
-              {"key": "okta_theme", "label": "Theme"}
-        ],
-    "Email": [
-             {"key":"okta_email_domain", "label": "Email"}
+        {"Theme": "okta_theme"}
     ],
-    "Sms_Template": [
-        {"key": "okta_template_sms"}
+    "Email": [
+        {"Email": "okta_email_domain"}
+    ],
+    "Sms Template": [
+        {"Sms Template": "okta_template_sms"}
     ],
     "Captcha": [
-        {"key": "okta_captcha", "label":"Captcha"},
-        {"key": "okta_captcha_org_wide_settings", "label":"Captacha Wide Org Settings"}
+        {"Captchas": "okta_captcha"},
+        {"Captacha Wide Org Settings": "okta_captcha_org_wide_settings"},
     ],
     "Organization Security": [
-          {"key":"okta_org_configuration", "label":"Organization_Security"}
+        {"Organization Security": "okta_org_configuration"}
     ],
-    "Threat_Insights": [
-        {"key":"okta_threat_insight_settings", "label":"Threat_Insights"}
+    "Threat Insights": [
+        {"Threat Insights": "okta_threat_insight_settings"}
     ],
     "Authenticator": [
-        {"key": "okta_authenticator", "label": "Authenticator"},
-        {"key": "okta_factors", "label": "Factor"}
+        {"Authenticator": "okta_authenticator"},
+        {"Factor": "okta_factors"},
     ],
     "Authorization Servers": [
-        {"key": "okta_auth_server","label": "Auth Server"},
-        {"key": "okta_auth_server_claim","label": "Auth Server Claim"},
-        {"key": "okta_auth_server_policy", "label": "Auth Server Policy"},
-        {"key": "okta_auth_server_policy_rule", "label": "Auth Server Policy Rule"},
-        {"key": "okta_auth_server_scope", "label": "Auth Server Scope"},
-        {"key": "okta_auth_server_policy","label": "Auth Server Policy"}, 
-        {"key": "okta_auth_server_policy_rule","label": "Auth Server Policy Rule"}
+        {"Auth Server": "okta_auth_server"},
+        {"Auth Server Claim": "okta_auth_server_claim"},
+        {"Auth Server Policy": "okta_auth_server_policy"},
+        {"Auth Server Policy Rule": "okta_auth_server_policy_rule"},
+        {"Auth Server Scope": "okta_auth_server_scope"},
+        {"Auth Server Policy": "okta_auth_server_policy"},
+        {"Auth Server Policy Rule": "okta_auth_server_policy_rule"},
     ],
     "Identity Providers": [
-        {"key":"okta_idp_oidc", "label":"IDP OIDC"}, 
-        {"key":"okta_idp_saml", "label":"IDP SAML"}, 
-        {"key":"okta_idp_social", "label":"IDP SOCIAL"}
+        {"IDP OIDC": "okta_idp_oidc"},
+        {"IDP SAML": "okta_idp_saml"},
+        {"IDP SOCIAL": "okta_idp_social"},
     ],
     "Policy": [
-        {"Key": "okta_policy_mfa", "label": "Policy MFA"},
-        {"Key": "okta_policy_rule_mfa", "label": "Policy Rule Mfa"},
-        {"Key": "okta_policy_password", "label": "Policy Password"},
-        {"Key": "okta_policy_rule_password", "label": "Policy Rule Password"},
-        {"Key": "okta_policy_profile_enrollment", "label": "Policy Profile Enrollemnt"},
-        {"Key": "okta_policy_rule_profile_enrollment", "label": "Policy Ruke Profile Enrollment"},
-        {"Key": "okta_policy_sign_on", "label": "Policy Sign On"},
-        {"Key": "okta_policy_rule_sign_on", "label": "Policy Rule Sign On"},
-        {"Key": "okta_policy_profile_enrollment_apps", "label": "Policy Profile Enrollment apps"},
-        {"Key": "okta_policy_rule_idp_discovery", "label": "Policy Rule Idp Discovery"},
-        ],
+        {"Policy MFA": "okta_policy_mfa"},
+        {"Policy Rule Mfa": "okta_policy_rule_mfa"},
+        {"Policy Password": "okta_policy_password"},
+        {"Policy Rule Password": "okta_policy_rule_password"},
+        {"Policy Profile Enrollemnt": "okta_policy_profile_enrollment"},
+        {"Policy Ruke Profile Enrollment": "okta_policy_rule_profile_enrollment"},
+        {"Policy Sign On": "okta_policy_sign_on"},
+        {"Policy Rule Sign On": "okta_policy_rule_sign_on"},
+        {"Policy Profile Enrollment apps": "okta_policy_profile_enrollment_apps"},
+        {"Policy Rule Idp Discovery": "okta_policy_rule_idp_discovery"},
+    ],
     "Network Zone": [
-        {"key": "okta_network_zone", "label":"Network Zone"}
+        {"Network Zone": "okta_network_zone"}
     ],
     "Behavior": [
-        {"key": "okta_behavior", "label":"Behavior"}
+        {"Behavior": "okta_behavior"}
     ],
     "Administrator Roles": [
-        {"key": "okta_admin_role_custom", "label": "Admin Role Custom"},
-        {"key": "okta_admin_role_targets", "label": "Admin Role Targets"},
-        {"key": "okta_role_subscription", "label": "Role Subscription"},
-        {"key": "okta_resource_set", "label": "Resoure set"},
+        {"Admin Role Custom": "okta_admin_role_custom"},
+        {"Admin Role Targets": "okta_admin_role_targets"},
+        {"Role Subscription": "okta_role_subscription"},
+        {"Resoure set": "okta_resource_set"},
     ],
-    "Trusted Origins":[
-        {"key": "okta_trusted_origin", "label": "Trusted Origin"},
-        {"key": "okta_trusted_server", "label": "Trusted Server"},
+    "Trusted Origins": [
+        {"Trusted Origin": "okta_trusted_origin"},
+        {"Trusted Server": "okta_trusted_server"},
     ],
     "Inline Hooks": [
-        {"key": "okta_inline_hook", "label": "Inline Hook"}
-        ],
+        {"Inline Hook": "okta_inline_hook"}
+    ],
     "Event_Hook": [
-        {"key": "okta_event_hook", "label": "Event_Hook"}
-        ],
+        {"Event_Hook": "okta_event_hook"}
+    ],
     "Domains": [
-        {"key": "okta_domain", "label": "Domain"}
-        ],
+        {"Domain": "okta_domain"}
+    ],
     "Link": [
-        {"key": "okta_link_definition", "label": "Link Definition"}
-     ],
-    "Applications":[
-        {"key": "okta_app_oauth", "label": "App Oauth"},
-        {"key": "okta_app_saml", "label": "App Saml"},
-        {"key": "okta_app_group_assignments", "label": "App Group Assignments"},
-        {"key": "okta_app_oauth_role_assignment", "label": "App Oauth Role Assignment"},
-        {"key": "okta_app_access_policy_assignment", "label": "App Access Policy Assignment"},
-        {"key": "okta_app_signon_policy", "label": "App Signon Policy"},
-        {"key": "okta_app_signon_policy_rule", "label": "App Signon Policy Rule"},
-        {"key": "okta_app_saml_app_settings", "label": "App Saml Settings"},
-        {"key": "okta_app_group_assignment", "label": "App Group Assignment"},
-        {"key": "okta_app_shared_credentials", "label": "App Shared Credentials"},
-        {"key": "okta_app_bookmark", "label": "App Bookmark"},
-        {"key": "okta_app_auto_login", "label": "App AUto Login"},
-        {"key": "okta_app_basic_auth", "label": "App Basic Auth"},
-        {"key": "okta_app_swa", "label": "App Swa"},
-        {"key": "okta_app_user", "label": "App User"},
-        {"key": "okta_app_oauth_api_scope", "label": "App Oauth Api Scope"},
-        {"key": "okta_app_oauth_post_logout_redirect_uri", "label": "APP Oauth Post Logout Redirect Uri"},
-        {"key": "okta_app_oauth_redirect_uri", "label": "App OAuth Redirect Uri"}
+        {"Link Definition": "okta_link_definition"}
+    ],
+    "Applications": [
+        {"App Oauth": "okta_app_oauth"},
+        {"App Saml": "okta_app_saml"},
+        {"App Group Assignments": "okta_app_group_assignments"},
+        {"App Oauth Role Assignment": "okta_app_oauth_role_assignment"},
+        {"App Access Policy Assignment": "okta_app_access_policy_assignment"},
+        {"App Signon Policy": "okta_app_signon_policy"},
+        {"App Signon Policy Rule": "okta_app_signon_policy_rule"},
+        {"App Saml Settings": "okta_app_saml_app_settings"},
+        {"App Group Assignment": "okta_app_group_assignment"},
+        {"App Shared Credentials": "okta_app_shared_credentials"},
+        {"App Bookmark": "okta_app_bookmark"},
+        {"App AUto Login": "okta_app_auto_login"},
+        {"App Basic Auth": "okta_app_basic_auth"},
+        {"App Swa": "okta_app_swa"},
+        {"App User": "okta_app_user"},
+        {"App Oauth Api Scope": "okta_app_oauth_api_scope"},
+        {"APP Oauth Post Logout Redirect Uri": "okta_app_oauth_post_logout_redirect_uri"},
+        {"App OAuth Redirect Uri": "okta_app_oauth_redirect_uri"},
     ]
 }

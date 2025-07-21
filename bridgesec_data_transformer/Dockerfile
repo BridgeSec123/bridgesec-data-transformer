@@ -25,6 +25,7 @@ COPY . .
 # Expose port
 EXPOSE 8000
 
-# Command to run Django (update in docker-compose)
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+## Optional: collect static if needed
+# RUN python manage.py collectstatic --noinput
 
+CMD ["gunicorn", "bridgesec_data_transformer.wsgi:application", "--bind", "0.0.0.0:8000"]

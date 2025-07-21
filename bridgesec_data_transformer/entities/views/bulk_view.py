@@ -3,7 +3,7 @@ import os
 import re
 from datetime import datetime
 
-from core.tasks.bulk_tasks import run_bulk_entity_task
+from entities.serializers.restore_serializer import RestoreDataSerializer
 from core.utils.collection_mapping import RESOURCE_COLLECTION_MAP
 from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
 from django.conf import settings
@@ -17,12 +17,21 @@ from core.tasks.bulk_tasks import run_bulk_entity_task
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from core.authentication import CustomJWTAuthentication
 from entities.registry import ENTITY_VIEWSETS
 
-
+def extract_time(db_name):
+    try:
+        time_part = db_name.split('T')[1]
+        return f"{time_part[:2]}:{time_part[2:]}"
+    except Exception:
+        return None 
+    
 class BulkEntityViewSet(viewsets.ViewSet):
-    # authentication_classes = [JWTAuthentication]
-    # permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = RestoreDataSerializer
+    
     """Viewset for bulk entity data import."""
     def post(self, request):
         db_name = get_dynamic_db()
@@ -32,7 +41,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
         return Response({
             "message": "Task Triggered",
             "db_name": db_name
-        }, status=status.HTTP_201_CREATED)
+        },status=status.HTTP_201_CREATED)
     
     @action(detail=False, methods=["get"], url_path="fetch-stored-data")
     def fetch_stored_data(self, request):
@@ -71,9 +80,6 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
             return Response(data, status=status.HTTP_200_OK)
 
-        except ValueError:
-            return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=status.HTTP_400_BAD_REQUEST)
-
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
@@ -102,12 +108,18 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     all_dbs = [db for db in all_dbs if db.startswith(date_prefix)]
                 except ValueError:
                     return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=status.HTTP_400_BAD_REQUEST)
+                
+            db_dict = {
+                extract_time(db): db
+                for db in all_dbs
+                if extract_time(db)
+            }
 
-            return Response({"databases": all_dbs}, status=status.HTTP_200_OK)
+            return Response(db_dict, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
     @swagger_auto_schema(
         manual_parameters=[
             openapi.Parameter(
@@ -138,36 +150,160 @@ class BulkEntityViewSet(viewsets.ViewSet):
                         status=status.HTTP_404_NOT_FOUND
                     )
 
-                display_names = [entry["label"] for entry in sub_entities]
-                return Response((display_names), status=status.HTTP_200_OK)
+                display_names = [value for entry in sub_entities for value in entry.keys()]
+
+                return Response({"data":display_names}, status=status.HTTP_200_OK)
 
             # No query param provided, return all entity types
             resource_names = sorted(RESOURCE_COLLECTION_MAP.keys())
-            return Response({"entity_types": resource_names}, status=status.HTTP_200_OK)
+            return Response({"data": resource_names}, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-    @action(detail=False, methods=["get"], url_path=r"data/(?P<db_name>[^/.]+)/(?P<resource_name>[^/.]+)")
-    def get_resource_data(self, request, db_name, resource_name):
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path=r"data/(?P<date_str>\d{4}-\d{2}-\d{2})/(?P<entity_name>[^/.]+)"
+    )
+    def get_resource_data(self, request, date_str, entity_name):
         """
-        Fetch data for a given resource from a specific MongoDB database.
+        Fetch data from latest matching DB for a given entity and date via path parameters.
         """
+        if not date_str or not entity_name:
+         return Response(
+            {"error": "Missing 'date' or 'entity_type' parameter"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
         try:
-            collections = RESOURCE_COLLECTION_MAP.get(resource_name)
-            if not collections:
-                return Response({"error": f"Invalid or unsupported resource: {resource_name}"}, status=status.HTTP_400_BAD_REQUEST)
+            #  Validate the date format
+            try:
+                datetime.strptime(date_str, "%Y-%m-%d")
+            except ValueError:
+                return Response(
+                    {"error": "Invalid date format. Use YYYY-MM-DD"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
+            # Connect to MongoDB and list all databases
             mongo_client = MongoClient(settings.MONGO_URI)
-            db = mongo_client[db_name]
+            all_dbs = mongo_client.list_database_names()
 
-            merged_data = []
-            for collection_name in collections:
-                if collection_name in db.list_collection_names():
-                    docs = list(db[collection_name].find({}, {'_id': 0}))  # omit MongoDB _id
-                    merged_data.extend(docs)
+            # Filter DBs with date prefix
+            date_prefix = f"{settings.MONGO_DB_NAME}_{date_str}"
+            matching_dbs = [db for db in all_dbs if db.startswith(date_prefix)]
 
-            return Response(merged_data, status=status.HTTP_200_OK)
+            if not matching_dbs:
+              return Response(
+                {
+                    "message": f"No matching databases found for the given date: {date_str}",
+                    "data": []
+               },
+              status=status.HTTP_200_OK
+              )
+
+            # Get the latest DB (last in sorted list)
+            latest_db_name = matching_dbs[-1]
+
+            # Get collection name for entity_type
+            collection_name = None
+            for group in RESOURCE_COLLECTION_MAP.values():
+                for mapping in group:
+                    if entity_name in mapping:
+                        collection_name = mapping[entity_name]
+                        break
+                if collection_name:
+                    break
+
+            if not collection_name:
+                return Response(
+                  {
+                    "message": f"Entity type '{entity_name}' not found in resource map.You are entering a wrong entity_type",
+                    "data": []
+                  },
+                status=status.HTTP_200_OK
+            )
+
+            # Fetch data from the latest db + collection
+            db = mongo_client[latest_db_name]
+            collection = db[collection_name]
+
+            data = list(collection.find({}, {"_id": 0}))  # exclude _id
+
+            return Response(data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @swagger_auto_schema(
+        method="post",
+        request_body=RestoreDataSerializer,
+        responses={201: "Success", 400: "Bad Request"}
+    )
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path=r"restore/(?P<date_str>\d{4}-\d{2}-\d{2})/(?P<entity_name>[^/.]+)"
+    )
+    def restore_modified_data(self, request, date_str, entity_name):
+        try:
+            serializer = RestoreDataSerializer(data=request.data)  
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=400)
+
+            modified_data = serializer.validated_data["data"]
+
+            collection_name = None
+            for group in RESOURCE_COLLECTION_MAP.values():
+                for mapping in group:
+                    if entity_name in mapping:
+                        collection_name = mapping[entity_name]
+                        break
+                if collection_name:
+                    break
+
+            if not collection_name:
+                return Response(
+                  {
+                    "message": f"Entity type '{entity_name}' not found in resource map.You are entering a wrong entity_type",
+                    "data": []
+                  },
+                status=status.HTTP_200_OK
+            )
+
+            new_db_name = get_dynamic_db()
+            ensure_mongo_connection(new_db_name)
+
+            # Connect and insert modified data
+            mongo_client = MongoClient(settings.MONGO_URI)
+            target_collection = mongo_client[new_db_name][collection_name]
+
+            for doc in modified_data:
+                doc.pop("_id", None)
+
+            target_collection.insert_many(modified_data)
+
+            return Response({
+                "message": "Modified data restored successfully.",
+                "restored_db": new_db_name,
+                "collection": collection_name,
+                "record_count": len(modified_data)
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({"error": str(e)}, status=500)
+
+
+
+
+
+
+
+
+

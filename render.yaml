@@ -1,0 +1,32 @@
+
+services:
+  - type: web
+    name: bridgesec-web-dev
+    env: docker
+    plan: free
+    branch: dev
+    dockerfilePath: ./bridgesec_data_transformer/Dockerfile
+    envVars:
+      - fromGroup: BridgesecDev
+    healthCheckPath: /
+
+  - type: worker
+    name: bridgesec-celery-worker-dev
+    env: docker
+    plan: free
+    branch: dev
+    dockerfilePath: ./bridgesec_data_transformer/Dockerfile
+    startCommand: >
+      celery -A bridgesec_data_transformer worker --loglevel=info
+    envVars:
+      - fromGroup: BridgesecDev
+
+  - type: worker
+    name: bridgesec-rabbit-consumer-dev
+    env: docker
+    plan: free
+    branch: dev
+    dockerfilePath: ./bridgesec_data_transformer/Dockerfile
+    startCommand: python core/rabbitmq_consumer.py
+    envVars:
+      - fromGroup: BridgesecDev
