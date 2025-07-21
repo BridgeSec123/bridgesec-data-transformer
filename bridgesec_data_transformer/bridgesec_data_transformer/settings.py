@@ -44,7 +44,8 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = False
 
 ALLOWED_HOSTS = [
-    '.onrender.com'
+    '.onrender.com',
+    '127.0.0.1'
 ]
 
 # Application definition
