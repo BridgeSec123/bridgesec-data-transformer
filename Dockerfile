@@ -10,17 +10,14 @@ RUN apt-get update && apt-get install -y supervisor && \
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Copy app source code
-COPY . .
-
-# Copy supervisor config
-COPY bridgesec_supervisord.conf /etc/supervisor/conf.d/bridgesec_supervisord.conf
-
-RUN chmod +x entrypoint.sh
-
-# Entry point
-# Ensure entrypoint has proper line endings and permissions
+# Copy entrypoint and supervisor config
+COPY entrypoint.sh .
 RUN dos2unix entrypoint.sh && chmod +x entrypoint.sh
 
-# Entrypoint
-ENTRYPOINT ["./entrypoint.sh"]
+COPY bridgesec_supervisord.conf /etc/supervisor/conf.d/bridgesec_supervisord.conf
+
+# Copy app source
+COPY . .
+
+# Default command
+CMD ["./entrypoint.sh"]

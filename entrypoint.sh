@@ -11,8 +11,5 @@ echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
 echo "Starting server..."
-exec gunicorn bridgesec_data_transformer.wsgi:application
-       --chdir bridgesec_data_transformer
-       --timeout 2000
-
+supervisord -c /etc/supervisor/conf.d/bridgesec_supervisord.conf
 
