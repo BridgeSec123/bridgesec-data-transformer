@@ -2,33 +2,9 @@ services:
   - type: web
     name: bridgesec-django
     env: docker
-    branch: dev
     plan: free
+    branch: dev
     dockerfilePath: bridgesec_data_transformer/Dockerfile
     envVars:
       - fromGroup: Bridgesec
-      - key: SERVICE
-        value: web
     healthCheckPath: /
-
-  - type: worker
-    name: bridgesec-celery
-    env: docker
-    branch: dev
-    plan: free
-    dockerfilePath: bridgesec_data_transformer/Dockerfile
-    envVars:
-      - fromGroup: Bridgesec
-      - key: SERVICE
-        value: celery
-
-  - type: worker
-    name: bridgesec-consumer
-    env: docker
-    branch: dev
-    plan: free
-    dockerfilePath: bridgesec_data_transformer/Dockerfile
-    envVars:
-      - fromGroup: Bridgesec
-      - key: SERVICE
-        value: consumer
