@@ -42,10 +42,12 @@ FRONTEND_URL = env("FRONTEND_URL")
 SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = [
+    '.onrender.com',
+    '127.0.0.1'
+]
 
 # Application definition
 
@@ -227,29 +229,9 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
-         "celery": {
-            "handlers": ["console", "file"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "pika": {
-            "handlers": ["file"],
-            "level": "WARNING",  # suppress INFO logs from pika
-            "propagate": False,
-        },
-        "urllib3": {
-            "handlers": ["file"],
-            "level": "WARNING",  # suppress verbose HTTP logs
-            "propagate": False,
-        },
     },
 }
 
-# REST_FRAMEWORK = {
-#     'DEFAULT_AUTHENTICATION_CLASSES': (
-#         'rest_framework_simplejwt.authentication.JWTAuthentication',
-#     )
-# }
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "core.authentication.CustomJWTAuthentication",
