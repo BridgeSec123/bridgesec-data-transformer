@@ -1,31 +1,17 @@
-# Use official Python image
-FROM python:3.10-slim
+# Dockerfile
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libpq-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies
-COPY requirements.txt .
+# Install dependencies
+COPY requirements.txt ./requirements.txt
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Copy project files
+# Copy code
 COPY . .
 
-# Expose port
-EXPOSE 8000
+# Make sure log directories exist
+RUN mkdir -p /app/logs /app/output
 
-## Optional: collect static if needed
-# RUN python manage.py collectstatic --noinput
-
-CMD ["gunicorn", "bridgesec_data_transformer.wsgi:application", "--bind", "0.0.0.0:8000"]
+# No CMD or ENTRYPOINT here — Render uses startCommand

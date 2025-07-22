@@ -135,7 +135,7 @@ from entities.okta_entities.groups.views import (
 )
 # Dictionary to register all entity viewsets
 ENTITY_VIEWSETS = {
-#      "users": BaseUserViewSet,
+      "users": BaseUserViewSet,
 #     "identity_providers": BaseIdentityProviderViewSet,
 #     "behavior": BehaviorViewSet, 
 #     "orgs": OrgViewSet,
@@ -180,21 +180,21 @@ AUTH_SERVER_ENTITY_VIEWSETS = {
 USER_ENTITY_VIEWSETS = {
     "users": UserViewSet,
     "user_types": UserTypeViewSet,
-    "user_admin_roles": UserAdminRolesViewSet,
-    "okta_admin_role_targets": AdminRoleTargetsViewSet,
-    "okta_role_subscription": RoleSubscriptionViewSet,
-    "user_factors": UserFactorViewSet,
+    # "user_admin_roles": UserAdminRolesViewSet,
+    # "okta_admin_role_targets": AdminRoleTargetsViewSet,
+    # "okta_role_subscription": RoleSubscriptionViewSet,
+    # "user_factors": UserFactorViewSet,
+    # "user_schema_properties": UserSchemaPropertyViewSet,
+    # "user_base_schema_property": UserBaseSchemaPropertyViewSet,
+    # "okta_user_group_memberships": UserGroupMembershipsViewSet,
+    # "user_types": UserTypeViewSet,
+    # "user_admin_roles": UserAdminRolesViewSet,
+    # "okta_admin_role_targets": AdminRoleTargetsViewSet,
+    # "okta_role_subscription": RoleSubscriptionViewSet,
+    # "user_factors": UserFactorViewSet,
     "user_schema_properties": UserSchemaPropertyViewSet,
     "user_base_schema_property": UserBaseSchemaPropertyViewSet,
-    "okta_user_group_memberships": UserGroupMembershipsViewSet,
-    "user_types": UserTypeViewSet,
-    "user_admin_roles": UserAdminRolesViewSet,
-    "okta_admin_role_targets": AdminRoleTargetsViewSet,
-    "okta_role_subscription": RoleSubscriptionViewSet,
-    "user_factors": UserFactorViewSet,
-    "user_schema_properties": UserSchemaPropertyViewSet,
-    "user_base_schema_property": UserBaseSchemaPropertyViewSet,
-    "okta_user_group_memberships": UserGroupMembershipsViewSet
+    # "okta_user_group_memberships": UserGroupMembershipsViewSet
 }
 
 IDENTITY_PROVIDER_ENTITY_VIEWSETS = {

@@ -1,31 +1,36 @@
 services:
   - type: web
-    name: bridgesec-web-dev
+    name: bridgesec-django
     env: docker
-    plan: free
     branch: dev
-    dockerfilePath: ./bridgesec_data_transformer/Dockerfile
+    plan: free
+    dockerfilePath: bridgesec_data_transformer/Dockerfile
+    startCommand: >
+      gunicorn bridgesec_data_transformer.wsgi:application
+      --chdir bridgesec_data_transformer
+      --bind 0.0.0.0:8000
+      --timeout 2000
     envVars:
-      - fromGroup: BridgesecDev
+      - fromGroup: Bridgesec
     healthCheckPath: /
 
   - type: worker
-    name: bridgesec-celery-worker-dev
+    name: bridgesec-celery
     env: docker
-    plan: free
     branch: dev
-    dockerfilePath: ./bridgesec_data_transformer/Dockerfile
+    plan: free
+    dockerfilePath: bridgesec_data_transformer/Dockerfile
     startCommand: >
-      celery -A bridgesec_data_transformer worker --loglevel=info
+      sh -c 'celery -A bridgesec_data_transformer worker --loglevel=INFO 2>&1 | tee -a /app/logs/app.log'
     envVars:
-      - fromGroup: BridgesecDev
+      - fromGroup: Bridgesec
 
   - type: worker
-    name: bridgesec-rabbit-consumer-dev
+    name: bridgesec-consumer
     env: docker
-    plan: free
     branch: dev
-    dockerfilePath: ./bridgesec_data_transformer/Dockerfile
+    plan: free
+    dockerfilePath: bridgesec_data_transformer/Dockerfile
     startCommand: python core/rabbitmq_consumer.py
     envVars:
-      - fromGroup: BridgesecDev
+      - fromGroup: Bridgesec
