@@ -4,7 +4,7 @@ services:
     env: docker
     plan: free
     branch: dev
-    dockerfilePath: bridgesec_data_transformer/Dockerfile
+    dockerfilePath: Dockerfile
     envVars:
       - fromGroup: Bridgesec
     healthCheckPath: /
