@@ -19,7 +19,8 @@ COPY bridgesec_supervisord.conf /etc/supervisor/conf.d/bridgesec_supervisord.con
 RUN chmod +x entrypoint.sh
 
 # Entry point
-ENTRYPOINT ["./entrypoint.sh"]
+# Ensure entrypoint has proper line endings and permissions
+RUN dos2unix entrypoint.sh && chmod +x entrypoint.sh
 
-# Entry point for Render
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/bridgesec_supervisord.conf"]
+# Entrypoint
+ENTRYPOINT ["./entrypoint.sh"]
