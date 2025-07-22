@@ -16,5 +16,10 @@ COPY . .
 # Copy supervisor config
 COPY bridgesec_supervisord.conf /etc/supervisor/conf.d/bridgesec_supervisord.conf
 
+RUN chmod +x entrypoint.sh
+
+# Entry point
+ENTRYPOINT ["./entrypoint.sh"]
+
 # Entry point for Render
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/bridgesec_supervisord.conf"]
