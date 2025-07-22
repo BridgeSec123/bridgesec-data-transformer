@@ -13,7 +13,6 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY bridgesec_data_transformer/ ./
 
-RUN python manage.py collectstatic --noinput
 COPY bridgesec_supervisord.conf /etc/supervisor/conf.d/bridgesec_supervisord.conf
 
 RUN mkdir -p /bridgesec_data_transformer/logs \
