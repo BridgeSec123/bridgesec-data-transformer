@@ -17,4 +17,6 @@ COPY bridgesec_supervisord.conf /etc/supervisor/conf.d/bridgesec_supervisord.con
 RUN mkdir -p /bridgesec_data_transformer/logs \
  && chmod -R 755 /bridgesec_data_transformer/logs
 
+EXPOSE 8000
+
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/bridgesec_supervisord.conf"]

@@ -7,4 +7,6 @@ services:
     dockerfilePath: Dockerfile
     envVars:
       - fromGroup: Bridgesec
+    ports:
+      - 8000
     healthCheckPath: /
