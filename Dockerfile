@@ -1,23 +1,20 @@
-FROM python:3.11-slim
+FROM python:3.10-slim
 
-WORKDIR /app
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    supervisor \
+ && rm -rf /var/lib/apt/lists/*
 
-# Install system packages
-RUN apt-get update && apt-get install -y supervisor && \
-    mkdir -p /app/logs /app/output /var/log/supervisor
+WORKDIR /bridgesec_data_transformer
 
-# Copy Python dependencies
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Copy entrypoint and supervisor config
-COPY entrypoint.sh .
-RUN dos2unix entrypoint.sh && chmod +x entrypoint.sh
-
+COPY bridgesec_data_transformer/ ./
 COPY bridgesec_supervisord.conf /etc/supervisor/conf.d/bridgesec_supervisord.conf
 
-# Copy app source
-COPY . .
+RUN mkdir -p /bridgesec_data_transformer/logs \
+ && chmod -R 755 /bridgesec_data_transformer/logs
 
-# Default command
-CMD ["./entrypoint.sh"]
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/bridgesec_supervisord.conf"]
