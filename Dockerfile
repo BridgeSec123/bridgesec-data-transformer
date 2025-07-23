@@ -32,7 +32,7 @@ ENV PATH="/bridgesec_data_transformer/venv/bin:$PATH"
 # Copy supervisord config
 COPY bridgesec_supervisord.conf /etc/supervisor/conf.d/bridgesec_supervisord.conf
 
-RUN . venv/bin/activate && python manage.py collectstatic --noinput --settings=bridgesec_data_transformer.settings
+RUN venv/bin/python manage.py collectstatic --noinput --settings=bridgesec_data_transformer.settings
 
 # Create logs directory
 RUN mkdir -p /bridgesec_data_transformer/logs \
