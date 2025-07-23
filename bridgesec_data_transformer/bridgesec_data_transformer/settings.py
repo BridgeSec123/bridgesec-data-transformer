@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'entities',
     'rest_framework_simplejwt',
     'corsheaders',
+
 ]
 
 MIDDLEWARE = [
@@ -228,6 +229,21 @@ LOGGING = {
             'handlers': ['console', 'file', 'error_file'],
             'level': 'INFO',
             'propagate': True,
+        },
+         "celery": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "pika": {
+            "handlers": ["file"],
+            "level": "WARNING",  # suppress INFO logs from pika
+            "propagate": False,
+        },
+        "urllib3": {
+            "handlers": ["file"],
+            "level": "WARNING",  # suppress verbose HTTP logs
+            "propagate": False,
         },
     },
 }
