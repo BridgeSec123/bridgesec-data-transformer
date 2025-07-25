@@ -31,7 +31,7 @@ class AppOauth(BaseEntityModel):
     accessibility_self_service = StringField(null=True,required=False)
     admin_note = StringField(null=True,required=False)
     app_links_json = StringField(null=True,required=False)
-    app_settings_json = StringField(null=True,required=False)
+    app_settings_json = DictField(null=True,required=False)
     authentication_policy = StringField(null=True,required=False)
     auto_key_rotation = BooleanField(null=True,required=False)
     auto_submit_toolbar = BooleanField(null=True,required=False)

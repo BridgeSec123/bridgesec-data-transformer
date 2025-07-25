@@ -38,5 +38,4 @@ class AdminRoleCustomViewSet(BaseAdministratorViewSet):
                 }
             )
         logger.info("Extracted and formatted %d admin role custom records from Okta", len(formatted_data))
-
         return formatted_data

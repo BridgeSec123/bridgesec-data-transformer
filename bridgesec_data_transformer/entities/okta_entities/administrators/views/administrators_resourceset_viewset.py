@@ -32,5 +32,4 @@ class AdminResourceSetViewSet(BaseAdministratorViewSet):
                 }
             )
         logger.info("Extracted and formatted %d admin resource set records from Okta", len(formatted_data))
-
         return formatted_data

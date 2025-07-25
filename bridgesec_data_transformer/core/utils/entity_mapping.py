@@ -157,7 +157,7 @@ ENTITY_TYPE_MAPPING = {
     "okta_app_oauth": {
         "okta_endpoint": "/api/v1/apps",
         "attributes": [
-            "id", "signOnMode", "label", "type", "accessibility", "visibility", "notes", "settings", "link", "userNameTemplate", "status", "credentials"
+            "id", "signOnMode", "label", "type", "accessibility", "visibility", "notes", "settings", "_links", "userNameTemplate", "status", "credentials"
         ]
     },
     "okta_app_saml": {

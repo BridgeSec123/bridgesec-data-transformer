@@ -21,8 +21,9 @@ class AppAutoLoginViewSet(BaseAppViewSet):
                 accessibility = record.get("accessibility", {})
                 credentials = record.get("credentials", {})
                 visibility = record.get("visibility", {})
-                signon = record.get("settings", {}).get("signOn", {})
                 settings = record.get("settings", {})
+                signon = settings.get("signOn", {})
+                note = settings.get("notes", {})
                 hide = visibility.get("hide", {})
                 logo_list = record.get("_links", {}).get("logo", [{}])
                 logo = logo_list[0].get("href", "") if logo_list and isinstance(logo_list, list) else ""
@@ -34,12 +35,12 @@ class AppAutoLoginViewSet(BaseAppViewSet):
                     "accessibility_error_redirect_url": accessibility.get("errorRedirectUrl", ""),
                     "accessibility_login_redirect_url": accessibility.get("loginRedirectUrl", ""),
                     "accessibility_self_service": accessibility.get("selfService", ""),
-                    "admin_note": record.get("adminNote", ""),
+                    "admin_note": note.get("admin", ""),
                     "app_links_json": any(visibility.get("appLinks",{}).values()),
-                    "app_settings_json": settings.get("app", ""),
+                    "app_settings_json": settings.get("app", "{}"),
                     "auto_submit_toolbar": visibility.get("autoSubmitToolbar", ""),
                     "credentials_scheme": credentials.get("scheme", ""),
-                    "enduser_note": record.get("enduserNote", ""),
+                    "enduser_note": note.get("enduser", ""),
                     "hide_ios": hide.get("iOS", ""),
                     "hide_web": hide.get("web", ""),
                     "logo": logo,
@@ -50,7 +51,7 @@ class AppAutoLoginViewSet(BaseAppViewSet):
                     "sign_on_redirect_url": signon.get("redirectUrl", ""),
                     "sign_on_url": signon.get("loginUrl", ""),
                     "status": record.get("status", ""),
-                    "timeouts": record.get("timeouts", ""),
+                    "timeouts": record.get("timeouts", []),
                     "user_name_template": username_template.get("template", ""),
                     "user_name_template_push_status": record.get("userNameTemplatePushStatus", ""),
                     "user_name_template_suffix": record.get("userNameTemplateSuffix", ""),

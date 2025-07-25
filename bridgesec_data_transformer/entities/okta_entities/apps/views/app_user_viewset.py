@@ -1,7 +1,7 @@
 import logging
 
 import requests
-from core.utils.rate_limit import handle_rate_limit
+from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
 
 from entities.okta_entities.apps.apps_models import AppUser
