@@ -27,7 +27,7 @@ class AppPolicySignOnViewSet(BaseAppViewSet):
         headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
         
         params = {
-            "type": "OKTA_SIGN_ON"
+            "type": "ACCESS_POLICY"
         }
         
         logger.info(f"Fetching data from Okta endpoint: {self.okta_endpoint}")

@@ -46,7 +46,8 @@ DEBUG = False
 
 ALLOWED_HOSTS = [
     '.onrender.com',
-    '127.0.0.1'
+    '127.0.0.1',
+    '31.97.229.6'
 ]
 
 # Application definition
@@ -98,7 +99,16 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'bridgesec_data_transformer.wsgi.application'
+ASGI_APPLICATION = 'bridgesec_data_transformer.asgi.application'
 
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)], 
+        },
+    },
+}
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases

@@ -1,4 +1,4 @@
-from mongoengine import BooleanField, DictField, ListField, StringField
+from mongoengine import BooleanField, DictField, ListField, StringField, IntField
 
 from entities.models.base import BaseEntityModel
 
@@ -59,8 +59,8 @@ class GroupSchemaProperty(BaseEntityModel):
     external_namespace = StringField(required=False)
     master = StringField(required=False)
     master_override_priority = StringField(required=False)
-    max_length = StringField(required=False)
-    min_length = StringField(required=False)
+    max_length = IntField(required=False)
+    min_length = IntField(required=False)
     one_of = ListField(required=False)
     permissions = ListField(required=False)
     required = BooleanField(required=False)

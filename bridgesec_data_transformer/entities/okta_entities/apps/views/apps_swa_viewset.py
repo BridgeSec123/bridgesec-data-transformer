@@ -50,7 +50,7 @@ class AppSwaViewSet(BaseAppViewSet):
                     "preconfigured_app": record.get("preconfiguredApp", ""),
                     "redirect_url": signon.get("redirectUrl", ""),
                     "status": record.get("status", ""),
-                    "timeouts": record.get("timeouts", ""),
+                    "timeouts": record.get("timeouts", []),
                     "url": record.get("url", ""),
                     "url_regex": record.get("urlRegex", ""),
                     "user_name_template": user_template.get("template", ""),
@@ -63,6 +63,5 @@ class AppSwaViewSet(BaseAppViewSet):
                 # Add the formatted record to the list
                 formatted_data.append(formatted_record)
 
-            logger.info("Extracted and formatted %d Identity Provider records from Okta", len(formatted_data))
-        
+            logger.info("Extracted and formatted %d app swa records from Okta", len(formatted_data))
         return formatted_data

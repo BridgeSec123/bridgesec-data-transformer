@@ -62,12 +62,12 @@ class GroupSchemaPropertyViewSet(BaseGroupViewSet):
                     "external_name": record.get("externalName", ""),
                     "external_namespace": record.get("externalNamespace", ""),
                     "one_of": record.get("oneOf", []),
-                    "permissions": record.get("permissions", []),
+                    "permissions": record.get("permissions", ""),
                     "required": record.get("required", False),
                     "master": record.get("definitions", "").get("base").get("properties").get("name").get("master", "").get("type", ""),
                     "master_override_priority": record.get("masterOverridePriority"),
-                    "max_length": record.get("maxLength"),
-                    "min_length": record.get("minLength"),
+                    "max_length": record.get("maxLength", 2),
+                    "min_length": record.get("minLength", 2),
                     "scope": record.get("definitions", "").get("base").get("properties").get("name").get("scope", ""),
                 }
             )

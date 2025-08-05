@@ -55,9 +55,9 @@ class GroupRoleViewSet(BaseGroupViewSet):
                 "group_id": group_id,
                 "role_type": role_type,
                 "disable_notifications": role.get("disableNotifications", False),
-                "resource_set_id": role.get("resourceSetId"),
-                "role_id": role.get("id"),
-                "target_app_list": role.get("targetAppInstanceIds", []),    
+                "resource_set_id": role.get("resourceSetId", ""),
+                "role_id": role.get("roleId", ""),
+                "target_app_list": role.get("targetAppInstanceIds", []),
                 "target_group_list": role.get("targetGroupIds", []),
             }
             extracted_roles.append(role_entry)

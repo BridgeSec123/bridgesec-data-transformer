@@ -52,11 +52,11 @@ class AuthorizationServerClaimViewSet(BaseAuthServerViewSet):
                 "claim_type": item.get("claimType"),
                 "name": item.get("name"),
                 "value": item.get("value", ""),
-                "alway_include_in_token": item.get("alwaysIncludeInToken"),
+                "always_include_in_token": item.get("alwaysIncludeInToken", ""),
                 "group_filter_type": item.get("groupFilterType", ""),
                 "scopes": item.get("conditions", {}).get("scopes", []),
-                "status": item.get("status"),
-                "value_type": item.get("valueType"),
+                "status": item.get("status", ""),
+                "value_type": item.get("valueType", ""),
             }
             extracted.append(record)
 

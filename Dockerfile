@@ -1,22 +1,22 @@
+# Dockerfile
+
 FROM python:3.10-slim
 
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
-    supervisor \
  && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /bridgesec_data_transformer
+# Set working directory
+WORKDIR /app
 
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-COPY bridgesec_data_transformer/ ./
-COPY bridgesec_supervisord.conf /etc/supervisor/conf.d/bridgesec_supervisord.conf
+# Copy the project files
+COPY . .
 
-RUN mkdir -p /bridgesec_data_transformer/logs \
- && chmod -R 755 /bridgesec_data_transformer/logs
-
+# Expose port for Django (Gunicorn)
 EXPOSE 8000
-
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/bridgesec_supervisord.conf"]

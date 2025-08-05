@@ -32,11 +32,13 @@ class IdentityProviderSAMLViewSet(BaseIdentityProviderViewSet):
                 account_link = policy.get("accountLink", {})
                 provisioning = policy.get("provisioning", {})
                 algorithms = protocol.get("algorithms", {})
+                sso = endpoints.get("sso", {})
                 formatted_record = {
                     "name": record.get("name", ""),
                     "acs_type": endpoints.get("acs", {}).get("type"),
                     "issuer": credentials.get("trust", {}).get("issuer"),
                     "kid": credentials.get("trust", {}).get("kid"),
+                    "sso_url": sso.get("url", ""),
                     "account_link_action": account_link.get("action"),
                     "account_link_group_include": account_link.get("groupInclude"),
                     "deprovisioned_action": provisioning.get("conditions", {}).get("deprovisioned", {}).get("action", ""),
@@ -53,8 +55,8 @@ class IdentityProviderSAMLViewSet(BaseIdentityProviderViewSet):
                     "request_signature_scope": algorithms.get("request", {}).get("signature", {}).get("scope", ""),
                     "response_signature_algorithm": algorithms.get("response", {}).get("signature", {}).get("algorithm", ""),
                     "response_signature_scope": algorithms.get("response", {}).get("signature", {}).get("scope", ""),
-                    "sso_binding": endpoints.get("sso", {}).get("binding", ""),
-                    "sso_destination": endpoints.get("sso", {}).get("destination", ""),
+                    "sso_binding": sso.get("binding", ""),
+                    "sso_destination": sso.get("sso", {}).get("destination", ""),
                     "status": record.get("status", ""),
                     "subject_filter": policy.get("subject", {}).get("filter", ""),
                     "subject_format": policy.get("subject", {}).get("format", []),

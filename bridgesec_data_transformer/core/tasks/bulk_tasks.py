@@ -6,29 +6,35 @@ import os
 import json
 import logging
 import pika
-from urllib.parse import urlparse
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def notify_backend_via_rabbitmq(db_name):
-    broker_url = os.getenv("CELERY_BROKER_URL")
-    print(f"[🔗] Connecting to broker: {broker_url}")
-    connection = pika.BlockingConnection(pika.URLParameters(broker_url))
-    channel = connection.channel()
+    try:
+        broker_url = os.getenv("CELERY_BROKER_URL")
+        logger.info(f"Connecting to broker: {broker_url}")
+        connection = pika.BlockingConnection(pika.URLParameters(broker_url))
+        channel = connection.channel()
 
-    channel.queue_declare(queue="task_status", durable=True)
-    message = json.dumps({"db_name": db_name, "status": "completed"})
+        channel.queue_declare(queue="task_status", durable=True)
+        message = json.dumps({"db_name": db_name, "status": "completed"})
 
-    print(f"[📤] Sending message to 'task_status': {message}")
-    channel.basic_publish(
-        exchange="",
-        routing_key="task_status",
-        body=message,
-        properties=pika.BasicProperties(delivery_mode=2),
-    )
+        logger.info(f"Sending message to 'task_status': {message}")
+        channel.basic_publish(
+            exchange="",
+            routing_key="task_status",
+            body=message,
+            properties=pika.BasicProperties(delivery_mode=2),
+        )
 
-    print(f"[✔] Status message for DB {db_name} sent.")
-    connection.close()
+        logger.info(f"Status message for DB {db_name} sent.")
+        connection.close()
+
+    except Exception as e:
+        logger.exception(f"Failed to notify via RabbitMQ: {e}")
+
 
 @shared_task
 def run_bulk_entity_task(db_name, task_id=None):
@@ -54,10 +60,7 @@ def run_bulk_entity_task(db_name, task_id=None):
                     json.dump(sub_entity_data, f, ensure_ascii=False, indent=4)
 
         logger.info(f"[{task_id}] Data stored for DB: {db_name}")
-
-        # TODO: Notify frontend via WebSocket here (Django Channels etc.)
+        notify_backend_via_rabbitmq(db_name)
 
     except Exception as e:
-        logger.exception(f"[{task_id}] Error during bulk entity fetch: {str(e)}")
-
-    notify_backend_via_rabbitmq(db_name)
+        logger.exception(f"[{task_id}] Error during bulk entity fetch: {e}")

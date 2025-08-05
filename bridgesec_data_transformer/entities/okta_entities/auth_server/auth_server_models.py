@@ -19,7 +19,7 @@ class AuthorizationServerClaim(BaseEntityModel):
     claim_type = StringField()
     name = StringField()
     value = StringField()
-    alway_include_in_token = BooleanField(null=True, required=False)
+    always_include_in_token = BooleanField(null=True, required=False)
     group_filter_type = StringField(null=True, required=False)
     scopes = ListField(null=True, required=False)
     status = StringField(null=True, required=False)

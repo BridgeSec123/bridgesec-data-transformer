@@ -60,35 +60,37 @@ class AppPolicyRuleSignOnViewSet(BaseAppViewSet):
         formatted_data = []
 
         for record in extracted_data:
-            actions = record.get("actions")
-            signon = actions.get("signon")
-            conditions = record.get("conditions")
+            actions = record.get("actions", {})
+            appsignon = actions.get("appSignOn", {})
+            verificationMethod = appsignon.get("verificationMethod") or {}
+            constraints = verificationMethod.get("constraints") or []
+            conditions = record.get("conditions") or {}
             formatted_record = {
-                "name": record.get("name"),
+                "name": record.get("name", ""),
                 "policy_id": policy_id,
-                "access": signon.get("access"),
-                "constraints": conditions.get("conditions", []),
-                "custom_expression": conditions.get("customExpression"),
-                "device_assurances_included": conditions.get("deviceEnrollments", []),
-                "device_is_managed": conditions.get("isManaged", False),
-                "device_is_registered": conditions.get("isRegistered", False),
-                "factor_mode": conditions.get("factorType", ""),
-                "groups_excluded": conditions.get("groups", {}).get("exclude", []),
-                "groups_included": conditions.get("groups", {}).get("include", []),
-                "inactivity_period": conditions.get("inactivity", {}).get("inactivityPeriod", ""),
-                "network_connection": conditions.get("network", {}).get("connection"),
-                "network_excludes": conditions.get("network", {}).get("exclude"),
-                "network_includes": conditions.get("network", {}).get("include"),
-                "platform_include": conditions.get("platform", {}).get("include", []),
-                "re_authentication_frequency": conditions.get("reauth", {}).get("frequency", ""),
+                "access": appsignon.get("access", ""),
+                "constraints": constraints,
+                "custom_expression": record.get("customExpression", ""),
+                "device_assurances_included": record.get("deviceEnrollments", []),
+                "device_is_managed": record.get("isManaged", False),
+                "device_is_registered": record.get("isRegistered", False),
+                "factor_mode": verificationMethod.get("factorMode", ""),
+                "groups_excluded": record.get("groups_excluded", []),
+                "groups_included": record.get("groups_included", []),
+                "inactivity_period": record.get("inactivityPeriod", ""),
+                "network_connection": record.get("network_connection", ""),
+                "network_excludes": record.get("network_excludes", []),
+                "network_includes": record.get("network_includes", []),
+                "platform_include": record.get("platform_include", []),
+                "re_authentication_frequency": record.get("reauth", {}).get("frequency", ""),
                 "priority": record.get("priority", ""),
-                "risk_score": signon.get("risk", ""),
+                "risk_score": conditions.get("riskScore", ""),
                 "status": record.get("status", ""),
-                "type": record.get("type", ""),
-                "user_types_excluded": conditions.get("people", {}).get("userTypes", {}).get("exclude", []),
-                "user_types_included": conditions.get("people", {}).get("userTypes", {}).get("include", []),
-                "users_included": conditions.get("people", {}).get("users", {}).get("include", []),
-                "users_excluded": conditions.get("people", {}).get("users", {}).get("exclude", []),
+                "type": verificationMethod.get("type", ""),
+                "user_types_excluded": record.get("userTypes_excluded", []),
+                "user_types_included": record.get("userTypes_included", []),
+                "users_included": record.get("users_included", []),
+                "users_excluded": record.get("users_excluded", []),
             }
             formatted_data.append(formatted_record)
 

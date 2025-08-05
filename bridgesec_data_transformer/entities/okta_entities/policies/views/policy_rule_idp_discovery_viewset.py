@@ -85,19 +85,19 @@ class PolicyRuleIDPDiscoveryViewSet(BasePolicyViewSet):
             formatted_record = {
                 "name": record.get("name"),
                 "policy_id": record.get("policy_id"),
-                "app_exclude": conditions.get("app").get("exclude"),
-                "app_include": conditions.get("app").get("include"),
-                "idp_id": actions.get("idp").get("providers")[0].get("type"),
-                "idp_type": actions.get("idp").get("providers")[0].get("type"),
-                "network_connection": conditions.get("network").get("connection"),
-                "network_excludes": record.get("network_excludes"),
-                "network_includes": record.get("network_includes"),
+                "app_exclude": conditions.get("app").get("exclude", []),
+                "app_include": conditions.get("app").get("include", []),
+                "idp_id": actions.get("idp").get("providers")[0].get("type", []),
+                "idp_type": actions.get("idp").get("providers")[0].get("type", []),
+                "network_connection": conditions.get("network").get("connection",[]),
+                "network_excludes": record.get("network_excludes",[]),
+                "network_includes": record.get("network_includes",[]),
                 "platform_include": conditions.get("platform").get("include"), 
                 "priority": record.get("priority"),
                 "status": record.get("status"),
-                "user_identifier_attribute": conditions.get("userIdentifier").get("attribute"),
-                "user_identifier_patterns": conditions.get("userIdentifier").get("patterns"),
-                "user_identifier_type": conditions.get("userIdentifier").get("type")
+                "user_identifier_attribute": conditions.get("userIdentifier").get("attribute",""),
+                "user_identifier_patterns": conditions.get("userIdentifier").get("patterns", []),
+                "user_identifier_type": conditions.get("userIdentifier").get("type", [])
             }
             formatted_data.append(formatted_record)
 

@@ -89,7 +89,7 @@ class AppsGroupAssignmentViewSet(BaseAppViewSet):
                     "priority": group.get("priority", ""),  
                     "profile": group.get("profile", {}),
                     "retain_assignment": group.get("retain_assignment", ""), 
-                    "timeouts": record.get("timeouts", {})
+                    "timeouts": record.get("timeouts", [])
                 }
                 
 

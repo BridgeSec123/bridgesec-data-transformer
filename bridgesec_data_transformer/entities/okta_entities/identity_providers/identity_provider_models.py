@@ -1,4 +1,4 @@
-from mongoengine import ListField, StringField, BooleanField
+from mongoengine import ListField, StringField, BooleanField, IntField
 
 from entities.models.base import BaseEntityModel
 
@@ -22,18 +22,19 @@ class IdentityProviderOIDC(BaseEntityModel):
     account_link_group_include = ListField(StringField(), null = True, required=False)
     deprovisioned_action = StringField(null = True, required=False)
     groups_action = StringField(null = True, required=False)
-    groups_assignments = ListField(StringField(), null = True, required=False)
+    groups_assignment = ListField(StringField(), null = True, required=False)
     groups_attribute = StringField(null = True, required=False)
     groups_filter = ListField(StringField(), null = True, required=False)
     issuer_mode = StringField(null = True, required=False)
-    max_clock_skew = StringField(null = True, required=False)
+    max_clock_skew = IntField(null = True, required=False)
     pkce_required = BooleanField(null = True, required=False)
+    protocol_type = StringField(null = True, required=False)
     profile_master = BooleanField(null = True, required=False)
     provisioning_action = StringField(null = True, required=False)
     request_signature_algorithm = StringField(null = True, required=False)
     request_signature_scope = StringField(null = True, required=False)
     status = StringField(null = True, required=False)
-    subject_match_algorithm = StringField(null = True, required=False)
+    subject_match_attribute = StringField(null = True, required=False)
     subject_match_type = StringField(null = True, required=False)
     suspended_action = StringField(null = True, required=False)
     
@@ -54,7 +55,7 @@ class IdentityProviderSAML(BaseEntityModel):
     groups_attribute = StringField(null = True, required=False)
     groups_filter = ListField(StringField(), null = True, required=False)
     issuer_mode = StringField(null = True, required=False)
-    max_clock_skew = StringField(null = True, required=False)
+    max_clock_skew = IntField(null = True, required=False)
     name_format = StringField(null = True, required=False)
     profile_master = BooleanField(null = True, required=False)
     provisioning_action = StringField(null = True, required=False)
@@ -92,7 +93,7 @@ class IdentityProviderSocial(BaseEntityModel):
     groups_attribute = StringField(null = True, required=False)
     groups_filter = ListField(StringField(), null = True, required=False)
     issuer_mode = StringField(null = True, required=False)
-    max_clock_skew = StringField(null = True, required=False)
+    max_clock_skew = IntField(null = True, required=False)
     profile_master = BooleanField(null = True, required=False)
     protocol_type = StringField(null = True, required=False)
     provisioning_action = StringField(null = True, required=False)

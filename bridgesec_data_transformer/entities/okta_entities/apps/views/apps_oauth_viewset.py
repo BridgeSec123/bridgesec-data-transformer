@@ -32,56 +32,65 @@ class AppOauthViewSet(BaseAppViewSet):
                 note = settings.get("notes", {})
                 oauthclient = settings.get("oauthClient", {})
                 link = record.get("_links", {})
+                authentication_policy = link.get("accessPolicy", {}).get("href", "").rstrip("/").split("/")[-1]
+                credentials = record.get("credentials", {})
+                oauthClient = credentials.get("oauthClient", {})
+                hide = visibility.get("hide", {})
+                oauthClient_settings = settings.get("oauthClient", {})
+                idp_initiated_login = oauthClient_settings.get("idp_initiated_login", {})
+                userNameTemplate = credentials.get("userNameTemplate", {})
+                refresh_token = oauthClient_settings.get("refresh_token", {})
 
+                
                 formatted_record = {
                     "app_id": record.get("id", ""),
                     "label": record.get("label", ""),
-                    "type": oauthclient.get("application_type","service"),
+                    "type": oauthClient_settings.get("application_type") or "service",
                     "accessibility_error_redirect_url": accessibility.get("errorRedirectUrl", ""),
                     "accessibility_login_redirect_url": accessibility.get("loginRedirectUrl", ""),
-                    "accessibility_self_service": accessibility.get("selfService", ""),
-                    "admin_note": note.get("admin", ""),
-                    "app_links_json": any(visibility.get("appLinks", {}).values()),
-                    "app_settings_json": record.get("app", "{}"),
-                    "authentication_policy": record.get("authentication_policy", ""),
-                    "auto_key_rotation": credentials.get("oauthClient", {}).get("autoKeyRotation", ""),
-                    "auto_submit_toolbar": visibility.get("autoSubmitToolbar", ""),
+                    "accessibility_self_service": accessibility.get("selfService", False),
+                    "admin_note": notes.get("admin", ""),
+                    "app_links_json": any(visibility.get("appLinks",{}).values()),  # store as string if needed
+                    "app_settings_json": settings.get("app", "{}"),  # recommend converting to JSON string if using StringField
+                    "authentication_policy": authentication_policy,
+                    "auto_key_rotation": oauthClient.get("autoKeyRotation", False),
+                    "auto_submit_toolbar": visibility.get("autoSubmitToolbar", False),
                     "client_basic_secret": record.get("client_basic_secret", ""),
-                    "client_id": credentials.get("oauthClient", {}).get("client_id", ""),
-                    "client_uri": oauthclient.get("client_uri", ""),
-                    "consent_method": oauthclient.get("consent_method", ""),
-                    "enduser_note": note.get("enduser", ""),
-                    "grant_types": oauthclient.get("grant_types", ""),
-                    "groups_claim": record.get("group_claims", []),
+                    "client_id": oauthClient.get("client_id", ""),
+                    "client_uri": oauthClient_settings.get("client_uri", ""),
+                    "consent_method": oauthClient_settings.get("consent_method", ""),
+                    "enduser_note": notes.get("enduser", ""),
+                    "grant_types": oauthClient_settings.get("grant_types", []) or [],  # ensure list
+                    "groups_claim": link.get("groups", []) if isinstance(link.get("groups", []), list) else [],  # list of dicts
                     "hide_ios": hide.get("iOS", False),
                     "hide_web": hide.get("web", False),
-                    "implicit_assignment": settings.get("implicitAssignment", ""),
-                    "issuer_mode": record.get("issuer_mode", ""),
-                    "jwks": record.get("jwks", {}),
-                    "jwks_uri": record.get("jwks_uri", ""),
-                    "login_mode": oauthclient.get("idp_initiated_login", {}).get("mode", ""),
-                    "login_scopes": oauthclient.get("idp_initiated_login", {}).get("default_scope", ""),
+                    "implicit_assignment": settings.get("implicitAssignment", False),
+                    "issuer_mode": oauthClient_settings.get("issuer_mode", ""),
+                    "jwks": oauthClient.get("jwks", []) if isinstance(oauthClient.get("jwks", []), list) else [],
+                    "jwks_uri": oauthClient.get("jwks_uri", ""),
+                    "login_mode": idp_initiated_login.get("mode", ""),
+                    "login_scopes": idp_initiated_login.get("default scope", []) or [],
                     "login_uri": record.get("login_uri", ""),
-                    "logo": link.get("logo", [{}])[0].get("href", ""),
-                    "logo_uri": record.get("logo_uri", ""),
-                    "omit_secret": record.get("omit_secret", ""),
-                    "pkce_required": credentials.get("oauthClient", {}).get("pkce_required", ""),
-                    "policy_uri": record.get("policy_uri", ""),
-                    "post_logout_redirect_uris": oauthclient.get("post_logout_redirect_uris", ""),
+                    "logo": record.get("logo", ""),
+                    "logo_uri": oauthClient_settings.get("logo_uri", ""),
+                    "omit_secret": record.get("omitSecret", False),
+                    "pkce_required": oauthClient.get("pkce_required", False),
+                    "policy_uri": link.get("policies", {}).get("hef", ""),
+                    "post_logout_redirect_uris": oauthClient.get("post_logout_redirect_uris", []) or [],
                     "profile": record.get("profile", "{}"),
-                    "redirect_uris": oauthclient.get("redirect_uris", ""),
-                    "refresh_token_leeway": record.get("refresh_token_leeway", 2),
-                    "refresh_token_rotation": record.get("refresh_token_rotation", ""),
-                    "response_types": oauthclient.get("response_types", ""),
+                    "redirect_uris": oauthClient_settings.get("redirect_uris", []) or [],
+                    "refresh_token_leeway": refresh_token.get("leeway", 0),
+                    "refresh_token_rotation": refresh_token.get("rotation_type", ""),
+                    "response_types": oauthClient_settings.get("response_types", []) or [],
                     "status": record.get("status", ""),
-                    "timeouts": record.get("timeouts", []),
-                    "token_endpoint_auth_method": credentials.get("oauthClient", {}).get("token_endpoint_auth_method", ""),
+                    "timeouts": record.get("timeouts", []) if isinstance(record.get("timeouts", []), list) else [],
+                    "token_endpoint_auth_method": oauthClient.get("token_endpoint_auth_method", ""),
                     "tos_uri": record.get("tos_uri", ""),
                     "user_name_template": userNameTemplate.get("template", ""),
                     "user_name_template_push_status": record.get("user_name_template_push_status", ""),
                     "user_name_template_suffix": record.get("user_name_template_suffix", ""),
                     "user_name_template_type": userNameTemplate.get("type", ""),
-                    "wildcard_redirect": oauthclient.get("wildcard_redirect", ""),
+                    "wildcard_redirect": oauthClient_settings.get("wildcard_redirect", "")
                 }
                 formatted_data.append(formatted_record)
 
