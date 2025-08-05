@@ -65,8 +65,16 @@ class PolicyMFAViewSet(BasePolicyViewSet):
         # allowed_fields = set(User._fields.keys())
 
         for record in extracted_data:
-            groups = record.get("conditions", {}).get("people", {}).get("groups", [])
-            factors = record.get("settings", {}).get("factors", [])
+            groups = record.get("conditions", {}).get("people", {}).get("groups", {})
+            factors = record.get("settings", {}).get("factors", {})
+
+            flattened = {
+                    k: {"enroll": v.get("enroll", {}).get("self")}
+                    for k, v in factors.items()
+                    if "self" in v.get("enroll", {})
+            }
+
+           
 
             formatted_record = {
                 "id": record.get("id"),
@@ -77,17 +85,17 @@ class PolicyMFAViewSet(BasePolicyViewSet):
                 "fido_u2f": record.get("fido_u2f"),
                 "fido_webauthn": record.get("fido_webauthn"),
                 "google_otp": record.get("google_otp"),
-                "groups_included": groups.get("include"),
+                "groups_included": groups.get("include", []),
                 "hotp": record.get("hotp"),
                 "is_oie": record.get("is_oie"),
-                "okta_call": record.get("okta_call"),
-                "okta_email": record.get("okta_email"),
-                "okta_otp": factors.get("okta_otp").get("enroll", {}),
-                "okta_password": factors.get("okta_password").get("enroll", {}),
-                "okta_push": record.get("okta_push"),
-                "okta_question": record.get("okta_question"),
-                "okta_sms": record.get("okta_sms"),
-                "okta_verify": record.get("okta_verify"),
+                "okta_call": flattened.get("okta_call", {}),
+                "okta_email": flattened.get("okta_email", {}),
+                "okta_otp":  flattened.get("okta_otp", {}),
+                "okta_password": flattened.get("okta_password", {}),
+                "okta_push": flattened.get("okta_push", {}),
+                "okta_question": flattened.get("okta_question", {}),
+                "okta_sms": flattened.get("okta_sms", {}),
+                "okta_verify": record.get("okta_verify", {}),
                 "onprem_mfa": record.get("onprem_mfa"),
                 "phone_number": record.get("phone_number"),
                 "priority": record.get("priority"),
@@ -99,6 +107,7 @@ class PolicyMFAViewSet(BasePolicyViewSet):
                 "yubikey_token": record.get("yubikey_token"),
             }
             formatted_data.append(formatted_record)
+
 
         logger.info("Final extracted %d user records after formatting and filtering", len(formatted_data))
         return formatted_data

@@ -23,7 +23,7 @@ class UserBaseSchemaPropertyViewSet(BaseUserViewSet):
             "title": okta_data.get("title", ""),
             "type": okta_data.get("type", ""),
             "master": login.get("master").get("type", ""),  
-            "permissions": login.get("permissions", ""),
+            "permissions": login.get("permissions")[0].get("action","") if login.get("permissions") else "",
             "pattern": okta_data.get("pattern", ""),
             "required": okta_data.get("required", ""),
             "user_type": user_type_id

@@ -67,11 +67,11 @@ class PolicySignOnViewSet(BasePolicyViewSet):
             groups = record.get("conditions", {}).get("people", {}).get("groups", [])
             formatted_record = {
                 "id": record.get("id"),
-                "name": record.get("name"),
-                "description": record.get("description"),
-                "groups_included": groups.get("include"),
-                "priority": record.get("priority"),
-                "status": record.get("status")
+                "name": record.get("name", ""),
+                "description": record.get("description", ""), 
+                "groups_included": groups.get("include", []),
+                "priority": record.get("priority", 0),
+                "status": record.get("status", "")
             }
             formatted_data.append(formatted_record)
 

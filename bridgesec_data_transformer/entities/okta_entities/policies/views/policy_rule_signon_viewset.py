@@ -67,8 +67,8 @@ class PolicyRuleSignOnViewSet(BasePolicyViewSet):
             conditions = record.get("conditions")
             session = signon.get("session")
             formatted_record = {
-                "name": record.get("name"),
-                "access": signon.get("access"),
+                "name": record.get("name", ""),
+                "access": signon.get("access", ""),
                 "auth_type": conditions.get("authContext").get("authType"),
                 "behaviors": conditions.get("behaviors"),
                 "factor_sequence": conditions.get("factorSequence", {}),
@@ -79,8 +79,8 @@ class PolicyRuleSignOnViewSet(BasePolicyViewSet):
                 "mfa_remember_device": signon.get("mfa", {}).get("rememberDevice"),
                 "mfa_required": signon.get("mfa", {}).get("required"),
                 "network_connection": conditions.get("network", {}).get("connection"),
-                "network_excludes": conditions.get("network", {}).get("exclude"),
-                "network_includes": conditions.get("network", {}).get("include"),
+                "network_excludes": conditions.get("network", {}).get("exclude", []),
+                "network_includes": conditions.get("network", {}).get("include", []),
                 "policy_id": policy_id,
                 "primary_factor": signon.get("primaryFactor", {}),
                 "priority": record.get("priority"),
@@ -89,7 +89,7 @@ class PolicyRuleSignOnViewSet(BasePolicyViewSet):
                 "session_lifetime": session.get("maxSessionLifetimeMinutes"),
                 "session_persistent": session.get("usePersistentCookie"),
                 "status": record.get("status"),
-                "users_excluded": conditions.get("people", {}).get("users", {}).get("exclude"),
+                "users_excluded": conditions.get("people", {}).get("users", {}).get("exclude", []),
             }
             formatted_data.append(formatted_record)
 

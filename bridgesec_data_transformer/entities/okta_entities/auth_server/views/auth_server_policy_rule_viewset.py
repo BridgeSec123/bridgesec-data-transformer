@@ -62,9 +62,9 @@ class AuthorizationServerPolicyRuleViewSet(BaseAuthServerViewSet):
                 "user_whitelist": rule.get("conditions", {}).get("people", {}).get("users", {}).get("include", []),
                 "scope_whitelist": rule.get("conditions", {}).get("scopes", {}).get("include", []),
                 "inline_hook_id": rule.get("actions", {}).get("token", {}).get("inlineHook", {}).get("id"),
-                "access_token_lifetime_minutes": rule.get("actions", {}).get("token", {}).get("accessTokenLifetimeMinutes"),
-                "refresh_token_lifetime_minutes": rule.get("actions", {}).get("token", {}).get("refreshTokenLifetimeMinutes"),
-                "refresh_token_window_minutes": rule.get("actions", {}).get("token", {}).get("refreshTokenWindowMinutes"),
+                "access_token_lifetime_minutes": rule.get("actions", {}).get("token", {}).get("accessTokenLifetimeMinutes", ""),
+                "refresh_token_lifetime_minutes": rule.get("actions", {}).get("token", {}).get("refreshTokenLifetimeMinutes", ""),
+                "refresh_token_window_minutes": rule.get("actions", {}).get("token", {}).get("refreshTokenWindowMinutes", ""),
                 "type": rule.get("type"),
                 "status": rule.get("status"),
             }

@@ -50,11 +50,11 @@ class AuthorizationServerPolicyViewSet(BaseAuthServerViewSet):
             record = {
                 "auth_server_id": auth_server_id,
                 "policy_id": item.get("id"),
-                "name": item.get("name"),
+                "name": item.get("name", ""),
                 "client_whitelist": item.get("conditions", {}).get("clients", {}).get("include", []),
-                "description": item.get("description"),
-                "priority": item.get("priority"),
-                "status": item.get("status"),
+                "description": item.get("description", ""),
+                "priority": item.get("priority", ""),
+                "status": item.get("status", ""),
             }
             extracted.append(record)
 

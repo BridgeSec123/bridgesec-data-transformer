@@ -4,7 +4,7 @@ logger = logging.getLogger(__name__)
 
 IDP_BASE_CONFIG = {
     "okta_endpoint": "/api/v1/idps",
-    "attributes": ["name", "protocol", "policy", "type"]
+    "attributes": ["name", "protocol", "policy", "type", "status"]
 }
 
 ENTITY_TYPE_MAPPING = {

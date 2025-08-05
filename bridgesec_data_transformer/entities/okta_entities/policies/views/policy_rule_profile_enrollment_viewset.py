@@ -80,7 +80,7 @@ class PolicyRuleProfileEnrollmentViewSet(BasePolicyViewSet):
                     for attr in profile_attributes.get("profileAttributes", [])
                 ],
                 "progressive_profiling_action": profile_attributes.get("progressiveProfilingAction", ""),
-                "target_group_id": profile_attributes.get("targetGroupId", ""),
+                "target_group_id": profile_attributes.get("targetGroupIds", ""),
                 "ui_schema_id": profile_attributes.get("uiSchemaId", "")
             }
             formatted_data.append(formatted_record)
