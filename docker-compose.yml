@@ -15,7 +15,7 @@ services:
       - ./output:/app/output
       - static_volume:/app/static
     command: >
-       gunicorn bridgesec_data_transformer.wsgi:application --bind 0.0.0.0:8000
+       gunicorn bridgesec_data_transformer.wsgi:application --bind 0.0.0.0:8000 --workers 4 --access-logfile -
     restart: always
 
   celery_worker:
