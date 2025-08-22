@@ -182,7 +182,9 @@ if not os.path.exists(LOG_DIR):
 
 CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
-    "https://bridgesec-fe.vercel.app"
+    "https://bridgesec-fe.vercel.app",
+    "http://31.97.229.6:3000",
+    "http://localhost:3000"
 ]
 
 CORS_ALLOW_CREDENTIALS = True
