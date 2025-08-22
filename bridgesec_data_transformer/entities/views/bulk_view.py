@@ -28,8 +28,8 @@ def extract_time(db_name):
         return None 
     
 class BulkEntityViewSet(viewsets.ViewSet):
-    authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    # authentication_classes = [CustomJWTAuthentication]
+    # permission_classes = [IsAuthenticated]
     serializer_class = RestoreDataSerializer
     
     """Viewset for bulk entity data import."""

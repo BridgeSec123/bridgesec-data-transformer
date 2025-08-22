@@ -67,15 +67,15 @@ class PolicyRulePasswordViewSet(BasePolicyViewSet):
             formatted_record = {
                 "name": record.get("name"),
                 "policy_id": policy_id,
-                "network_connection": conditions.get("network").get("connection"),
-                "network_excludes": record.get("network_excludes"),
-                "network_includes": record.get("network_includes"),
+                "network_connection": conditions.get("network").get("connection", "ANYWHERE"),
+                "network_excludes": record.get("network_excludes", []),
+                "network_includes": record.get("network_includes", []),
                 "password_change": actions.get("passwordChange", {}).get("access", ""),
                 "password_reset": actions.get("selfServicePasswordReset", {}).get("access", ""),
                 "password_unlock": actions.get("selfServiceUnlock", {}).get("access", ""),
-                "priority": record.get("priority"),
-                "status": record.get("status"),
-                "user_excluded": conditions.get("people").get("users").get("exclude"),
+                "priority": record.get("priority" , 0),
+                "status": record.get("status", ""),
+                "user_excluded": conditions.get("people").get("users").get("exclude", []),
             }
             formatted_data.append(formatted_record)
 

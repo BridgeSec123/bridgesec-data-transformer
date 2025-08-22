@@ -74,17 +74,15 @@ class PolicyMFAViewSet(BasePolicyViewSet):
                     if "self" in v.get("enroll", {})
             }
 
-           
-
             formatted_record = {
                 "id": record.get("id"),
                 "name": record.get("name"),
-                "description": record.get("description"),
-                "duo": record.get("duo"),
-                "external_idps": record.get("external_idps"),
-                "fido_u2f": record.get("fido_u2f"),
-                "fido_webauthn": record.get("fido_webauthn"),
-                "google_otp": record.get("google_otp"),
+                "description": record.get("description",""),
+                "duo": record.get("duo", {}),
+                "external_idps": record.get("external_idps", {}),
+                "fido_u2f": record.get("fido_u2f",{}),
+                "fido_webauthn": record.get("fido_webauthn", {}),
+                "google_otp": record.get("google_otp", {}),
                 "groups_included": groups.get("include", []),
                 "hotp": record.get("hotp"),
                 "is_oie": record.get("is_oie"),
@@ -95,16 +93,16 @@ class PolicyMFAViewSet(BasePolicyViewSet):
                 "okta_push": flattened.get("okta_push", {}),
                 "okta_question": flattened.get("okta_question", {}),
                 "okta_sms": flattened.get("okta_sms", {}),
-                "okta_verify": record.get("okta_verify", {}),
-                "onprem_mfa": record.get("onprem_mfa"),
-                "phone_number": record.get("phone_number"),
-                "priority": record.get("priority"),
-                "rsa_token": record.get("rsa_token"),
-                "security_question": record.get("security_question"),
-                "status": record.get("status"),
-                "symantec_vip": record.get("symantec_vip"),
-                "web_authn": record.get("web_authn"),
-                "yubikey_token": record.get("yubikey_token"),
+                "okta_verify": flattened.get("okta_verify", {}),
+                "onprem_mfa": record.get("onprem_mfa", {}),
+                "phone_number": record.get("phone_number", {}),
+                "priority": record.get("priority", 0),
+                "rsa_token": record.get("rsa_token", {}),
+                "security_question": record.get("security_question", {}),
+                "status": record.get("status", ""),
+                "symantec_vip": record.get("symantec_vip", {}),
+                "web_authn": record.get("web_authn", {}),
+                "yubikey_token": record.get("yubikey_token", {})
             }
             formatted_data.append(formatted_record)
 

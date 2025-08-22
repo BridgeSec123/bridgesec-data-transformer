@@ -194,12 +194,12 @@ USER_ENTITY_VIEWSETS = {
     # "user_factors": UserFactorViewSet,
     "user_schema_properties": UserSchemaPropertyViewSet,
     "user_base_schema_property": UserBaseSchemaPropertyViewSet,
-    # "okta_user_group_memberships": UserGroupMembershipsViewSet
+    "okta_user_group_memberships": UserGroupMembershipsViewSet
 }
 
 IDENTITY_PROVIDER_ENTITY_VIEWSETS = {
-    "okta_idp_oidc": IdentityProviderOIDCViewSet,
-    "okta_idp_saml": IdentityProviderSAMLViewSet,
+    # "okta_idp_oidc": IdentityProviderOIDCViewSet,
+    # "okta_idp_saml": IdentityProviderSAMLViewSet,
     "okta_idp_social": IdentityProviderSocialViewSet
 } 
 
@@ -211,11 +211,11 @@ DEVICE_ASSURANCE_POLICY_ENTITY_VIEWSETS = {
 }
 
 POLICY_ENTITY_VIEWSETS = {
-    "okta_policy_mfa": PolicyMFAViewSet,
-    "okta_policy_rule_mfa": PolicyRuleMFAViewSet,
-    "okta_policy_password": PolicyPasswordViewSet,
-    "okta_policy_profile_enrollment": PolicyProfileEnrollmentViewSet,
-    "okta_policy_profile_enrollment_apps": PolicyProfileEnrollmentAppsViewSet,
+    # "okta_policy_mfa": PolicyMFAViewSet,
+    # "okta_policy_rule_mfa": PolicyRuleMFAViewSet,
+    # "okta_policy_password": PolicyPasswordViewSet,
+    # "okta_policy_profile_enrollment": PolicyProfileEnrollmentViewSet,
+    # "okta_policy_profile_enrollment_apps": PolicyProfileEnrollmentAppsViewSet,
     "okta_policy_rule_idp_discovery": PolicyRuleIDPDiscoveryViewSet,
     "okta_policy_rule_password": PolicyRulePasswordViewSet,
     "okta_policy_rule_profile_enrollment": PolicyRuleProfileEnrollmentViewSet,
@@ -240,7 +240,7 @@ AUTHENTICATOR_ENTITY_VIEWSETS = {
 }
 
 APP_ENTITY_VIEWSETS = {
-    "okta_app_oauth": AppOauthViewSet,
+     "okta_app_oauth": AppOauthViewSet,
     "okta_app_saml": AppSAMLViewSet,
     "okta_apps_group_assignments": AppsGroupAssignmentsViewSet,
     "apps_access_policy_assignment": AppAccessPolicyAssignmentViewSet,

@@ -19,14 +19,16 @@ class BehaviorViewSet(BaseEntityViewSet):
         extracted_data = super().extract_data(okta_data)
         formatted_data = []
 
-        for item in extracted_data:
+        for record in extracted_data:
+            settings= record.get("settings",{})
             formatted_record = {
-                "name": item.get("name"),
-                "type": item.get("type"),
-                "status": item.get("status"),
-                "velocity": item.get("velocity"),
-                "location_granularity_type": item.get("type"),
-                "number_of_authentications": item.get("type")
+                "name": record.get("name", ""),
+                "type": record.get("type", ""),
+                "status": record.get("status", ""),
+                "velocity": settings.get("velocityKph", 0),
+                "location_granularity_type": settings.get("granularity", ""),
+                "number_of_authentications": record.get("number_of_authentications", 0),
+                "radius_from_location": settings.get("radiusKilometers", 0),
                 }
             
             formatted_data.append(formatted_record)

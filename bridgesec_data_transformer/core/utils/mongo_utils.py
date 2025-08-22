@@ -25,7 +25,7 @@ CONNECTED_DBS = set()
 def ensure_mongo_connection(db_name):
     """ 
     Ensure a connection to the given MongoDB database dynamically.
-    """
+    """ 
     global CONNECTED_DBS
 
     # # 🔹 First, ensure a 'default' connection is set up

@@ -22,10 +22,11 @@ class TrustedOriginViewSet(BaseEntityViewSet):
         formatted_data = []
 
         for item in extracted_data:
+            scope=item.get("scopes", [])
             formatted_record = {
                 "name": item.get("name"),
                 "origin": item.get("origin"),
-                "scopes": item.get("scopes"),
+                "scopes": [scope["type"].lower() for scope in item.get("scopes", [])],
                 "active": item.get("status"),
             }
             formatted_data.append(formatted_record)

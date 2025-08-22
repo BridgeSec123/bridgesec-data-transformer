@@ -82,6 +82,27 @@ class PolicyRuleIDPDiscoveryViewSet(BasePolicyViewSet):
         for record in extracted_data:
             conditions = record.get("conditions")
             actions = record.get("actions")
+
+            raw_platforms = conditions.get("platform", {}).get("include", [])
+            platform_include = []
+            for p in raw_platforms:
+                platform_data = {
+                    "type": p.get("type")
+                }
+                if "os" in p:
+                    platform_data["os_type"] = p["os"].get("type")
+                    platform_data["os_expression"] = p["os"].get("expression", "")
+                platform_include.append(platform_data)
+
+            raw_patterns = conditions.get("userIdentifier", {}).get("patterns", [])
+            user_identifier_patterns = []
+            for p in raw_patterns:
+                pattern_data = {
+                    "match_type": p.get("matchType"),
+                    "value": p.get("value")
+                }
+                user_identifier_patterns.append(pattern_data)
+            
             formatted_record = {
                 "name": record.get("name"),
                 "policy_id": record.get("policy_id"),
@@ -92,11 +113,11 @@ class PolicyRuleIDPDiscoveryViewSet(BasePolicyViewSet):
                 "network_connection": conditions.get("network").get("connection",[]),
                 "network_excludes": record.get("network_excludes",[]),
                 "network_includes": record.get("network_includes",[]),
-                "platform_include": conditions.get("platform").get("include"), 
+                "platform_include": platform_include, 
                 "priority": record.get("priority"),
                 "status": record.get("status"),
                 "user_identifier_attribute": conditions.get("userIdentifier").get("attribute",""),
-                "user_identifier_patterns": conditions.get("userIdentifier").get("patterns", []),
+                "user_identifier_patterns": user_identifier_patterns,
                 "user_identifier_type": conditions.get("userIdentifier").get("type", [])
             }
             formatted_data.append(formatted_record)

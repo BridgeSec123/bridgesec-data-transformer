@@ -41,11 +41,12 @@ class AppOauthViewSet(BaseAppViewSet):
                 userNameTemplate = credentials.get("userNameTemplate", {})
                 refresh_token = oauthClient_settings.get("refresh_token", {})
 
-                
+                type = oauthClient_settings.get("application_type") or "service"
+                    
                 formatted_record = {
                     "app_id": record.get("id", ""),
                     "label": record.get("label", ""),
-                    "type": oauthClient_settings.get("application_type") or "service",
+                    "type": type,
                     "accessibility_error_redirect_url": accessibility.get("errorRedirectUrl", ""),
                     "accessibility_login_redirect_url": accessibility.get("loginRedirectUrl", ""),
                     "accessibility_self_service": accessibility.get("selfService", False),
@@ -92,8 +93,29 @@ class AppOauthViewSet(BaseAppViewSet):
                     "user_name_template_type": userNameTemplate.get("type", ""),
                     "wildcard_redirect": oauthClient_settings.get("wildcard_redirect", "")
                 }
-                formatted_data.append(formatted_record)
 
-        logger.info("Extracted and formatted %d app oauth records from Okta", len(formatted_data))
+                if type == "web":
+                    if not formatted_record.get("grant_types"):
+                        formatted_record["grant_types"] = ["authorization_code"]
+                    if not formatted_record.get("response_types"):
+                        formatted_record["response_types"] = ["code"]
+                    if not formatted_record.get("redirect_uris"):
+                        formatted_record["redirect_uris"] = ["https://example.com/"]
+
+                elif type == "service":
+                    if not formatted_record.get("grant_types"):
+                        formatted_record["grant_types"] = ["client_credentials"]
+                    if not formatted_record.get("response_types"):
+                        formatted_record["response_types"] = ["token"]
+                    if not formatted_record.get("token_endpoint_auth_method"):
+                        formatted_record["token_endpoint_auth_method"] = "private_key_jwt"
+                    if not formatted_record.get("jwks"):
+                        formatted_record["jwks"] = []
+            
+
+                formatted_data.append(formatted_record)
+        logger.info("Extracted and formatted %d apps oauth records from Okta", len(formatted_data))
+
+        
         return formatted_data
 

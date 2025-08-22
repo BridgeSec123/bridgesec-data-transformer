@@ -69,8 +69,8 @@ class PolicyProfileEnrollmentViewSet(BasePolicyViewSet):
         for record in extracted_data:
             formatted_record = {
                 "id" : record.get("id"),
-                "name": record.get("name"),
-                "status": record.get("status")
+                "name": record.get("name", {}),
+                "status": record.get("status", {})
             }
 
             formatted_data.append(formatted_record)

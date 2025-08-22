@@ -93,7 +93,7 @@ ENTITY_TYPE_MAPPING = {
     },
     "behavior": {
         "okta_endpoint": "/api/v1/behaviors",
-        "attributes": ["name", "type", "status", "velocity", "settings"]
+        "attributes": ["name", "type", "status", "settings"]
     },
     "okta_policy_device_assurance_android": {
         "okta_endpoint": "/api/v1/device-assurances",
@@ -165,7 +165,7 @@ ENTITY_TYPE_MAPPING = {
     "okta_app_oauth": {
         "okta_endpoint": "/api/v1/apps",
         "attributes": [
-            "id", "signOnMode", "label", "type", "accessibility", "visibility", "notes", "settings", "_links", "userNameTemplate", "status", "credentials","idp_initiated_login",
+            "id", "signOnMode", "label", "type", "accessibility", "visibility", "notes", "settings", "_links", "userNameTemplate", "status", "credentials"
         ]
     },
     "okta_app_saml": {
@@ -251,6 +251,14 @@ ENTITY_TYPE_MAPPING = {
     "okta_app_basic_auth": {
         "okta_endpoint": "/api/v1/apps",
         "attributes": ["signOnMode", "label", "accessibility", "visibility", "settings", "status"]
+    },
+    "okta_app_secure_password_store": {
+        "okta_endpoint": "/api/v1/apps",
+        "attributes": ["signOnMode", "label", "accessibility", "visibility", "settings", "status", "credentials"]
+    },
+     "okta_app_three_field": {
+        "okta_endpoint": "/api/v1/apps",
+        "attributes": ["signOnMode", "label", "accessibility", "visibility", "settings", "status", "credentials"]
     },
     "okta_apps_oauth_api_scope":{
         "okta_endpoint": "/api/v1/apps/{app_id}/grants",

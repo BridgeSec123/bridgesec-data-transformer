@@ -21,10 +21,10 @@ class CaptchaViewSet(BaseCaptchaViewSet):
         formatted_data = []
         for record in extracted_data:
             formatted_record = {
-                "name": record.get("name"),
-                "type": record.get("type"),
-                "site_key": record.get("siteKey"),
-                "string_key": record.get("siteKey"),
+                "name": record.get("name", ""),
+                "type": record.get("type", ""),
+                "site_key": record.get("siteKey", ""),
+                "secret_key ": record.get("secret_key", ""),
             }
             formatted_data.append(formatted_record)
         logger.info(f"Extracted and formatted {len(formatted_data)} group records from Okta.")

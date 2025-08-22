@@ -18,23 +18,25 @@ class OrgViewSet(BaseEntityViewSet):
     def extract_data(self, okta_data):
         """ Extract data from Okta API response. """
         logger.info("extracting data from Okta API response for entity type orgs")
-        formatted_data = [{
-            "company_name": okta_data.get("companyName"),
-            "website": okta_data.get("website"),
-            "address1": okta_data.get("address1"),
-            "address2": okta_data.get("address2"),
-            "billing_contact_user": okta_data.get("billing_contact_user"),
-            "city": okta_data.get("city"),
-            "country": okta_data.get("country"),
-            "end_user_support_help_url": okta_data.get("endUserSupportHelpURL"),
-            "logo": okta_data.get("logo"),
-            "opt_out_communication_emails": okta_data.get("opt_out_communication_emails"),
-            "phone_number": okta_data.get("phoneNumber"),
-            "postal_code": okta_data.get("postalCode"),
-            "state": okta_data.get("state"),
-            "support_phone_number": okta_data.get("supportPhoneNumber"),
-            "technical_contact_user": okta_data.get("technical_contact_user")
-        }]
+        formatted_data = [
+            {
+            "company_name": okta_data.get("companyName", ""),
+            "website": okta_data.get("website", ""),
+            "address1": okta_data.get("address1") or None,
+            "address2": okta_data.get("address2") or None,
+            "billing_contact_user": okta_data.get("billing_contact_user", ""),
+            "city": okta_data.get("city", ""),
+            "country": okta_data.get("country", ""),
+            "end_user_support_help_url": okta_data.get("endUserSupportHelpURL", ""),
+            "logo": okta_data.get("logo", ""),
+            "opt_out_communication_emails": okta_data.get("opt_out_communication_emails", False),
+            "phone_number": okta_data.get("phoneNumber", ""),
+            "postal_code": okta_data.get("postalCode", ""),
+            "state": okta_data.get("state", ""),
+            "support_phone_number": okta_data.get("supportPhoneNumber", ""),
+            "technical_contact_user": okta_data.get("technical_contact_user", "")
+        }
+        ]
         logger.info(f"Extracted {len(formatted_data)} records for entity type {self.entity_type}")
         return formatted_data
 

@@ -36,7 +36,7 @@ class AppBasicAuthViewSet(BaseAppViewSet):
                     "url": app.get("url", ""),
                     "accessibility_error_redirect_url": accessibility.get("errorRedirectUrl", ""),
                     "accessibility_login_redirect_url": accessibility.get("loginRedirectUrl", ""),
-                    "accessibility_self_service": accessibility.get("selfService", ""),
+                    "accessibility_self_service": accessibility.get("selfService", False),
                     "admin_note": note.get("admin", ""),
                     "app_links_json":  any(visibility.get("appLinks",{}).values()),
                     "auto_submit_toolbar": visibility.get("autoSubmitToolbar", ""),
