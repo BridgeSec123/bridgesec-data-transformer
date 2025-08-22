@@ -21,11 +21,11 @@ class AuthorizationServerDefaultViewSet(BaseAuthServerViewSet):
     def extract_data(self, okta_data):
         return [
             {
-                "audiences": okta_data.get("audiences"),
-                "credentials_rotation_mode": okta_data.get("credentials").get("signing").get("rotationMode"),
-                "description": okta_data.get("description"),
-                "issuer_mode": okta_data.get("issuerMode"),
-                "name": okta_data.get("name"),
-                "status": okta_data.get("status"),
+                "audiences": okta_data.get("audiences", []),
+                "credentials_rotation_mode": okta_data.get("credentials", {}).get("signing", {}).get("rotationMode", ""),
+                "description": okta_data.get("description",""),
+                "issuer_mode": okta_data.get("issuerMode", ""),
+                "name": okta_data.get("name", ""),
+                "status": okta_data.get("status", ""),
             }
         ]

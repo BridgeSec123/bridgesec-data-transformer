@@ -4,14 +4,14 @@ from mongoengine import StringField, BooleanField
 
 class Brand(BaseEntityModel):
     name = StringField(required=True)
-    agree_to_custom_privacy_policy = BooleanField(required=False)
-    brand_id = StringField(required=False)
-    custom_privacy_policy_url = StringField(required=False)
-    default_app_app_instance_id = StringField(required=False)
-    default_app_app_link_name = StringField(required=False)
-    default_app_classic_application_uri = StringField(required=False)
-    locale = StringField(required=False)
-    remove_powered_by_okta = BooleanField(required=False)
+    agree_to_custom_privacy_policy = BooleanField(required=False, null=True)
+    brand_id = StringField(required=False, null=True)
+    custom_privacy_policy_url = StringField(required=False, null=True)
+    default_app_app_instance_id = StringField(required=False, null=True)
+    default_app_app_link_name = StringField(required=False, null=True)
+    default_app_classic_application_uri = StringField(required=False, null=True)
+    locale = StringField(required=False, null=True)
+    remove_powered_by_okta = BooleanField(required=False, null=True)
     
     meta = {"collection": "okta_brand"}
 
@@ -26,17 +26,17 @@ class EmailDomain(BaseEntityModel):
 
 class OktaTheme(BaseEntityModel):
     brand_id = StringField(required=True)
-    background_image = StringField(required=False)
-    email_template_touch_point_variant = StringField(required=False)
-    end_user_dashboard_touch_point_variant = StringField(required=False)
-    error_page_touch_point_variant = StringField(required=False)
-    favicon = StringField(required=False)
-    logo = StringField(required=False)
-    primary_color_contrast_hex = StringField(required=False)
-    primary_color_hex = StringField(required=False)
-    secondary_color_contrast_hex = StringField(required=False)
-    secondary_color_hex = StringField(required=False)
-    sign_in_page_touch_point_variant = StringField(required=False)
-    theme_id = StringField(required=False)
+    background_image = StringField(required=False, null=True)
+    email_template_touch_point_variant = StringField(required=False, null=True)
+    end_user_dashboard_touch_point_variant = StringField(required=False, null=True)
+    error_page_touch_point_variant = StringField(required=False, null=True)
+    favicon = StringField(required=False, null=True)
+    logo = StringField(required=False, null=True)
+    primary_color_contrast_hex = StringField(required=False, null=True)
+    primary_color_hex = StringField(required=False, null=True)
+    secondary_color_contrast_hex = StringField(required=False, null=True)
+    secondary_color_hex = StringField(required=False, null=True)
+    sign_in_page_touch_point_variant = StringField(required=False, null=True)
+    theme_id = StringField(required=False, null=True)
 
     meta = {"collection": "okta_theme"}

@@ -29,7 +29,7 @@ class IdentityProviderSocialViewSet(BaseIdentityProviderViewSet):
                 policy = record.get("policy", {})
                 credentials = protocol.get("credentials", {})
                 account_link = policy.get("accountLink", {})
-                provisioning = policy.get("provisioning", {})
+                provisioning = policy.get("provisioning") or {}
                 formatted_record = {
                     "name": record.get("name", ""),
                     "scopes": protocol.get("scopes", []),
@@ -41,12 +41,12 @@ class IdentityProviderSocialViewSet(BaseIdentityProviderViewSet):
                     "apple_team_id": credentials.get("apple", {}).get("teamId"),
                     "client_id": credentials.get("client", {}).get("client_id"),
                     "client_secret": credentials.get("client", {}).get("client_secret"),
-                    "deprovisioned_action": provisioning.get("conditions", {}).get("deprovisioned", {}).get("action", ""),
-                    "groups_action": provisioning.get("groups", {}).get("action", ""),
-                    "groups_assignments": provisioning.get("groups", {}).get("assignments", []),
-                    "groups_attribute": provisioning.get("groups", {}).get("attribute", ""),
-                    "groups_filter": provisioning.get("groups", {}).get("filter", []),
-                    "issuer_mode": provisioning.get("issuer", {}).get("mode", ""),
+                    "deprovisioned_action": (provisioning.get("conditions") or {}).get("deprovisioned", {}).get("action", ""),
+                    "groups_action": (provisioning.get("groups") or {}).get("action", ""),
+                    "groups_assignments": (provisioning.get("groups") or {}).get("assignments", []),
+                    "groups_attribute": (provisioning.get("groups") or {}).get("attribute", ""),
+                    "groups_filter": (provisioning.get("groups") or {}).get("filter", []),
+                    "issuer_mode": (provisioning.get("issuer") or {}).get("mode", ""),
                     "max_clock_skew": policy.get("maxClockSkew", ""),
                     "profile_master": provisioning.get("profileMaster", ""),
                     "protocol_type": protocol.get("type", ""),

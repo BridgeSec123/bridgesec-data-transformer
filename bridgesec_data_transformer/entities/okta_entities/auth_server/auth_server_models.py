@@ -46,22 +46,22 @@ class AuthorizationServerDefault(BaseEntityModel):
     meta = {"collection" : "okta_auth_server_default"}
 
 class AuthorizationServerPolicy(BaseEntityModel):
-    policy_id = StringField()
-    auth_server_id = StringField()
-    name = StringField()
-    client_whitelist = ListField()
-    description = StringField()
-    priority = IntField()
+    policy_id = StringField(required=True)
+    auth_server_id = StringField(required=True)
+    name = StringField(required=True)
+    client_whitelist = ListField(required=True)
+    description = StringField(required=True)
+    priority = IntField(required=True)
     status = StringField(null=True, required=False)
     
     meta = {"collection" : "okta_auth_server_policy"}
 
 class AuthorizationServerPolicyRule(BaseEntityModel):
-    auth_server_id = StringField()
-    grant_type_whitelist = ListField()
-    policy_id = StringField()
-    name = StringField()
-    priority = IntField()
+    auth_server_id = StringField(required=True)
+    grant_type_whitelist = ListField(required=True)
+    policy_id = StringField(required=True)
+    name = StringField(required=True)
+    priority = IntField(required=True)
     access_token_lifetime_minutes = IntField(null=True, required=False)
     group_blacklist = ListField(null=True, required=False)
     group_whitelist = ListField(null=True, required=False)

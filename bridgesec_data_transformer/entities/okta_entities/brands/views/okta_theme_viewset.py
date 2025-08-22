@@ -71,17 +71,17 @@ class ThemeViewset(BaseBrandViewSet):
         for record in extracted_data:
             formatted_record = {
                 "brand_id": brand_id,
-                "background_image": record.get("backgroundImage"),
-                "email_template_touch_point_variant": record.get("emailTemplateTouchPointVariant"),
-                "end_user_dashboard_touch_point_variant": record.get("endUserDashboardTouchPointVariant"),
-                "error_page_touch_point_variant": record.get("errorPageTouchPointVariant"),
-                "favicon": record.get("favicon"),
-                "logo": record.get("logo"),
-                "primary_color_contrast_hex": record.get("primaryColorContrastHex"),
-                "primary_color_hex": record.get("primaryColorHex"),
-                "secondary_color_contrast_hex": record.get("secondaryColorContrastHex"),
-                "secondary_color_hex": record.get("secondaryColorHex"),
-                "sign_in_page_touch_point_variant": record.get("signInPageTouchPointVariant"),
+                "background_image": record.get("backgroundImage", ""),
+                "email_template_touch_point_variant": record.get("emailTemplateTouchPointVariant", ""),
+                "end_user_dashboard_touch_point_variant": record.get("endUserDashboardTouchPointVariant", ""),
+                "error_page_touch_point_variant": record.get("errorPageTouchPointVariant", ""),
+                "favicon": record.get("favicon", ""),
+                "logo": record.get("logo", ""),
+                "primary_color_contrast_hex": record.get("primaryColorContrastHex", ""),
+                "primary_color_hex": record.get("primaryColorHex", ""),
+                "secondary_color_contrast_hex": record.get("secondaryColorContrastHex", ""),
+                "secondary_color_hex": record.get("secondaryColorHex", ""),
+                "sign_in_page_touch_point_variant": record.get("signInPageTouchPointVariant", ""),
                 "theme_id": record.get("id"),
             }
             formatted_data.append(formatted_record)

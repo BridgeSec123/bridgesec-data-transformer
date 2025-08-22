@@ -25,14 +25,18 @@ class GroupRuleViewSet(BaseGroupViewSet):
 
         extracted_rules = []
         for rule in okta_data:
+            conditions = rule.get("conditions", {})
+            expressions= conditions.get("expression", {})
+            people= conditions.get("people", {})
+            groups_assignments = conditions.get("actions", {}).get("assignUserToGroups", {})
             rule_entry = {
                 "name": rule.get("name"),
                 "status": rule.get("status"),
-                "group_assignments": rule.get("groupAssignments"),
-                "expression_type": rule.get("expressionType"),
-                "expression_value": rule.get("expressionValue"),
-                "remove_assigned_users": rule.get("removeAssignedUsers"),
-                "users_excluded": rule.get("usersExcluded"),
+                "group_assignments": groups_assignments.get("groupIds", []),
+                "expression_type": expressions.get("type",""),
+                "expression_value": expressions.get("value",""),
+                "remove_assigned_users": rule.get("removeAssignedUsers",""),
+                "users_excluded": people.get("users", {}).get("exclude", []),
             }
             extracted_rules.append(rule_entry)
 

@@ -53,9 +53,9 @@ class AuthorizationServerScopeViewSet(BaseAuthServerViewSet):
             record = {
                 "auth_server_id": auth_server_id,
                 "name": scope.get("name"),
-                "display_name": scope.get("displayName"),
-                "description": scope.get("description"),
-                "consent": scope.get("consent"),
+                "display_name": scope.get("displayName", ""),
+                "description": scope.get("description", ""),
+                "consent": scope.get("consent", "implicit"),
                 "metadata_publish": scope.get("metadataPublish"),
                 "default": scope.get("default", False),
                 "optional": scope.get("optional", False),

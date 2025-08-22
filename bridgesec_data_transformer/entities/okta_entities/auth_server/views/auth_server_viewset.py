@@ -27,7 +27,7 @@ class AuthorizationServerViewSet(BaseAuthServerViewSet):
                 "audiences": data.get("audiences"),
                 "description": data.get("description", ""),
                 "issuer_mode": data.get("issuerMode", ""),
-                "credentials_rotation_mode": data.get("credentials", {}).get("rotationMode", ""),
+                "credentials_rotation_mode": data.get("credentials", {}).get("rotationMode", "Manual"),
                 "status": data.get("status", "")
             }
             formatted_data.append(formatted_record)

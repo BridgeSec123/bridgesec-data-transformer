@@ -30,17 +30,27 @@ class AppSAMLViewSet(BaseAppViewSet):
                 signon = settings.get("signOn", {})
                 hide = visibility.get("hide", {})
                 userNameTemplate=record.get("credentials", {}).get("userNameTemplate", {})
+                
+                raw_statements = signon.get("attributeStatements", [])
+                attribute_statements = []
+
+                for s in raw_statements:
+                    # normalize only if actual keys exist
+                    attribute_statements.append({
+                        "filter_type": s.get("filterType"),
+                        "filter_value": s.get("filterValue")
+                    })
 
                 formatted_record = {
                     "label": record.get("label", ""),
                     "accessibility_error_redirect_url": accessibility.get("errorRedirectUrl", ""),
                     "accessibility_login_redirect_url": accessibility.get("loginRedirectUrl", ""),
-                    "accessibility_self_service": accessibility.get("selfService", ""),
+                    "accessibility_self_service": accessibility.get("selfService", False),
                     "acs_endpoints": signon.get("acsEndpoints", []),
                     "admin_note": note.get("admin", ""),
                     "app_links_json":  any(visibility.get("appLinks",{}).values()),
                     "app_settings_json": any(visibility.get("appLinks", {}).values()),
-                    "attribute_statements": signon.get("attributeStatements", {}),
+                    "attribute_statements": attribute_statements,
                     "audience": signon.get("audience", ""),
                     "authentication_policy": record.get("authentication_policy", ""),
                     "authn_context_class_ref": signon.get("authnContextClassRef", ""),
@@ -51,7 +61,7 @@ class AppSAMLViewSet(BaseAppViewSet):
                     "enduser_note": note.get("enduser", ""),
                     "hide_ios": hide.get("iOS", ""),
                     "hide_web": hide.get("web", ""),
-                    "honor_force_authn": signon.get("honorForceAuthn", ""),
+                    "honor_force_authn": signon.get("honorForceAuthn", False),
                     "idp_issuer": signon.get("idpIssuer", ""),
                     "inline_hook_id": signon.get("inlineHooks", ""),
                     "implicit_assignment" : settings.get("implicitAssignment", ""),
@@ -63,7 +73,7 @@ class AppSAMLViewSet(BaseAppViewSet):
                     "request_compressed": signon.get("requestCompressed", ""),
                     "response_signed": signon.get("responseSigned", ""),
                     "saml_signed_request_enabled": signon.get("samlSignedRequest", ""),
-                    "saml_version": record.get("samlVersion", ""),
+                    "saml_version": record.get("samlVersion", "2.0"),
                     "signature_algorithm": signon.get("signatureAlgorithm", ""),
                     "single_logout_certificate": record.get("singleLogoutCertificate", ""),
                     "single_logout_issuer": record.get("singleLogoutIssuer", ""),
@@ -74,11 +84,11 @@ class AppSAMLViewSet(BaseAppViewSet):
                     "subject_name_id_format": signon.get("subjectNameIdFormat", ""),
                     "subject_name_id_template": signon.get("subjectNameIdTemplate", ""),
                     "timeouts": record.get("timeouts", []),
-                    "user_name_template": userNameTemplate.get("template", ""),
+                    "user_name_template": userNameTemplate.get("template", "${source.login}"),
                     "user_name_template_push_status": record.get("userNameTemplatePushStatus", ""),
                     "user_name_template_suffix": record.get("userNameTemplateSuffix", ""),
-                    "user_name_template_type": userNameTemplate.get("type", ""),
-                    "acs_endpoints_indices": record.get("acs_endpoints_indices",{})
+                    "user_name_template_type": userNameTemplate.get("type", "BUILT_IN"),
+                    "acs_endpoints_indices": record.get("acs_endpoints_indices", {})
                 }
                 formatted_data.append(formatted_record)
         logger.info("Extracted and formatted %d app saml records from Okta", len(formatted_data))

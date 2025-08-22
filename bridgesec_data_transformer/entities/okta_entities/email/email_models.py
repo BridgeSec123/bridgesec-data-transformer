@@ -4,8 +4,8 @@ from entities.models.base import BaseEntityModel
 
 
 class EmailCustomization(BaseEntityModel):
-    brand_id = StringField(required=False)
-    template_name =  StringField(required=False)
+    brand_id = StringField(required=True)
+    template_name =  StringField(required=True)
     body = StringField(required=False)
     is_default = BooleanField(required=False)
     language = StringField(required=False)
@@ -14,9 +14,9 @@ class EmailCustomization(BaseEntityModel):
     meta = {"collection": "okta_email_customization"}
 
 class EmailTemplateSettings(BaseEntityModel):
-    brand_id = StringField(required=False)
-    template_name = StringField(required=False)
-    recipients = StringField(required=False)
+    brand_id = StringField(required=True)
+    template_name = StringField(required=True)
+    recipients = StringField(required=True)
 
     meta = {"collection": "okta_email_template_settings"}
 

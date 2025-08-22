@@ -58,16 +58,16 @@ class BrandEntityViewSet(BaseEntityViewSet):
             formatted_record = {
                 "name": data.get("name"),
                 "brand_id": data.get("id"),
-                "agree_to_custom_privacy_policy": data.get("agreeToCustomPrivacyPolicy"),
-                "custom_privacy_policy_url": data.get("customPrivacyPolicyUrl"),
-                "default_app_app_instance_id": default_app.get("appInstanceId"),
-                "default_app_app_link_name": default_app.get("appLinkName"),
-                "default_app_classic_application_uri": default_app.get("classicApplicationUri"),
-                "locale": data.get("locale"),
-                "remove_powered_by_okta": data.get("removePoweredByOkta"),
+                "agree_to_custom_privacy_policy": data.get("agreeToCustomPrivacyPolicy", ""),
+                "custom_privacy_policy_url": data.get("customPrivacyPolicyUrl", ""),
+                "default_app_app_instance_id": default_app.get("appInstanceId", ""),
+                "default_app_app_link_name": default_app.get("appLinkName", ""),
+                "default_app_classic_application_uri": default_app.get("classicApplicationUri", ""),
+                "locale": data.get("locale", ""),
+                "remove_powered_by_okta": data.get("removePoweredByOkta", ""),
             }
             formatted_data.append(formatted_record)
-        
+    
         logger.info(f"Extracted {len(formatted_data)} brands from Okta response")
         return formatted_data
     

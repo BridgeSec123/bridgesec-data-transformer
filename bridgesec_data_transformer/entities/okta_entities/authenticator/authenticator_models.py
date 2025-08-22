@@ -22,16 +22,16 @@ class Authenticator(BaseEntityModel):
 
 class OktaFactor(BaseEntityModel):
     provider_id = StringField(required=True)
-    active = BooleanField(required=False)
+    active = BooleanField(required=False, null=True)
 
     meta = {"collection": "okta_factor"}
 
 class AuthenticatorOktaFactorTotp(BaseEntityModel):
     name = StringField(required=True)
-    clock_drift_interval = IntField(required=False)
-    hmac_algorithm = StringField(required=False)
-    otp_length = IntField(required=False)
-    shared_secret_encoding = StringField(required=False)
-    time_step = IntField(required=False)
+    clock_drift_interval = IntField(required=False, null=True)
+    hmac_algorithm = StringField(required=False, null=True)
+    otp_length = IntField(required=False, null=True)
+    shared_secret_encoding = StringField(required=False, null=True)
+    time_step = IntField(required=False, null=True)
 
     meta = {"collection": "okta_factor_totp"}
