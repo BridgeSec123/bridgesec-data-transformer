@@ -10,7 +10,7 @@ RESOURCE_COLLECTION_MAP = {
         {"User Type": "okta_user_type"}
     ],
     "Groups": [
-        {"Groups": "okta_groups"},
+        {"Groups": "okta_group"},
         {"Group Schema Property": "okta_group_schemas"},
         {"Group Rules": "okta_group_rules"},
         {"Group Roles": "okta_group_roles"},
