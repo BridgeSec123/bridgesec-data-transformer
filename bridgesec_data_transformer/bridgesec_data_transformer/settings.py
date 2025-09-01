@@ -17,6 +17,7 @@ from pathlib import Path
 import environ
 from core.utils.mongo_utils import connect_to_mongo
 from mongoengine import connect
+from pymongo import MongoClient
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -34,6 +35,7 @@ OKTA_ISSUER = env("OKTA_ISSUER")
 OKTA_SECRET_KEY = env("OKTA_SECRET_KEY")
 FRONTEND_REDIRECT_URL = env("FRONTEND_REDIRECT_URL")
 FRONTEND_URL = env("FRONTEND_URL")
+SERVER_URL = env("SERVER_URL")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
@@ -164,6 +166,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MONGO_DB_NAME = env("MONGO_DB_NAME")
 MONGO_URI = env("MONGO_URI")
+MONGO_CLIENT = MongoClient(MONGO_URI)
 
 connect(db=MONGO_DB_NAME, host=MONGO_URI)
 connect_to_mongo()
