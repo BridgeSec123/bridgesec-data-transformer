@@ -289,7 +289,10 @@ SWAGGER_SETTINGS = {
             'name': 'Authorization',
             'in': 'header'
         }
-    }
+    },
+    "USE_SESSION_AUTH": False,   # hides Django login/logout
+    "LOGIN_URL": None,
+    "LOGOUT_URL": None,
 }
 
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL")
