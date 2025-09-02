@@ -19,7 +19,7 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path("", include(router.urls)),
-    path("api/bulk/", BulkEntityViewSet.as_view({"post": "post", "get":"fetch_stored_data"}), name="bulk-api"),
+    path("api/bulk/", BulkEntityViewSet.as_view({"post": "post"}), name="bulk-api"),
     # path("fetch_db/", BulkEntityViewSet.as_view({"get": "list_databases"}), name="fetch-db"),
     path("resources/", BulkEntityViewSet.as_view({"get": "get_resource_names"}), name="resources"),
     path("data/<str:date_str>/<str:entity_name>/", BulkEntityViewSet.as_view({"get": "get_resource_data"}), name="data"),

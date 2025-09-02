@@ -33,7 +33,8 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 class CustomTokenRefreshView(TokenRefreshView):
     @swagger_auto_schema(
         operation_description="Refresh your JWT token using a valid refresh token",
-        responses={200: openapi.Response('Token refreshed')}
+        responses={200: openapi.Response('Token refreshed')},
+        tags=["login"]
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
@@ -43,7 +44,8 @@ class CustomTokenObtainView(APIView):
     @swagger_auto_schema(
         request_body=UserLoginSerializer,
         operation_description="Login and get JWT token",
-        responses={200: "JWT Token returned"}
+        responses={200: "JWT Token returned"},
+        tags=["login"]
     )
     def post(self, request):
         serializer = UserLoginSerializer(data=request.data)
