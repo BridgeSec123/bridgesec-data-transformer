@@ -56,8 +56,8 @@ def get_latest_db(mongo_client, date_str):
 
 
 class BulkEntityViewSet(viewsets.ViewSet):
-    # authentication_classes = [CustomJWTAuthentication]
-    # permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomJWTAuthentication]
+    permission_classes = [IsAuthenticated]
     serializer_class = RestoreDataSerializer
 
     @swagger_auto_schema(
@@ -308,9 +308,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     if docs:
                         target_collection.insert_many(docs)
             
-            
-            response = requests.post(f"{server_url}/api/", json={"db_name":new_db_name},headers={"Content-Type": "application/json"}  )
-            
+            response = requests.post(f"{server_url}/api/", json={"db_name":new_db_name},headers={"Content-Type": "application/json"}  ) 
 
             if response.status_code == 200:
                 return Response(
