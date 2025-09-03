@@ -308,33 +308,29 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     if docs:
                         target_collection.insert_many(docs)
             
-            response = requests.post(f"{server_url}/api/", json={"db_name":new_db_name},headers={"Content-Type": "application/json"}  ) 
+            tf_response = requests.post(f"{server_url}/api/", json={"db_name":new_db_name},headers={"Content-Type": "application/json"}  ) 
 
-            if response.status_code == 200:
-                return Response(
-                    {
-                        "message": "Modified data restored successfully.",
-                        "restored_db": new_db_name,
-                        "collection_modified": collection_name,
-                        "record_count": len(modified_data),
-                        "total_collections": len(source_db.list_collection_names()),
-                    },
-                    status=status.HTTP_201_CREATED,
-                )
-            else:
-                # API call failed → raise error for Swagger/Client
-                try:
-                    # Attempt to pass the error message from API
-                    error_detail = response.json()
-                except Exception:
-                    error_detail = {"error": "Unknown error from internal API"}
-                return Response(
-                    {
-                        "message": "Failed to restore data",
-                        "api_response": error_detail,
-                    },
-                    status=response.status_code  
-                )
+            try:
+                tf_data = tf_response.json()
+            except Exception:
+                tf_data = {"message": "Unknown response from TF repo"}
+
+                # extract message
+            tf_message = tf_data.get("message", "No message returned")
+
+          
+            return Response(
+                {
+                    "tf_message": tf_message,
+                    "message": "Modified data restored successfully.",
+                    "restored_db": new_db_name,
+                    "collection_modified": collection_name,
+                    "record_count": len(modified_data),
+                    "total_collections": len(source_db.list_collection_names()),
+                },
+                status=status.HTTP_201_CREATED,
+            )
+            
 
         except Exception as e:
             import traceback
