@@ -1,28 +1,34 @@
-from mongoengine import BooleanField, DictField, ListField, StringField, IntField
-
 from entities.models.base import BaseEntityModel
+from mongoengine import BooleanField, DictField, IntField, ListField, StringField
 
 
 class Group(BaseEntityModel):
     group_id = StringField(required=True)
     name = StringField(required=True)
     description = StringField(required=False, null=True)
-    custom_profile_attributes = DictField(null = True, required=False)
+    custom_profile_attributes = DictField(null=True, required=False)
 
     meta = {"collection": "okta_group"}
+
 
 class GroupMember(BaseEntityModel):
     group_id = StringField(required=True)
     users = ListField(required=True)
-    
-    meta = {"collection": "okta_group_memberships"} 
+
+    meta = {"collection": "okta_group_memberships"}
+
 
 class GroupOwner(BaseEntityModel):
-    group_id = StringField()
-    id_of_group_owner = StringField()
-    type = StringField()
-    
+    group_id = StringField(required=True)
+    id_of_group_owner = StringField(required=True)
+    type = StringField(required=True)
+    display_name = StringField(required=False, null=True)
+    origin_id = StringField(required=False, null=True)
+    origin_type = StringField(required=False, null=True)
+    resolved = BooleanField(required=False, null=True)
+
     meta = {"collection": "okta_group_owner"}
+
 
 class GroupRole(BaseEntityModel):
     group_id = StringField(required=True)
@@ -32,8 +38,9 @@ class GroupRole(BaseEntityModel):
     role_id = StringField(required=False, null=True)
     target_app_list = ListField(required=False, null=True)
     target_group_list = ListField(required=False, null=True)
-    
+
     meta = {"collection": "okta_group_role"}
+
 
 class GroupRule(BaseEntityModel):
     name = StringField(required=True)
@@ -43,8 +50,9 @@ class GroupRule(BaseEntityModel):
     expression_type = StringField(required=False, null=True)
     remove_assigned_users = BooleanField(required=False, null=True)
     users_excluded = ListField(required=False, null=True)
-    
+
     meta = {"collection": "okta_group_rule"}
+
 
 class GroupSchemaProperty(BaseEntityModel):
     index = StringField(required=True)
@@ -66,5 +74,5 @@ class GroupSchemaProperty(BaseEntityModel):
     required = BooleanField(required=False, null=True)
     scope = StringField(required=False, null=True)
     unique = StringField(required=False, null=True)
-    
+
     meta = {"collection": "okta_group_schema_property"}

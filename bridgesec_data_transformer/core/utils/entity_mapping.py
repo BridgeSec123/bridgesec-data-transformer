@@ -4,7 +4,7 @@ logger = logging.getLogger(__name__)
 
 IDP_BASE_CONFIG = {
     "okta_endpoint": "/api/v1/idps",
-    "attributes": ["name", "protocol", "policy", "type", "status"]
+    "attributes": ["name", "protocol", "policy", "type", "status"],
 }
 
 ENTITY_TYPE_MAPPING = {
@@ -14,19 +14,16 @@ ENTITY_TYPE_MAPPING = {
     },
     "trusted_origins": {
         "okta_endpoint": "/api/v1/trustedOrigins",
-        "attributes": ["name", "origin", "scopes", "status"]
+        "attributes": ["name", "origin", "scopes", "status"],
     },
-    "okta_users": {
-        "okta_endpoint": "/api/v1/users",
-        "attributes": ["id", "profile"]
-    },
-    "user_factors":{
+    "okta_users": {"okta_endpoint": "/api/v1/users", "attributes": ["id", "profile"]},
+    "user_factors": {
         "okta_endpoint": "/api/v1/users/{userId}/factors",
-        "attributes": ["id", "status"]
+        "attributes": ["id", "status"],
     },
     "user_admin_roles": {
         "okta_endpoint": "/api/v1/users/{userId}/roles",
-        "attributes": ["id", "type", "disableNotifications"]
+        "attributes": ["id", "type", "disableNotifications"],
     },
     "groups": {
         "okta_endpoint": "/api/v1/groups",
@@ -34,247 +31,393 @@ ENTITY_TYPE_MAPPING = {
     },
     "group_owners": {
         "okta_endpoint": "/api/v1/groups/{groupId}/owners",
-        "attributes": ["id"]
+        "attributes": ["id"],
     },
     "group_memberships": {
         "okta_endpoint": "/api/v1/groups/{groupId}/users",
-        "attributes": ["id"]
+        "attributes": ["id"],
     },
     "group_schemas": {
         "okta_endpoint": "/api/v1/meta/schemas/group/default",
-        "attributes": ["title", "type", "definitions", "description"]
+        "attributes": ["title", "type", "definitions", "description"],
     },
-    "group_rules":{
-        "okta_endpoint":"api/v1/groups/rules",
-        "attributes":["id", "name", "actions", "conditions", "status"]
+    "group_rules": {
+        "okta_endpoint": "api/v1/groups/rules",
+        "attributes": ["id", "name", "actions", "conditions", "status"],
     },
-    "group_roles":{
-        "okta_endpoint":"api/v1/groups/{group_id}/roles",
-        "attributes":["id", "type", "description", "status","targetGroupIds","targetAppInstanceIds","disableNotifications"]
+    "group_roles": {
+        "okta_endpoint": "api/v1/groups/{group_id}/roles",
+        "attributes": [
+            "id",
+            "type",
+            "description",
+            "status",
+            "targetGroupIds",
+            "targetAppInstanceIds",
+            "disableNotifications",
+        ],
     },
-    "user_types" : {
+    "user_types": {
         "okta_endpoint": "/api/v1/meta/types/user",
-        "attributes": ["name", "displayName", "description"]
+        "attributes": ["name", "displayName", "description"],
     },
     "brands": {
         "okta_endpoint": "/api/v1/brands",
-        "attributes": ["id", "name", "removePoweredByOkta", "customPrivacyPolicyUrl", "agreeToCustomPrivacyPolicy", "defaultApp", "locale"],
+        "attributes": [
+            "id",
+            "name",
+            "removePoweredByOkta",
+            "customPrivacyPolicyUrl",
+            "agreeToCustomPrivacyPolicy",
+            "defaultApp",
+            "locale",
+        ],
     },
-    "event_hooks" : {
+    "event_hooks": {
         "okta_endpoint": "/api/v1/eventHooks",
-        "attributes": ["name", "events", "channel"]
+        "attributes": ["name", "events", "channel"],
     },
     "okta_idp_oidc": IDP_BASE_CONFIG,
     "okta_idp_saml": IDP_BASE_CONFIG,
     "okta_idp_social": IDP_BASE_CONFIG,
     "auth_servers": {
         "okta_endpoint": "/api/v1/authorizationServers",
-        "attributes": ["id", "name", "audiences", "description", "issuerMode", "status"]
+        "attributes": [
+            "id",
+            "name",
+            "audiences",
+            "description",
+            "issuerMode",
+            "status",
+        ],
     },
-    "auth_servers_default":{
+    "auth_servers_default": {
         "okta_endpoint": "/api/v1/authorizationServers/default",
-        "attributes": ["name", "audiences", "description", "issuerMode", "status", "credentials"]
+        "attributes": [
+            "name",
+            "audiences",
+            "description",
+            "issuerMode",
+            "status",
+            "credentials",
+        ],
     },
     "inline_hooks": {
-        "okta_endpoint" : "/api/v1/inlineHooks",
-        "attributes": ["name", "type", "version", "channel"]
+        "okta_endpoint": "/api/v1/inlineHooks",
+        "attributes": ["name", "type", "version", "channel"],
     },
     "sms_templates": {
         "okta_endpoint": "/api/v1/templates/sms",
-        "attributes": ["type", "template", "translations"]
+        "attributes": ["type", "template", "translations"],
     },
     "threat_insights": {
         "okta_endpoint": "/api/v1/threats/configuration",
-        "attributes": ["action", "excludeZones"]
+        "attributes": ["action", "excludeZones"],
     },
     "network_zones": {
         "okta_endpoint": "/api/v1/zones",
-        "attributes": ["name", "type", "asns", "gateways", "proxies", "ipServiceCategories", "locations"]
+        "attributes": [
+            "name",
+            "type",
+            "asns",
+            "gateways",
+            "proxies",
+            "ipServiceCategories",
+            "locations",
+        ],
     },
     "behavior": {
         "okta_endpoint": "/api/v1/behaviors",
-        "attributes": ["name", "type", "status", "settings"]
+        "attributes": ["name", "type", "status", "settings"],
     },
     "okta_policy_device_assurance_android": {
         "okta_endpoint": "/api/v1/device-assurances",
-        "attributes": [""]
+        "attributes": [""],
     },
-    "okta_policy_mfa":{
+    "okta_policy_mfa": {
         "okta_endpoint": "/api/v1/policies",
-        "attributes": ["id", "name", "description", "priority", "conditions", "settings"]
+        "attributes": [
+            "id",
+            "name",
+            "description",
+            "priority",
+            "conditions",
+            "settings",
+        ],
     },
     "okta_policy_password": {
         "okta_endpoint": "/api/v1/policies",
-        "attributes": ["id", "status", "priority", "name", "description", "conditions", "settings"]
+        "attributes": [
+            "id",
+            "status",
+            "priority",
+            "name",
+            "description",
+            "conditions",
+            "settings",
+        ],
     },
     "okta_policy_profile_enrollment": {
         "okta_endpoint": "/api/v1/policies",
-        "attributes": ["id", "name", "status"]
+        "attributes": ["id", "name", "status"],
     },
     "okta_policy_profile_enrollment_apps": {
         "okta_endpoint": "/api/v1/policies/{policyProfileEnrollmentId}/app",
-        "attributes": ["id"]
+        "attributes": ["id"],
     },
     "okta_policy_rule_mfa": {
         "okta_endpoint": "/api/v1/policies/{policy_id}/rule",
-        "attributes": ["priority", "name", "actions", "conditions", "status"]
+        "attributes": ["priority", "name", "actions", "conditions", "status"],
     },
     "okta_policy_rule_idp_discovery": {
         "okta_endpoint": "/api/v1/policies/{policy_id}/rules",
-        "attributes": ["priority", "name", "actions", "conditions", "status"]
+        "attributes": ["priority", "name", "actions", "conditions", "status"],
     },
     "okta_policy_rule_password": {
         "okta_endpoint": "/api/v1/policies/{policy_id}/rules",
-        "attributes": ["priority", "name", "actions", "conditions", "status"]
+        "attributes": ["priority", "name", "actions", "conditions", "status"],
     },
     "okta_policy_rule_profile_enrollment": {
         "okta_endpoint": "/api/v1/policies/{policy_id}/rules",
-        "attributes": ["actions"]
+        "attributes": ["actions"],
     },
     "okta_policy_sign_on": {
         "okta_endpoint": "/api/v1/policies",
-        "attributes": ["id", "name", "description", "priority", "conditions", "status"]
+        "attributes": ["id", "name", "description", "priority", "conditions", "status"],
     },
     "okta_policy_rule_signon": {
         "okta_endpoint": "/api/v1/policies/{policy_id}/rules",
-        "attributes": ["priority", "name", "actions", "conditions", "status"]
+        "attributes": ["priority", "name", "actions", "conditions", "status"],
     },
     "okta_factors": {
         "okta_endpoint": "/api/v1/org/factors",
-        "attributes": ["id", "status"]
+        "attributes": ["id", "status"],
     },
     "okta_email_notifications": {
         "okta_endpoint": "/api/internal/org/settings/security-notification-settings",
         "attributes": [
-            "sendEmailForNewDeviceEnabled","sendEmailForFactorEnrollmentEnabled", "sendEmailForFactorResetEnabled", 
-            "sendEmailForPasswordChangedEnabled","reportSuspiciousActivityEnabled"
-        ]
+            "sendEmailForNewDeviceEnabled",
+            "sendEmailForFactorEnrollmentEnabled",
+            "sendEmailForFactorResetEnabled",
+            "sendEmailForPasswordChangedEnabled",
+            "reportSuspiciousActivityEnabled",
+        ],
     },
     "okta_email_domain": {
         "okta_endpoint": "api/v1/email-domains",
-        "attributes": ["displayName", "domain", "userName"]
+        "attributes": ["displayName", "domain", "userName"],
     },
     "okta_theme": {
         "okta_endpoint": "/api/v1/brands/{{brandId}}/themes",
         "attributes": [
-            "brandid","backgroundImage","emailTemplateTouchPointVariant","endUserDashboardTouchPointVariant",
-            "errorPageTouchPointVariant","favicon","logo","primaryColorHex","primaryColorContrastHex","secondaryColorContrastHex",
-            "secondaryColorHex","signInPageTouchPointVariant","id"
-        ]
+            "brandid",
+            "backgroundImage",
+            "emailTemplateTouchPointVariant",
+            "endUserDashboardTouchPointVariant",
+            "errorPageTouchPointVariant",
+            "favicon",
+            "logo",
+            "primaryColorHex",
+            "primaryColorContrastHex",
+            "secondaryColorContrastHex",
+            "secondaryColorHex",
+            "signInPageTouchPointVariant",
+            "id",
+        ],
     },
     "okta_app_oauth": {
         "okta_endpoint": "/api/v1/apps",
         "attributes": [
-            "id", "signOnMode", "label", "type", "accessibility", "visibility", "notes", "settings", "_links", "userNameTemplate", "status", "credentials"
-        ]
+            "id",
+            "signOnMode",
+            "label",
+            "type",
+            "accessibility",
+            "visibility",
+            "notes",
+            "settings",
+            "_links",
+            "userNameTemplate",
+            "status",
+            "credentials",
+        ],
     },
     "okta_app_saml": {
         "okta_endpoint": "/api/v1/apps",
         "attributes": [
-            "id", "signOnMode", "label", "accessibility", "visibility", "notes", "settings",
-            "signon", "hide","userNameTemplate", "status"
-            ]
+            "id",
+            "signOnMode",
+            "label",
+            "accessibility",
+            "visibility",
+            "notes",
+            "settings",
+            "signon",
+            "hide",
+            "userNameTemplate",
+            "status",
+        ],
     },
     "okta_apps_group_assignments": {
         "okta_endpoint": "/api/v1/apps/{{appId}}/groups",
-        "attributes": [ "app_id", "group","timeouts"]
+        "attributes": ["app_id", "group", "timeouts"],
     },
     "okta_app_policy_sign_on": {
         "okta_endpoint": "/api/v1/policies",
-        "attributes": ["id", "name", "description", "priority", "catch_all"]
+        "attributes": ["id", "name", "description", "priority", "catch_all"],
     },
     "okta_app_signon_policy_rule": {
         "okta_endpoint": "/api/v1/policies/{policy_id}/rules",
-        "attributes": ["priority", "name", "actions", "conditions", "status", "type"]
+        "attributes": ["priority", "name", "actions", "conditions", "status", "type"],
     },
     "okta_app_saml_settings": {
         "okta_endpoint": "/api/v1/apps",
-        "attributes": ["id", "settings", "signOnMode"]
+        "attributes": ["id", "settings", "signOnMode"],
     },
     "okta_app_oauth_role_assignment": {
         "okta_endpoint": "/oauth2/v1/clients/{client_id}/roles",
-        "attributes": ["type", "resource_set", "role"]
+        "attributes": ["type", "resource_set", "role"],
     },
     "okta_admin_role_custom": {
         "okta_endpoint": "/api/v1/iam/roles",
-        "attributes": ["description","label", "permissions"]
+        "attributes": ["description", "label", "permissions"],
     },
     "okta_admin_role_targets": {
         "okta_endpoint": "/api/v1/users/{user_id}/roles/{roleAssignmentId}/targets/catalog/apps",
-        "attributes": ["name"]
+        "attributes": ["name"],
     },
     "okta_role_subscription": {
         "okta_endpoint": "api/v1/roles/{role_type}/subscriptions",
-        "attributes": ["notificationType","status"]
+        "attributes": ["notificationType", "status"],
     },
     "okta_link_definition": {
         "okta_endpoint": "/api/v1/meta/schemas/user/linkedObjects",
-        "attributes": ["primary","associated"]
+        "attributes": ["primary", "associated"],
     },
     "okta_apps_group_assignment": {
         "okta_endpoint": "/api/v1/apps/{appId}/groups",
-        "attributes": [ "app_id","group","timeouts"]
+        "attributes": ["app_id", "group", "timeouts"],
     },
-    "okta_app_shared_credentials":{
+    "okta_app_shared_credentials": {
         "okta_endpoint": "/api/v1/apps",
-        "attributes":  [
-            "label", "accessibility", "visibility", "settings", "notes","oauthClient","hide","userNameTemplate"
-        ]
+        "attributes": [
+            "label",
+            "accessibility",
+            "visibility",
+            "settings",
+            "notes",
+            "oauthClient",
+            "hide",
+            "userNameTemplate",
+        ],
     },
-    "okta_user_group_memberships":{
+    "okta_user_group_memberships": {
         "okta_endpoint": "api/v1/users/{user_id}/groups",
-        "attributes": ["id"]
+        "attributes": ["id"],
     },
     "okta_app_swa": {
         "okta_endpoint": "/api/v1/apps",
         "attributes": [
-            "signOnMode", "label", "accessibility", "visibility", "settings", 
-            "logo", "hide", "userNameTemplate", "status"
-        ]
+            "signOnMode",
+            "label",
+            "accessibility",
+            "visibility",
+            "settings",
+            "logo",
+            "hide",
+            "userNameTemplate",
+            "status",
+        ],
     },
     "okta_domains": {
         "okta_endpoint": "/api/v1/domains",
-        "attributes": ["domain", "brandId", "certificateSourceType"]
+        "attributes": ["domain", "brandId", "certificateSourceType"],
     },
-    "okta_app_users":{
-        "okta_endpoint": "/api/v1/apps",
-        "attributes": ["id","users"]
-    },
+    "okta_app_users": {"okta_endpoint": "/api/v1/apps", "attributes": ["id", "users"]},
     "okta_app_bookmark": {
         "okta_endpoint": "/api/v1/apps",
-        "attributes": ["signOnMode", "label", "accessibility", "visibility", "settings", "status"]
+        "attributes": [
+            "signOnMode",
+            "label",
+            "accessibility",
+            "visibility",
+            "settings",
+            "status",
+        ],
     },
     "okta_app_auto_login": {
         "okta_endpoint": "/api/v1/apps",
-        "attributes": ["signOnMode", "label", "accessibility", "visibility", "settings", "status", "credentials",],
+        "attributes": [
+            "signOnMode",
+            "label",
+            "accessibility",
+            "visibility",
+            "settings",
+            "status",
+            "credentials",
+        ],
     },
     "okta_app_basic_auth": {
         "okta_endpoint": "/api/v1/apps",
-        "attributes": ["signOnMode", "label", "accessibility", "visibility", "settings", "status"]
+        "attributes": [
+            "signOnMode",
+            "label",
+            "accessibility",
+            "visibility",
+            "settings",
+            "status",
+        ],
     },
     "okta_app_secure_password_store": {
         "okta_endpoint": "/api/v1/apps",
-        "attributes": ["signOnMode", "label", "accessibility", "visibility", "settings", "status", "credentials"]
+        "attributes": [
+            "signOnMode",
+            "label",
+            "accessibility",
+            "visibility",
+            "settings",
+            "status",
+            "credentials",
+        ],
     },
-     "okta_app_three_field": {
+    "okta_app_three_field": {
         "okta_endpoint": "/api/v1/apps",
-        "attributes": ["signOnMode", "label", "accessibility", "visibility", "settings", "status", "credentials"]
+        "attributes": [
+            "signOnMode",
+            "label",
+            "accessibility",
+            "visibility",
+            "settings",
+            "status",
+            "credentials",
+        ],
     },
-    "okta_apps_oauth_api_scope":{
+    "okta_apps_oauth_api_scope": {
         "okta_endpoint": "/api/v1/apps/{app_id}/grants",
-        "attributes": ["issuer","scopeId"]
+        "attributes": ["issuer", "scopeId"],
     },
-    "okta_apps_oauth_post_redirect_uri":{
+    "okta_apps_oauth_post_redirect_uri": {
         "okta_endpoint": "/api/v1/apps",
-        "attributes": ["id", "settings", "signOnMode"]
+        "attributes": ["id", "settings", "signOnMode"],
     },
     "okta_apps_oauth_redirect_uri": {
         "okta_endpoint": "/api/v1/apps",
-        "attributes": ["id", "settings", "signOnMode"]
+        "attributes": ["id", "settings", "signOnMode"],
     },
     "okta_captcha": {
         "okta_endpoint": "/api/v1/captchas",
-        "attributes": ["name", "type", "siteKey"]
+        "attributes": ["name", "type", "siteKey"],
+    },
+    "okta_group_owners": {
+        "okta_endpoint": "/api/v1/groups/{group_id}/owners",
+        "attributes": [
+            "id",
+            "origin_id",
+            "origin_type",
+            "display_name",
+            "resolved",
+            "type",
+        ],
     },
     # "email_template_settings":{
     #     "okta_endpoint": "/api/v1/brands/{brandId}/templates/email",
@@ -284,13 +427,13 @@ ENTITY_TYPE_MAPPING = {
     #     "okta_endpoint": "/api/v1/iam/roles",
     #     "attributes": ["roles"]
     # }
-    # "orgs": { 
+    # "orgs": {
     #     "okta_endpoint": "/api/v1/org",
     #     "attributes": ["companyName", "website"]
-    # } 
+    # }
 }
 
-ENTITY_UNIQUE_FIELDS = { 
+ENTITY_UNIQUE_FIELDS = {
     "users": "email",
     "groups": "name",
     "group_memberships": "group_id",
@@ -302,30 +445,32 @@ ENTITY_UNIQUE_FIELDS = {
     "auth_servers": "name",
     "inline_hooks": "name",
     "orgs": "company_name",
-    "roles": "label"
+    "roles": "label",
 }
 
 EXCLUDED_OUTPUT_FIELDS = {
     "okta_policy_profile_enrollment": ["id"],
-    "okta_app_policy_sign_on" : ["id"],
+    "okta_app_policy_sign_on": ["id"],
     "auth_server_policy": ["policy_id"],
     "auth_servers": ["auth_server_id"],
     "groups": ["group_id"],
     "okta_policy_mfa": ["id"],
     "okta_policy_password": ["id"],
     "okta_users": ["id"],
-    "user_admin_roles": ["role_ids"]
+    "user_admin_roles": ["role_ids"],
     # Add more entity types as needed
 }
+
 
 def get_unique_field(entity_type):
     """Return the unique field for a given entity type."""
     return ENTITY_UNIQUE_FIELDS.get(entity_type, "_id")
 
+
 def get_nested_value(data, attribute_path):
     """
     Retrieve a nested value from a dictionary based on a given attribute path.
-    
+
     :param data: The dictionary (JSON response from Okta).
     :param attribute_path: The attribute path (e.g., "profile.firstName").
     :return: The extracted value or None if not found.
@@ -337,6 +482,7 @@ def get_nested_value(data, attribute_path):
         else:
             return None
     return data
+
 
 def extract_entity_data(entity_type, okta_data):
     """
@@ -355,14 +501,19 @@ def extract_entity_data(entity_type, okta_data):
         extracted_data = []
         for record in okta_data:
             if isinstance(record, dict) or isinstance(record, list):
-                extracted_record = {attr: get_nested_value(record, attr) for attr in attributes}
+                extracted_record = {
+                    attr: get_nested_value(record, attr) for attr in attributes
+                }
                 extracted_data.append(extracted_record)
-        logger.info(f"Extracted {len(extracted_data)} records for entity type {entity_type}")
+        logger.info(
+            f"Extracted {len(extracted_data)} records for entity type {entity_type}"
+        )
         return extracted_data
-    
+
     except Exception as e:
         logger.error(f"Error extracting data for entity type {entity_type}: {e}")
         return {"error": f"Error extracting data for entity type {entity_type}: {e}"}
+
 
 def clean_entity_data(entity_type, data_list):
     """
@@ -377,8 +528,7 @@ def clean_entity_data(entity_type, data_list):
 
     for record in data_list:
         cleaned_record = {
-            key: value for key, value in record.items()
-            if key not in excluded_fields
+            key: value for key, value in record.items() if key not in excluded_fields
         }
         cleaned_data.append(cleaned_record)
 

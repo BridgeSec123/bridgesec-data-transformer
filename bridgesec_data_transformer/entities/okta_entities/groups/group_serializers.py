@@ -15,6 +15,10 @@ class GroupOwnerSerializer(serializers.Serializer):
     group_id = serializers.CharField()
     id_of_group_owner = serializers.CharField()
     type = serializers.CharField()
+    display_name = serializers.CharField()
+    origin_id = serializers.CharField()
+    origin_type = serializers.CharField()
+    resolved = serializers.BooleanField(required=False)
     
 class GroupRoleSerializer(serializers.Serializer):
     group_id = serializers.CharField()

@@ -10,15 +10,17 @@ from rest_framework.response import Response
 
 logger = logging.getLogger(__name__)
 
+
 class GroupOwnerViewSet(BaseGroupViewSet):
     """
     ViewSet to fetch and store group owner details from Okta.
     """
+
     okta_endpoint = "api/v1/groups/{group_id}/owners"
-    entity_type = "group_owners"
+    entity_type = "okta_group_owners"
     serializer_class = GroupOwnerSerializer
     model = GroupOwner
-    
+
     def fetch_from_okta(self, group_id):
         """
         Fetch group owners details for a specific group from Okta.
@@ -28,31 +30,44 @@ class GroupOwnerViewSet(BaseGroupViewSet):
             return []
 
         url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(group_id=group_id)}"
-        headers = {"Authorization": f"{settings.OKTA_API_TOKEN}"}
+        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
 
         logger.info(f"Fetching data from Okta API: {url}")
-        
+
         response = requests.get(url, headers=headers)
 
         if response.status_code == 200:
             logger.info(f"Successfully fetched owners for group {group_id}")
             return response.json()
         else:
-            logger.error(f"Failed to fetch group owners. Status Code: {response.status_code}, Response: {response.text}")
+            logger.error(
+                f"Failed to fetch group owners. Status Code: {response.status_code}, Response: {response.text}"
+            )
             return []
-    
+
     def extract_data(self, okta_data, group_id):
         """
         Extract and format group owner data from Okta response.
         """
         logger.info("Extracting owner data from Okta response.")
         extracted_data = super().extract_data(okta_data)
-        user_ids = [record.get("id", "") for record in extracted_data if "id" in record]
 
-        # Structure data correctly
-        formatted_data = {
-            "group_id": group_id,
-            "users": user_ids
-        }
-        
+        formatted_data = []
+        for record in extracted_data:
+
+            formatted_record = {
+                "group_id": group_id,
+                "id_of_group_owner": record.get("id"),
+                "type": record.get("type"),
+                "display_name": record.get("profile", {}).get("displayName"),
+                "origin_id": record.get("profile", {}).get("originId"),
+                "origin_type": record.get("profile", {}).get("originType"),
+                "resolved": record.get("profile", {}).get("resolved"),
+            }
+            formatted_data.append(formatted_record)
+
+        logger.info(
+            "Extracted and formatted %d apps oauth records from Okta",
+            len(formatted_data),
+        )
         return formatted_data

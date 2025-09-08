@@ -1,37 +1,92 @@
-
-from entities.okta_entities.trusted_origins.views import (
-    TrustedOriginViewSet,
-)
-from entities.okta_entities.inline_hooks.views import (
-    InlineHookEntityViewSet
-    )
-from entities.okta_entities.identity_providers.views import (
-    BaseIdentityProviderViewSet, 
-    IdentityProviderOIDCViewSet, 
-    IdentityProviderSAMLViewSet, 
-    IdentityProviderSocialViewSet
-)
-from entities.okta_entities.link.views import (
-    OktaLinkDefinitionViewSet,
-    BaseLinkViewSet
-)
 from entities.okta_entities.administrators.views import (
-    BaseAdministratorViewSet,
     AdminResourceSetViewSet,
     AdminRoleCustomViewSet,
+    BaseAdministratorViewSet,
 )
-from entities.okta_entities.network_zone.views import(
-    NetworkZoneViewSet,
+from entities.okta_entities.apps.views import (
+    AppAccessPolicyAssignmentViewSet,
+    AppAutoLoginViewSet,
+    AppBasicAuthViewSet,
+    AppBookmarkViewSet,
+    AppOauthApiScopeViewSet,
+    AppOauthPostRedirectUriViewSet,
+    AppOauthRedirectUriViewSet,
+    AppOauthRoleAssignmentViewSet,
+    AppOauthViewSet,
+    AppPolicyRuleSignOnViewSet,
+    AppPolicySignOnViewSet,
+    AppSAMLSettingsViewSet,
+    AppSAMLViewSet,
+    AppsGroupAssignmentsViewSet,
+    AppsGroupAssignmentViewSet,
+    AppSharedCredentialsViewSet,
+    AppSwaViewSet,
+    AppUserBaseSchemaPropertyViewSet,
+    AppUserViewSet,
+    BaseAppViewSet,
 )
-from entities.okta_entities.org.views import ( 
-    OrgViewSet
+from entities.okta_entities.auth_server.views import (
+    AuthorizationServerClaimDefaultViewSet,
+    AuthorizationServerClaimViewSet,
+    AuthorizationServerDefaultViewSet,
+    AuthorizationServerPolicyRuleViewSet,
+    AuthorizationServerPolicyViewSet,
+    AuthorizationServerScopeViewSet,
+    AuthorizationServerViewSet,
+    AuthTrustedServerViewSet,
+    BaseAuthServerViewSet,
 )
+from entities.okta_entities.authenticator.views import (
+    AuthenticatorViewSet,
+    BaseAuthenticatorViewSet,
+    OktaFactorViewSet,
+)
+from entities.okta_entities.behavior.views import BehaviorViewSet
+from entities.okta_entities.brands.views import (
+    BaseBrandViewSet,
+    BrandEntityViewSet,
+    EmailDomainViewset,
+    ThemeViewset,
+)
+from entities.okta_entities.captchas.views import (
+    BaseCaptchaViewSet,
+    CaptchaOrgWideSettingsViewSet,
+    CaptchaViewSet,
+)
+from entities.okta_entities.device_assurance_policies.views import (
+    BaseDeviceAssurancePolicyViewSet,
+    DeviceAndroidViewSet,
+    DeviceIOSViewSet,
+    DeviceMacOSViewSet,
+    DeviceWindowsViewSet,
+)
+from entities.okta_entities.email.views import BaseEmailViewSet
+from entities.okta_entities.event_hook.views import EventHookViewSet
+from entities.okta_entities.groups.views import (
+    BaseGroupViewSet,
+    GroupEntityViewSet,
+    GroupMembershipViewSet,
+    GroupOwnerViewSet,
+    GroupRoleViewSet,
+    GroupRuleViewSet,
+    GroupSchemaPropertyViewSet,
+)
+from entities.okta_entities.identity_providers.views import (
+    BaseIdentityProviderViewSet,
+    IdentityProviderOIDCViewSet,
+    IdentityProviderSAMLViewSet,
+    IdentityProviderSocialViewSet,
+)
+from entities.okta_entities.inline_hooks.views import InlineHookEntityViewSet
+from entities.okta_entities.link.views import BaseLinkViewSet, OktaLinkDefinitionViewSet
+from entities.okta_entities.network_zone.views import NetworkZoneViewSet
+from entities.okta_entities.org.views import OrgViewSet
 from entities.okta_entities.policies.views import (
     BasePolicyViewSet,
-    PolicyPasswordViewSet,
     PolicyMFAViewSet,
-    PolicyProfileEnrollmentViewSet,
+    PolicyPasswordViewSet,
     PolicyProfileEnrollmentAppsViewSet,
+    PolicyProfileEnrollmentViewSet,
     PolicyRuleIDPDiscoveryViewSet,
     PolicyRuleMFAViewSet,
     PolicyRulePasswordViewSet,
@@ -39,132 +94,54 @@ from entities.okta_entities.policies.views import (
     PolicyRuleSignOnViewSet,
     PolicySignOnViewSet,
 )
-from entities.okta_entities.sms_templates.views import (
-    SmsTemplateViewSet,
-)
-from entities.okta_entities.threat_insights.views import (
-    ThreatInsightViewSet,
-)
+from entities.okta_entities.sms_templates.views import SmsTemplateViewSet
+from entities.okta_entities.threat_insights.views import ThreatInsightViewSet
+from entities.okta_entities.trusted_origins.views import TrustedOriginViewSet
 from entities.okta_entities.users.views import (
     AdminRoleTargetsViewSet,
+    BaseUserViewSet,
     RoleSubscriptionViewSet,
     UserAdminRolesViewSet,
     UserBaseSchemaPropertyViewSet,
-    BaseUserViewSet,
     UserFactorViewSet,
     UserGroupMembershipsViewSet,
     UserSchemaPropertyViewSet,
     UserTypeViewSet,
-    UserViewSet
+    UserViewSet,
 )
 
-from entities.okta_entities.apps.views import (
-    AppOauthApiScopeViewSet,
-    AppOauthPostRedirectUriViewSet,
-    AppOauthRedirectUriViewSet,
-    AppPolicyRuleSignOnViewSet,
-    AppSAMLSettingsViewSet,
-    AppSharedCredentialsViewSet,
-    AppUserBaseSchemaPropertyViewSet,
-    AppUserViewSet,
-    AppAccessPolicyAssignmentViewSet,
-    AppAutoLoginViewSet,
-    BaseAppViewSet,
-    AppBasicAuthViewSet,
-    AppBookmarkViewSet,
-    AppsGroupAssignmentViewSet,
-    AppsGroupAssignmentsViewSet,
-    AppOauthRoleAssignmentViewSet,
-    AppOauthViewSet,
-    AppPolicySignOnViewSet,
-    AppSAMLViewSet,
-    AppSwaViewSet,
-)
-
-from entities.okta_entities.auth_server.views import (
-    BaseAuthServerViewSet,
-    AuthorizationServerClaimViewSet,
-    AuthorizationServerDefaultViewSet,
-    AuthorizationServerPolicyViewSet,
-    AuthorizationServerPolicyRuleViewSet,
-    AuthorizationServerScopeViewSet,
-    AuthorizationServerViewSet,
-    AuthTrustedServerViewSet,
-    AuthorizationServerClaimDefaultViewSet,
-)
-from entities.okta_entities.authenticator.views import (
-     BaseAuthenticatorViewSet,
-     AuthenticatorViewSet,
-     OktaFactorViewSet,
-)
-from entities.okta_entities.behavior.views import(
-     BehaviorViewSet
-)
-from entities.okta_entities.brands.views import ( 
-    BaseBrandViewSet,
-    BrandEntityViewSet,
-    EmailDomainViewset,
-    ThemeViewset
-)
-from entities.okta_entities.captchas.views import (
-    BaseCaptchaViewSet,
-    CaptchaOrgWideSettingsViewSet,
-    CaptchaViewSet
-)
-from entities.okta_entities.device_assurance_policies.views import (
-    DeviceAndroidViewSet,
-    BaseDeviceAssurancePolicyViewSet,
-    DeviceIOSViewSet,
-    DeviceMacOSViewSet,
-    DeviceWindowsViewSet
-)
-from entities.okta_entities.email.views import (
-    BaseEmailViewSet
-)
-from entities.okta_entities.event_hook.views import(
-   EventHookViewSet
-)
-from entities.okta_entities.groups.views import (
-    BaseGroupViewSet,
-    GroupRoleViewSet,
-    GroupRuleViewSet,
-    GroupSchemaPropertyViewSet,
-    GroupEntityViewSet,
-    GroupMembershipViewSet,
-    GroupOwnerViewSet,
-)
 # Dictionary to register all entity viewsets
 ENTITY_VIEWSETS = {
-      "users": BaseUserViewSet,
-#     "identity_providers": BaseIdentityProviderViewSet,
-#     "behavior": BehaviorViewSet, 
-#     "orgs": OrgViewSet,
-#     "authenticators": BaseAuthenticatorViewSet,
-#     "groups": BaseGroupViewSet,
-#     "brands": BaseBrandViewSet,
-#     "sms_templates": SmsTemplateViewSet,
-#     "threat_insights": ThreatInsightViewSet,
-#     "network_zones": NetworkZoneViewSet,
-#     "inline_hooks": InlineHookEntityViewSet,
-#     "event_hooks": EventHookViewSet,
-#     "auth_server": BaseAuthServerViewSet,
-#     "trusted_origins": TrustedOriginViewSet,
-#     "device_assurance_policy": BaseDeviceAssurancePolicyViewSet,
-#     "policies": BasePolicyViewSet,
-#     "apps": BaseAppViewSet,
-#     "administrators": BaseAdministratorViewSet,
-#     "links": BaseLinkViewSet,   
-      "captchas": BaseCaptchaViewSet,
+    #   "users": BaseUserViewSet,
+    #     "identity_providers": BaseIdentityProviderViewSet,
+    #     "behavior": BehaviorViewSet,
+    #     "orgs": OrgViewSet,
+    #     "authenticators": BaseAuthenticatorViewSet,
+    "groups": BaseGroupViewSet,
+    #     "brands": BaseBrandViewSet,
+    #     "sms_templates": SmsTemplateViewSet,
+    #     "threat_insights": ThreatInsightViewSet,
+    #     "network_zones": NetworkZoneViewSet,
+    #     "inline_hooks": InlineHookEntityViewSet,
+    #     "event_hooks": EventHookViewSet,
+    #     "auth_server": BaseAuthServerViewSet,
+    #     "trusted_origins": TrustedOriginViewSet,
+    #     "device_assurance_policy": BaseDeviceAssurancePolicyViewSet,
+    #     "policies": BasePolicyViewSet,
+    #     "apps": BaseAppViewSet,
+    #     "administrators": BaseAdministratorViewSet,
+    #     "links": BaseLinkViewSet,
+    # "captchas": BaseCaptchaViewSet,
     # "emails": BaseEmailViewSet
 }
 
 GROUP_ENTITY_VIEWSETS = {
     "group": GroupEntityViewSet,
-    "group_memberships": GroupMembershipViewSet,
-    #"group_owners": GroupOwnerViewSet,
-    "group_roles": GroupRoleViewSet,
-    "group_rules": GroupRuleViewSet,
-    "group_schemas": GroupSchemaPropertyViewSet
+    # "group_memberships": GroupMembershipViewSet,
+    "group_owners": GroupOwnerViewSet,
+    # "group_roles": GroupRoleViewSet,
+    # "group_rules": GroupRuleViewSet,
+    # "group_schemas": GroupSchemaPropertyViewSet
 }
 
 AUTH_SERVER_ENTITY_VIEWSETS = {
@@ -194,20 +171,20 @@ USER_ENTITY_VIEWSETS = {
     # "user_factors": UserFactorViewSet,
     "user_schema_properties": UserSchemaPropertyViewSet,
     "user_base_schema_property": UserBaseSchemaPropertyViewSet,
-    "okta_user_group_memberships": UserGroupMembershipsViewSet
+    "okta_user_group_memberships": UserGroupMembershipsViewSet,
 }
 
 IDENTITY_PROVIDER_ENTITY_VIEWSETS = {
     # "okta_idp_oidc": IdentityProviderOIDCViewSet,
     # "okta_idp_saml": IdentityProviderSAMLViewSet,
     "okta_idp_social": IdentityProviderSocialViewSet
-} 
+}
 
 DEVICE_ASSURANCE_POLICY_ENTITY_VIEWSETS = {
     "okta_policy_device_assurance_android": DeviceAndroidViewSet,
     "okta_policy_device_assurance_macos": DeviceMacOSViewSet,
     "okta_policy_device_assurance_windows": DeviceWindowsViewSet,
-    "okta_policy_device_assurance_ios": DeviceIOSViewSet
+    "okta_policy_device_assurance_ios": DeviceIOSViewSet,
 }
 
 POLICY_ENTITY_VIEWSETS = {
@@ -231,7 +208,7 @@ EMAIL_ENTITY_VIEWSETS = {
 BRAND_ENTITY_VIEWSETS = {
     "brands": BrandEntityViewSet,
     "okta_email_domain": EmailDomainViewset,
-    "okta_theme": ThemeViewset
+    "okta_theme": ThemeViewset,
 }
 
 AUTHENTICATOR_ENTITY_VIEWSETS = {
@@ -240,7 +217,7 @@ AUTHENTICATOR_ENTITY_VIEWSETS = {
 }
 
 APP_ENTITY_VIEWSETS = {
-     "okta_app_oauth": AppOauthViewSet,
+    "okta_app_oauth": AppOauthViewSet,
     "okta_app_saml": AppSAMLViewSet,
     "okta_apps_group_assignments": AppsGroupAssignmentsViewSet,
     "apps_access_policy_assignment": AppAccessPolicyAssignmentViewSet,
@@ -258,19 +235,17 @@ APP_ENTITY_VIEWSETS = {
     "okta_apps_oauth_api_scope": AppOauthApiScopeViewSet,
     "okta_apps_oauth_post_redirect_uri": AppOauthPostRedirectUriViewSet,
     "okta_apps_oauth_redirect_uri": AppOauthRedirectUriViewSet,
-    "okta_app_user_base_schema_property": AppUserBaseSchemaPropertyViewSet
+    "okta_app_user_base_schema_property": AppUserBaseSchemaPropertyViewSet,
 }
 
 ADMINISTRATORS_ENTITY_VIEWSETS = {
     "okta_admin_role_custom": AdminRoleCustomViewSet,
-    "okta_resource_set": AdminResourceSetViewSet
+    "okta_resource_set": AdminResourceSetViewSet,
 }
 
-LINK_ENTITY_VIEWSETS = {
-    "okta_link_definition": OktaLinkDefinitionViewSet
-}
+LINK_ENTITY_VIEWSETS = {"okta_link_definition": OktaLinkDefinitionViewSet}
 
 CAPTCHA_ENTITY_VIEWSETS = {
     "okta_captcha": CaptchaViewSet,
-    "okta_captcha_settings": CaptchaOrgWideSettingsViewSet
+    "okta_captcha_settings": CaptchaOrgWideSettingsViewSet,
 }
