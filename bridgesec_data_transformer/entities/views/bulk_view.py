@@ -1,7 +1,8 @@
 import json
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
+
 
 from entities.serializers.restore_serializer import RestoreDataSerializer
 from core.utils.collection_mapping import RESOURCE_COLLECTION_MAP
@@ -14,12 +15,16 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from core.tasks.bulk_tasks import run_bulk_entity_task
+from celery import shared_task
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from core.authentication import CustomJWTAuthentication
 from entities.registry import ENTITY_VIEWSETS
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
 
 mongo_client = settings.MONGO_CLIENT 
 server_url = settings.SERVER_URL
@@ -32,6 +37,15 @@ def extract_time(db_name):
         return f"{time_part[:2]}:{time_part[2:]}"
     except Exception:
         return None
+    
+def normalize_db_name(db_name):
+    """
+    Normalize DB name: strip time suffix (Txxxx).
+    Example: bridgesec_2025-09-02T1503 -> bridgesec_2025-09-02
+    """
+    if "T" in db_name:
+        return db_name.split("T")[0]
+    return db_name
 
 def get_collection_name(entity_name):
     """Resolve collection name from entity name using RESOURCE_COLLECTION_MAP."""
@@ -54,7 +68,37 @@ def get_latest_db(mongo_client, date_str):
         return None
     return sorted(matching_dbs)[-1]
 
+def get_fallback_db(mongo_client, date_str, entity_name, days_back=30):
+    """
+    Return the latest DB name that has data for the given entity,
+    falling back to recent past dates (up to days_back).
+    """
+    base_date = datetime.strptime(date_str, "%Y-%m-%d")
 
+    # List all DBs once to avoid multiple calls
+    all_dbs = mongo_client.list_database_names()
+    normalized_map = {}
+    for db in all_dbs:
+        norm = normalize_db_name(db)
+        normalized_map.setdefault(norm, []).append(db)
+
+    # Walk backward day by day
+    for i in range(days_back + 1):
+        check_date = (base_date - timedelta(days=i)).strftime("%Y-%m-%d")
+        db_key = f"{settings.MONGO_DB_NAME}_{check_date}"
+
+        if db_key in normalized_map:
+            collection_name = get_collection_name(entity_name)
+            if not collection_name:
+                continue
+
+            # Check each variant with timestamp (e.g., bridgesec_2025-09-02T1503)
+            for real_db_name in sorted(normalized_map[db_key], reverse=True):
+                db = mongo_client[real_db_name]
+                if collection_name in db.list_collection_names():
+                    if db[collection_name].count_documents({}) > 0:
+                        return real_db_name
+            
 class BulkEntityViewSet(viewsets.ViewSet):
     authentication_classes = [CustomJWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -64,35 +108,15 @@ class BulkEntityViewSet(viewsets.ViewSet):
         operation_description="Fetch data from all registered entity APIs and store them in MongoDB",
         responses={201: openapi.Response("Data fetched and stored successfully")},
     )
+    @action(detail=False, methods=["post"], url_path="bulk")
     def post(self, request):
         """
-        Fetch fresh data for all registered entities and store them in a dynamic MongoDB.
-        This flow uses mongoengine models → keep ensure_mongo_connection.
+        Triggers a background task to fetch fresh data for all registered entities and store them in a dynamic MongoDB.
         """
-        db_name = get_dynamic_db()
-        ensure_mongo_connection(db_name)  # needed since models use mongoengine
-
-        for entity_name, viewset_class in ENTITY_VIEWSETS.items():
-            viewset_instance = viewset_class()
-            extracted_data = viewset_instance.fetch_and_store_data(db_name)
-            if not extracted_data:
-                return Response(
-                    {"error": f"Failed to fetch {entity_name} data"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
-
-            # Save extracted data to local JSON
-            output_dir = os.path.join(settings.BASE_DIR, "output", db_name)
-            os.makedirs(output_dir, exist_ok=True)
-
-            for sub_entity_name, sub_entity_data in extracted_data.items():
-                file_name = f"{sub_entity_name}.json"
-                file_path = os.path.join(output_dir, file_name)
-                with open(file_path, "w", encoding="utf-8") as f:
-                    json.dump(sub_entity_data, f, ensure_ascii=False, indent=4)
-
+        run_bulk_entity_task.delay()
+    
         return Response(
-            {"message": "Data fetched and stored successfully", "db_name": db_name},
+            {"message": "Data fetch task triggered successfully"},
             status=status.HTTP_201_CREATED,
         )
 
@@ -214,11 +238,13 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
         try:
             datetime.strptime(date_str, "%Y-%m-%d")
-            latest_db = get_latest_db(mongo_client, date_str)
-            if not latest_db:
+
+            # 🔑 Use fallback search instead of latest only
+            db_name = get_fallback_db(mongo_client, date_str, entity_name, days_back=30)
+            if not db_name:
                 return Response(
                     {
-                        "message": f"No matching databases found for the given date: {date_str}",
+                        "message": f"No data found for '{entity_name}' in the last 30 days from {date_str}",
                         "data": [],
                     },
                     status=status.HTTP_200_OK,
@@ -235,7 +261,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     status=status.HTTP_200_OK,
                 )
 
-            db = mongo_client[latest_db]
+            db = mongo_client[db_name]
             data = list(db[collection_name].find({}, {"_id": 0}))
             return Response(data, status=status.HTTP_200_OK)
 
