@@ -29,8 +29,8 @@ class AppOauthViewSet(BaseAppViewSet):
                 credentials = record.get("credentials", {})
                 userNameTemplate = credentials.get("userNameTemplate", {})
                 settings = record.get("settings", {})
-                note = settings.get("notes", {})
-                oauthclient = settings.get("oauthClient", {})
+                notes = settings.get("notes", {})
+                oauthClient = settings.get("oauthClient", {})
                 link = record.get("_links", {})
                 authentication_policy = link.get("accessPolicy", {}).get("href", "").rstrip("/").split("/")[-1]
                 credentials = record.get("credentials", {})

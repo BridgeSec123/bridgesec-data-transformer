@@ -262,7 +262,11 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 )
 
             db = mongo_client[db_name]
-            data = list(db[collection_name].find({}, {"_id": 0}))
+            data = list(
+                        db[collection_name]
+                        .find({}, {"_id": 0})
+                        .sort("_id", 1)
+                    )
             return Response(data, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -318,22 +322,16 @@ class BulkEntityViewSet(viewsets.ViewSet):
             new_db_name = get_dynamic_db()
             new_db = mongo_client[new_db_name]
 
-            for coll in source_db.list_collection_names():
-                source_collection = source_db[coll]
-                target_collection = new_db[coll]
+            if collection_name in source_db.list_collection_names():
+                source_collection = source_db[collection_name]
+                target_collection = new_db[collection_name]
 
-                if coll == collection_name:
-                    for doc in modified_data:
-                        doc.pop("_id", None)
-                    if modified_data:
-                        target_collection.insert_many(modified_data)
-                else:
-                    docs = list(source_collection.find({}))
-                    for doc in docs:
-                        doc.pop("_id", None)
-                    if docs:
-                        target_collection.insert_many(docs)
-            
+                for doc in modified_data:
+                    doc.pop("_id", None)
+
+                if modified_data:
+                    target_collection.insert_many(modified_data)
+                
             tf_response = requests.post(f"{server_url}/api/", json={"db_name":new_db_name},headers={"Content-Type": "application/json"}  ) 
 
             try:
@@ -343,8 +341,19 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
                 # extract message
             tf_message = tf_data.get("message", "No message returned")
+            
+            for coll in source_db.list_collection_names():
+                if coll == collection_name:
+                    continue  # already handled
+                source_collection = source_db[coll]
+                target_collection = new_db[coll]
 
-          
+                docs = list(source_collection.find({}))
+                for doc in docs:
+                    doc.pop("_id", None)
+                if docs:
+                    target_collection.insert_many(docs)
+
             return Response(
                 {
                     "tf_message": tf_message,

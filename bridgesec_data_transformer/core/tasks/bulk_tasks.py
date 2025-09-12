@@ -1,5 +1,5 @@
 from celery import shared_task
-from core.utils.mongo_utils import ensure_mongo_connection
+from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
 from django.conf import settings
 from entities.registry import ENTITY_VIEWSETS
 import os
@@ -37,10 +37,13 @@ def notify_backend_via_rabbitmq(db_name):
 
 
 @shared_task
-def run_bulk_entity_task(db_name, task_id=None):
+def run_bulk_entity_task(task_id=None):
+
+    db_name = get_dynamic_db()
+    logger.info(f"[TASK START] run_bulk_entity_task triggered with db_name={db_name}")
     try:
         ensure_mongo_connection(db_name)
-
+        logger.info(f"[TASK END] run_bulk_entity_task completed for db_name={db_name}")
         for entity_name, viewset_class in ENTITY_VIEWSETS.items():
             viewset_instance = viewset_class()
             extracted_data = viewset_instance.fetch_and_store_data(db_name)
