@@ -22,7 +22,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from core.authentication import CustomJWTAuthentication
 from entities.registry import ENTITY_VIEWSETS
-from entities.services.resouce_data_service import EntityDataService
+# from entities.services.resouce_data_service import EntityDataService
 import requests
 import logging
 
