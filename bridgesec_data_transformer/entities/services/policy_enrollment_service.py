@@ -44,4 +44,4 @@ class PolicyEnrollmentDataBuilder:
             results.append(formatted)
 
         logger.info(f"Built nested Policy Enrollment data for {len(results)} policies")
-        return {"policy_enrollment_list": results}
+        return  results

@@ -42,4 +42,4 @@ class PolicyPasswordDataBuilder:
             results.append(formatted)
 
         logger.info(f"Built nested Policy Password data for {len(results)} policies")
-        return {"policy_password_list": results}
+        return results

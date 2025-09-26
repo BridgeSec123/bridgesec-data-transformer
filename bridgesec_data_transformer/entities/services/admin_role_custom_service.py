@@ -42,4 +42,4 @@ class AdminRoleCustomDataBuilder:
             results.append(formatted)
 
         logger.info(f"Built nested Admin Role Custom data for {len(results)} roles")
-        return {"admin_role_custom_list": results}
+        return results

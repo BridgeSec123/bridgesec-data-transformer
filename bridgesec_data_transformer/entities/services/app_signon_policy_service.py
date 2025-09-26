@@ -44,4 +44,4 @@ class AppSignonPolicyDataBuilder:
             results.append(formatted)
 
         logger.info(f"Built nested App Signon Policy data for {len(results)} policies")
-        return {"app_signon_policy_list": results}
+        return results

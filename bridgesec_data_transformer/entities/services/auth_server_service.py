@@ -48,4 +48,4 @@ class AuthServer:
             results.append(formatted)
 
         logger.info(f" Built nested Auth Server data for {len(results)} servers")
-        return {"auth_server_list": results}
+        return  results

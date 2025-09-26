@@ -106,4 +106,4 @@ class PolicySignonDataBuilder:
             results.append(result)
 
         logger.info(f"Built nested Policy Signon data for {len(results)} policies")
-        return {"policy_signon_list": results}
+        return results
