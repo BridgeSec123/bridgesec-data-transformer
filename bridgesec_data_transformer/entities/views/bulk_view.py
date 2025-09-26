@@ -153,31 +153,31 @@ class BulkEntityViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    @action(
-        detail=False,
-        methods=["get"],
-        url_path=r"data/(?P<date_str>\d{4}-\d{2}-\d{2})/(?P<entity_name>[^/.]+)",
-    )
-    def get_resource_data(self, request, date_str, entity_name):
-        """
-        Fetch data from Mongo using pymongo → no ensure_mongo_connection needed.
-        """
-        if not date_str or not entity_name:
-            return Response(
-                {"error": "Missing 'date' or 'entity_type' parameter"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+    # @action(
+    #     detail=False,
+    #     methods=["get"],
+    #     url_path=r"data/(?P<date_str>\d{4}-\d{2}-\d{2})/(?P<entity_name>[^/.]+)",
+    # )
+    # def get_resource_data(self, request, date_str, entity_name):
+    #     """
+    #     Fetch data from Mongo using pymongo → no ensure_mongo_connection needed.
+    #     """
+    #     if not date_str or not entity_name:
+    #         return Response(
+    #             {"error": "Missing 'date' or 'entity_type' parameter"},
+    #             status=status.HTTP_400_BAD_REQUEST,
+    #         )
 
-        try:
-            datetime.strptime(date_str, "%Y-%m-%d")
+    #     try:
+    #         datetime.strptime(date_str, "%Y-%m-%d")
 
-            service = EntityDataService()
-            data = service.fetch(date_str, entity_name)
+    #         service = EntityDataService()
+    #         data = service.fetch(date_str, entity_name)
 
-            return Response(data, status=status.HTTP_200_OK)
+    #         return Response(data, status=status.HTTP_200_OK)
 
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    #     except Exception as e:
+    #         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @swagger_auto_schema(
         method="post",
