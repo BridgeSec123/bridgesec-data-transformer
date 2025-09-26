@@ -42,4 +42,4 @@ class PolicyMFADataBuilder:
             results.append(formatted)
 
         logger.info(f"Built nested Policy MFA data for {len(results)} policies")
-        return {"policy_mfa_list": results}
+        return {"authenticator_enroll_policies_list": results}
