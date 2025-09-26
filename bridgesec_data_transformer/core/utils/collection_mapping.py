@@ -72,7 +72,7 @@ RESOURCE_COLLECTION_MAP = {
         {"Policy Sign On": "okta_policy_sign_on"},
         # {"Policy Rule Sign On": "okta_policy_rule_sign_on"},
         # {"Policy Profile Enrollment apps": "okta_policy_profile_enrollment_apps"},
-        {"Policy Rule Idp Discovery": "okta_policy_rule_idp_discovery"},
+        # {"Policy Rule Idp Discovery": "okta_policy_rule_idp_discovery"},
     ],
     "Network Zone": [
         {"Network Zone": "okta_network_zone"}
