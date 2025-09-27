@@ -16,15 +16,15 @@ RESOURCE_COLLECTION_MAP = {
         {"Group Roles": "okta_group_roles"},
         {"Group Memberships": "okta_group_memberships"},
     ],
-    # "Brands": [
-    #     {"Brand": "okta_brand"}
-    # ],
-    # "Device": [
-    #     {"Policy Device Assurance Android": "okta_policy_device_assurance_android"},
-    #     {"Policy Device Assurance IOS": "okta_policy_device_assurance_ios"},
-    #     {"Policy Device Assurance Macos": "okta_policy_device_assurance_macos"},
-    #     {"Policy Device Assurance Windows": "okta_policy_device_assurance_windows"},
-    # ],
+    "Brands": [
+        {"Brand": "okta_brand"}
+    ],
+    "Device": [
+        {"Policy Device Assurance Android": "okta_policy_device_assurance_android"},
+        {"Policy Device Assurance IOS": "okta_policy_device_assurance_ios"},
+        {"Policy Device Assurance Macos": "okta_policy_device_assurance_macos"},
+        {"Policy Device Assurance Windows": "okta_policy_device_assurance_windows"},
+    ],
     # "Theme": [
     #     {"Theme": "okta_theme"}
     # ],
