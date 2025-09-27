@@ -11,10 +11,10 @@ RESOURCE_COLLECTION_MAP = {
     # ],
     "Groups": [
         {"Groups": "okta_group"},
-        # {"Group Schema Property": "okta_group_schemas"},
-        # {"Group Rules": "okta_group_rules"},
-        # {"Group Roles": "okta_group_roles"},
-        # {"Group Memberships": "okta_group_memberships"},
+        {"Group Schema Property": "okta_group_schemas"},
+        {"Group Rules": "okta_group_rules"},
+        {"Group Roles": "okta_group_roles"},
+        {"Group Memberships": "okta_group_memberships"},
     ],
     # "Brands": [
     #     {"Brand": "okta_brand"}
@@ -57,11 +57,11 @@ RESOURCE_COLLECTION_MAP = {
         # {"Auth Server Policy": "okta_auth_server_policy"},
         # {"Auth Server Policy Rule": "okta_auth_server_policy_rule"},
     ],
-    # "Identity Providers": [
-    #     {"IDP OIDC": "okta_idp_oidc"},
-    #     {"IDP SAML": "okta_idp_saml"},
-    #     {"IDP SOCIAL": "okta_idp_social"},
-    # ],
+    "Identity Providers": [
+        {"IDP OIDC": "okta_idp_oidc"},
+        {"IDP SAML": "okta_idp_saml"},
+        {"IDP SOCIAL": "okta_idp_social"},
+    ],
     "Policy": [
         {"Policy MFA": "okta_policy_mfa"},
         # {"Policy Rule Mfa": "okta_policy_rule_mfa"},
@@ -74,34 +74,34 @@ RESOURCE_COLLECTION_MAP = {
         # {"Policy Profile Enrollment apps": "okta_policy_profile_enrollment_apps"},
         # {"Policy Rule Idp Discovery": "okta_policy_rule_idp_discovery"},
     ],
-    # "Network Zone": [
-    #     {"Network Zone": "okta_network_zone"}
-    # ],
-    # "Behavior": [
-    #     {"Behavior": "okta_behavior"}
-    # ],
-    # "Administrator Roles": [
-    #     {"Admin Role Custom": "okta_admin_role_custom"},
-    #     {"Admin Role Targets": "okta_admin_role_targets"},
-    #     {"Role Subscription": "okta_role_subscription"},
-    #     {"Resoure set": "okta_resource_set"},
-    # ],
-    # "Trusted Origins": [
-    #     {"Trusted Origin": "okta_trusted_origin"},
+    "Network Zone": [
+        {"Network Zone": "okta_network_zone"}
+    ],
+    "Behavior": [
+        {"Behavior": "okta_behavior"}
+    ],
+    "Administrator Roles": [
+        {"Admin Role Custom": "okta_admin_role_custom"},
+        {"Admin Role Targets": "okta_admin_role_targets"},
+        {"Role Subscription": "okta_role_subscription"},
+        {"Resoure set": "okta_resource_set"},
+    ],
+    #  "Trusted Origins": [
+    #   {"Trusted Origin": "okta_trusted_origin"},
     #     {"Trusted Server": "okta_trusted_server"},
     # ],
-    # "Inline Hooks": [
-    #     {"Inline Hook": "okta_inline_hook"}
-    # ],
-    # "Event_Hook": [
-    #     {"Event_Hook": "okta_event_hook"}
-    # ],
-    # "Domains": [
-    #     {"Domain": "okta_domain"}
-    # ],
-    # "Link": [
-    #     {"Link Definition": "okta_link_definition"}
-    # ],
+    "Inline Hooks": [
+        {"Inline Hook": "okta_inline_hook"}
+    ],
+    "Event_Hook": [
+        {"Event_Hook": "okta_event_hook"}
+    ],
+    "Domains": [
+        {"Domain": "okta_domain"}
+    ],
+    "Link": [
+        {"Link Definition": "okta_link_definition"}
+    ],
     "Applications": [
         {"App Oauth": "okta_app_oauth"},
         {"App Saml": "okta_app_saml"},
