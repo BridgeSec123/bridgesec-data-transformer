@@ -19,4 +19,5 @@ from .apps_bookmark_viewset import *
 from .apps_group_assignments_viewset import *
 from .apps_group_assignment_viewset import *
 from .app_user_base_schema_property_viewset import *
+from .app_user_schema_property_viewset import *
 from .app_shared_credentials_viewset import *
