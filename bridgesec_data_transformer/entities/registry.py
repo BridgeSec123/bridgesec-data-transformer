@@ -8,12 +8,12 @@ from entities.okta_entities.apps.views import (
     AppPolicySignOnViewSet, AppSAMLSettingsViewSet, AppSAMLViewSet,
     AppsGroupAssignmentsViewSet, AppsGroupAssignmentViewSet,
     AppSharedCredentialsViewSet, AppSwaViewSet,
-    AppUserBaseSchemaPropertyViewSet)
+    AppUserBaseSchemaPropertyViewSet,AppUserSchemaPropertyViewSet, AppUserViewSet )
 from entities.okta_entities.apps.views.app_secure_password_store_viewset import \
     AppSecurePasswordStoreViewSet
 from entities.okta_entities.apps.views.app_three_field_viewset import \
     AppThreeFieldViewSet
-from entities.okta_entities.apps.views.app_user_viewset import AppUserViewSet
+
 from entities.okta_entities.apps.views.apps_access_policy_assignment_viewset import \
     AppAccessPolicyAssignmentViewSet
 from entities.okta_entities.apps.views.apps_auto_login_viewset import \
@@ -78,26 +78,26 @@ from entities.okta_entities.users.views import (AdminRoleTargetsViewSet,
 # Dictionary to register all entity viewsets
 ENTITY_VIEWSETS = {
     #  "users": BaseUserViewSet,
-      "identity_providers": BaseIdentityProviderViewSet,
-     "behavior": BehaviorViewSet, 
-    "orgs": OrgViewSet,
-     "authenticators": BaseAuthenticatorViewSet,
-       "groups": BaseGroupViewSet,
-     "brands": BaseBrandViewSet,
-     "sms_templates": SmsTemplateViewSet,
-     "threat_insights": ThreatInsightViewSet,
-    "network_zones": NetworkZoneViewSet,
-    "inline_hooks": InlineHookEntityViewSet,
-    "event_hooks": EventHookViewSet,
-      "auth_server": BaseAuthServerViewSet,
-     "trusted_origins": TrustedOriginViewSet,
-     "device_assurance_policy": BaseDeviceAssurancePolicyViewSet,
-     "policies": BasePolicyViewSet,
-     "apps": BaseAppViewSet,
-       "administrators": BaseAdministratorViewSet,
-    "links": BaseLinkViewSet,
-    "captchas": BaseCaptchaViewSet,
-    "emails": BaseEmailViewSet
+    #   "identity_providers": BaseIdentityProviderViewSet,
+    #  "behavior": BehaviorViewSet, 
+    # "orgs": OrgViewSet,
+    #  "authenticators": BaseAuthenticatorViewSet,
+    #    "groups": BaseGroupViewSet,
+    #  "brands": BaseBrandViewSet,
+    #  "sms_templates": SmsTemplateViewSet,
+    #  "threat_insights": ThreatInsightViewSet,
+    # "network_zones": NetworkZoneViewSet,
+    # "inline_hooks": InlineHookEntityViewSet,
+    # "event_hooks": EventHookViewSet,
+    #   "auth_server": BaseAuthServerViewSet,
+    #  "trusted_origins": TrustedOriginViewSet,
+    #  "device_assurance_policy": BaseDeviceAssurancePolicyViewSet,
+    #  "policies": BasePolicyViewSet,
+    "apps": BaseAppViewSet,
+    #    "administrators": BaseAdministratorViewSet,
+    # "links": BaseLinkViewSet,
+    # "captchas": BaseCaptchaViewSet,
+    # "emails": BaseEmailViewSet
 }
 
 GROUP_ENTITY_VIEWSETS = {
@@ -176,25 +176,26 @@ AUTHENTICATOR_ENTITY_VIEWSETS = {
 APP_ENTITY_VIEWSETS = {
     "okta_app_oauth": AppOauthViewSet,
     "okta_app_saml": AppSAMLViewSet,
-    "okta_apps_group_assignments": AppsGroupAssignmentsViewSet,
-     "apps_access_policy_assignment": AppAccessPolicyAssignmentViewSet,
-     "okta_app_policy_sign_on": AppPolicySignOnViewSet,
-    "okta_apps_group_assignment": AppsGroupAssignmentViewSet,
-    "okta_app_shared_credentials": AppSharedCredentialsViewSet,
-    "okta_app_saml_settings": AppSAMLSettingsViewSet,
-     "okta_app_signon_policy_rule": AppPolicyRuleSignOnViewSet,
-     "okta_app_oauth_role_assignment": AppOauthRoleAssignmentViewSet,
-    "okta_app_bookmark": AppBookmarkViewSet,
-    "okta_app_auto_login": AppAutoLoginViewSet,
-    "okta_app_basic_auth": AppBasicAuthViewSet,
-     "okta_app_swa": AppSwaViewSet,
-    "okta_app_users": AppUserViewSet,
-    "okta_app_user_base_schema_property": AppUserBaseSchemaPropertyViewSet,
-    "okta_app_secure_password_store": AppSecurePasswordStoreViewSet,
-    "okta_app_three_field": AppThreeFieldViewSet,
-    "okta_apps_oauth_post_redirect_uri": AppOauthPostRedirectUriViewSet,
-    "okta_apps_oauth_redirect_uri": AppOauthRedirectUriViewSet,
-    "okta_app_oauth_api_scope": AppOauthApiScopeViewSet,
+    # "okta_apps_group_assignments": AppsGroupAssignmentsViewSet,
+    #  "apps_access_policy_assignment": AppAccessPolicyAssignmentViewSet,
+    #  "okta_app_policy_sign_on": AppPolicySignOnViewSet,
+    # "okta_apps_group_assignment": AppsGroupAssignmentViewSet,
+    # "okta_app_shared_credentials": AppSharedCredentialsViewSet,
+    # "okta_app_saml_settings": AppSAMLSettingsViewSet,
+    #  "okta_app_signon_policy_rule": AppPolicyRuleSignOnViewSet,
+    #  "okta_app_oauth_role_assignment": AppOauthRoleAssignmentViewSet,
+    # "okta_app_bookmark": AppBookmarkViewSet,
+    # "okta_app_auto_login": AppAutoLoginViewSet,
+    # "okta_app_basic_auth": AppBasicAuthViewSet,
+    #  "okta_app_swa": AppSwaViewSet,
+    # "okta_app_users": AppUserViewSet,
+    #  "okta_app_user_base_schema_property": AppUserBaseSchemaPropertyViewSet,
+    #    "okta_app_user_schema_property": AppUserSchemaPropertyViewSet,
+    # "okta_app_secure_password_store": AppSecurePasswordStoreViewSet,
+    # "okta_app_three_field": AppThreeFieldViewSet,
+    # "okta_apps_oauth_post_redirect_uri": AppOauthPostRedirectUriViewSet,
+    # "okta_apps_oauth_redirect_uri": AppOauthRedirectUriViewSet,
+    # "okta_app_oauth_api_scope": AppOauthApiScopeViewSet,
 
 }
 
