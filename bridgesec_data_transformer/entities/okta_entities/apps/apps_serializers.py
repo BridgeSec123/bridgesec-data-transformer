@@ -160,6 +160,7 @@ class AppSharedCredentialsSerializer(serializers.Serializer):
     username_field = serializers.CharField(required=False, allow_null=True)
 
 class AppPolicySignOnRuleSerializer(serializers.Serializer):
+    policy_rule_id = serializers.CharField(required=True)
     name = serializers.CharField(required=True)
     policy_id = serializers.CharField(required=True)
     access = serializers.CharField(required=False, allow_null=True)
@@ -374,4 +375,30 @@ class AppThreeFieldSerializer(serializers.Serializer):
     user_name_template_push_status = serializers.CharField(required=False, allow_null=True)
     user_name_template_suffix = serializers.CharField(required=False, allow_null=True)
     user_name_template_type = serializers.CharField(required=False, allow_null=True)
+
+class AppUserSchemaPropertySerializer(serializers.Serializer):
+    app_id = serializers.CharField(required=True)
+    index = serializers.CharField(required=True)
+    title = serializers.CharField(required=True)
+    type = serializers.CharField(required=True)
+    master = serializers.CharField(required=False, allow_null=True)
+    pattern = serializers.CharField(required=False, allow_null=True)
+    permissions = serializers.CharField(required=False, allow_null=True)
+    required = serializers.BooleanField(required=False, allow_null=True)
+    user_type = serializers.CharField(required=False, allow_null=True)
+    array_enum = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    array_one_of = serializers.ListField(child=serializers.DictField(), required=False, allow_null=True)
+    array_type = serializers.CharField(required=False, allow_null=True)
+    enum = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    description = serializers.CharField(required=False, allow_null=True)
+    external_name = serializers.CharField(required=False, allow_null=True)
+    external_namespace = serializers.CharField(required=False, allow_null=True)
+    max_length = serializers.IntegerField(required=False, allow_null=True)
+    min_length = serializers.IntegerField(required=False, allow_null=True)
+    one_of = serializers.ListField(child=serializers.DictField(), required=False, allow_null=True)
+    scope = serializers.CharField(required=False, allow_null=True)
+    unique = serializers.CharField(required=False, allow_null=True)
+    union = serializers.BooleanField(required=False, allow_null=True)
+   
+    
    

@@ -84,6 +84,7 @@ class AttributeStatement(EmbeddedDocument):
 
 class AppSAML(BaseEntityModel):
     label = StringField(required=True)
+    app_id = StringField(required=True)
     accessibility_error_redirect_url = StringField(null=True, required=False)
     accessibility_login_redirect_url = StringField(null=True, required=False)
     accessibility_self_service = BooleanField(null=True, required=False, default=False)
@@ -161,6 +162,7 @@ class AppAccessPolicyAssignment(BaseEntityModel):
     meta = {"collection" : "okta_app_access_policy_assignment"}
 
 class AppPolicySignOn(BaseEntityModel):
+    app_policy_id = StringField(required=True)
     description = StringField(required=True)
     name = StringField(required=True)
     catch_all = BooleanField(required=False, null=True)
@@ -174,16 +176,17 @@ class PlatformInclude(EmbeddedDocument):
     type = StringField(required=False)
 
 class AppPolicySignOnRule(BaseEntityModel):
+    policy_rule_id = StringField(required=True)
     name = StringField(required=True)
     policy_id = StringField(required=True)
     access = StringField(required=False, null=True)
     constraints = ListField(StringField(), required=False, null=True)
     custom_expression = StringField(required=False, null=True)
-    device_assurances_included = ListField(StringField(), required=False, nul=True)
+    device_assurances_included = ListField(StringField(), required=False, null=True)
     device_is_managed = BooleanField(required=False, null=True)
     device_is_registered = BooleanField(required=False, null=True)
-    factor_mode = StringField(required=False, nul=True)
-    groups_excluded = ListField(StringField(), required=False, null =True)
+    factor_mode = StringField(required=False, null=True)
+    groups_excluded = ListField(StringField(), required=False, null=True)
     groups_included = ListField(StringField(), required=False, null=True)
     inactivity_period = StringField(required=False, null=True)
     network_connection = StringField(required=False, null=True)
@@ -251,6 +254,7 @@ class AppSharedCredentials(BaseEntityModel):
     meta = {"collection" :"okta_app_shared_credentials"}
 
 class AppBookMark(BaseEntityModel):
+    app_id = StringField(required=True)
     label = StringField(required=True)
     url = StringField(required=True)
     accessibility_error_redirect_url = StringField(required=False, null=True)
@@ -300,6 +304,7 @@ class AppAutoLogin(BaseEntityModel):
     meta = {"collection": "okta_app_auto_login"}
 
 class AppBasicAuth(BaseEntityModel):
+    app_id = StringField(required=True)
     auth_url = StringField(required=True)
     label = StringField(required=True)
     url = StringField(required=True)
@@ -319,6 +324,7 @@ class AppBasicAuth(BaseEntityModel):
     meta = {"collection": "okta_app_basic_auth"}
 
 class AppSwa(BaseEntityModel):
+    app_id = StringField(required=True)
     label = StringField(required=True)
     accessibility_error_redirect_url = StringField(null=True,required=False)
     accessibility_login_redirect_url = StringField(null=True,required=False)
@@ -390,6 +396,7 @@ class AppUserBaseSchemaProperty(BaseEntityModel):
     meta = {"collection": "okta_app_user_base_schema_property"}
 
 class AppSecurePasswordStore(BaseEntityModel):
+    app_id = StringField(required=True)
     label = StringField(required=True)
     password_field = StringField(required=True)
     url = StringField(required=True)
@@ -424,6 +431,7 @@ class AppSecurePasswordStore(BaseEntityModel):
     meta = {"collection": "okta_app_secure_password_store"}
     
 class AppThreeField(BaseEntityModel):
+    app_id = StringField(required=True)
     label = StringField(required=True)
     url = StringField(required=True)
     username_selector = StringField(required=True)
@@ -454,4 +462,29 @@ class AppThreeField(BaseEntityModel):
     user_name_template_type = StringField(required=False, null=True)
     
     meta = {"collection": "okta_app_three_field"}
-    
+
+class AppUserSchemaProperty(BaseEntityModel):
+    app_id = StringField(required=True)
+    index = StringField(required=True)
+    master = StringField(required=False, null=True)
+    title = StringField(required=True)
+    type = StringField(required=True)
+    pattern = StringField(required=False, null=True)
+    permissions = StringField(required=False, null=True)
+    required = BooleanField(required=False, null=True)
+    user_type = StringField(required=False, null=True)
+    array_enum = ListField(StringField(), required=False, null=True)
+    array_one_of = ListField(DictField(), required=False, null=True)
+    array_type = StringField(required=False, null=True)
+    enum = ListField(StringField(), required=False, null=True)
+    description = StringField(required=False, null=True)
+    external_name = StringField(required=False, null=True)
+    external_namespace = StringField(required=False, null=True)
+    max_length = IntField(required=False, null=True)
+    min_length = IntField(required=False, null=True)
+    one_of = ListField(DictField(), required=False, null=True)
+    scope = StringField(required=False, null=True)
+    unique = StringField(required=False, null=True)
+    union = BooleanField(required=False, null=True)
+
+    meta = {"collection": "okta_app_user_schema_property"}

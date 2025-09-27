@@ -3,6 +3,7 @@ import logging
 from entities.okta_entities.apps.apps_models import AppOauth
 from entities.okta_entities.apps.apps_serializers import AppOauthSerializer
 from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
+from entities.entity_filters import should_skip_app_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,11 @@ class AppOauthViewSet(BaseAppViewSet):
                 continue
 
             if record.get("signOnMode") == "OPENID_CONNECT":
+                # Check if this app label should be excluded
+                app_label = record.get("label", "")
+                if should_skip_app_extraction(app_label):
+                    logger.info(f"Skipping app extraction for label: {app_label}")
+                    continue
                 accessibility = record.get("accessibility", {})
                 visibility = record.get("visibility", {})
                 hide = visibility.get("hide", {})
@@ -42,7 +48,24 @@ class AppOauthViewSet(BaseAppViewSet):
                 refresh_token = oauthClient_settings.get("refresh_token", {})
 
                 type = oauthClient_settings.get("application_type") or "service"
-                    
+
+                jwks_formatted = []
+                if oauthClient.get("token_endpoint_auth_method") == "private_key_jwt":
+                    jwks_data = oauthClient_settings.get("jwks", {}).get("keys", [])  # <-- keys inside jwks
+                    for key in jwks_data:
+                        jwks_entry = {
+                            "kty": key.get("kty"),
+                            "kid": key.get("kid")
+                        }
+                        if key.get("kty") == "RSA":
+                            jwks_entry["e"] = key.get("e")
+                            jwks_entry["n"] = key.get("n")
+                        elif key.get("kty") == "EC":
+                            jwks_entry["x"] = key.get("x")
+                            jwks_entry["y"] = key.get("y")
+                        jwks_formatted.append(jwks_entry)
+
+                                
                 formatted_record = {
                     "app_id": record.get("id", ""),
                     "label": record.get("label", ""),
@@ -52,7 +75,7 @@ class AppOauthViewSet(BaseAppViewSet):
                     "accessibility_self_service": accessibility.get("selfService", False),
                     "admin_note": notes.get("admin", ""),
                     "app_links_json": any(visibility.get("appLinks",{}).values()),  # store as string if needed
-                    "app_settings_json": settings.get("app", "{}"),  # recommend converting to JSON string if using StringField
+                    "app_settings_json": settings.get("apps", "{}"),  # recommend converting to JSON string if using StringField
                     "authentication_policy": authentication_policy,
                     "auto_key_rotation": oauthClient.get("autoKeyRotation", False),
                     "auto_submit_toolbar": visibility.get("autoSubmitToolbar", False),
@@ -67,12 +90,12 @@ class AppOauthViewSet(BaseAppViewSet):
                     "hide_web": hide.get("web", False),
                     "implicit_assignment": settings.get("implicitAssignment", False),
                     "issuer_mode": oauthClient_settings.get("issuer_mode", ""),
-                    "jwks": oauthClient.get("jwks", []) if isinstance(oauthClient.get("jwks", []), list) else [],
+                    "jwks": jwks_formatted,
                     "jwks_uri": oauthClient.get("jwks_uri", ""),
                     "login_mode": idp_initiated_login.get("mode", ""),
                     "login_scopes": idp_initiated_login.get("default scope", []) or [],
                     "login_uri": record.get("login_uri", ""),
-                    "logo": record.get("logo", ""),
+                    "logo": record.get("logo"),
                     "logo_uri": oauthClient_settings.get("logo_uri", ""),
                     "omit_secret": record.get("omitSecret", False),
                     "pkce_required": oauthClient.get("pkce_required", False),

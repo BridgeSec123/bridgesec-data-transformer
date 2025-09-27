@@ -43,6 +43,7 @@ class AppSAMLViewSet(BaseAppViewSet):
 
                 formatted_record = {
                     "label": record.get("label", ""),
+                    "app_id" : record.get("id", ""),
                     "accessibility_error_redirect_url": accessibility.get("errorRedirectUrl", ""),
                     "accessibility_login_redirect_url": accessibility.get("loginRedirectUrl", ""),
                     "accessibility_self_service": accessibility.get("selfService", False),
@@ -67,7 +68,7 @@ class AppSAMLViewSet(BaseAppViewSet):
                     "implicit_assignment" : settings.get("implicitAssignment", ""),
                     "key_name": record.get("keyName", ""),
                     "key_years_valid": record.get("keyYearsValid", 2),
-                    "logo" : record.get("logo", ""),
+                    "logo" : record.get("logo"),
                     "preconfigured_app": record.get("preconfiguredApp", ""),
                     "recipient": signon.get("recipient", ""),
                     "request_compressed": signon.get("requestCompressed", ""),
