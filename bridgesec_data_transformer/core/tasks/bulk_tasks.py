@@ -37,24 +37,30 @@ def notify_backend_via_rabbitmq(db_name):
 
 
 @shared_task
-def run_bulk_entity_task(task_id=None):
-
+def run_bulk_entity_task():
     db_name = get_dynamic_db()
     logger.info(f"[TASK START] run_bulk_entity_task triggered with db_name={db_name}")
+
     try:
+        # Ensure MongoDB connection
         ensure_mongo_connection(db_name)
-        logger.info(f"[TASK END] run_bulk_entity_task completed for db_name={db_name}")
+        logger.info(f"MongoDB connection established for db_name={db_name}")
+
+        # Process each entity
         for entity_name, viewset_class in ENTITY_VIEWSETS.items():
+            logger.info(f"Processing entity: {entity_name}")
             viewset_instance = viewset_class()
             extracted_data = viewset_instance.fetch_and_store_data(db_name)
 
             if not extracted_data:
-                logger.error(f"[{task_id}] Failed to fetch {entity_name} data")
+                logger.error(f"Failed to fetch {entity_name} data")
                 continue
 
+            # Create output directory
             output_dir = os.path.join(settings.BASE_DIR, "output", db_name)
             os.makedirs(output_dir, exist_ok=True)
 
+            # Save data to JSON files
             for sub_entity_name, sub_entity_data in extracted_data.items():
                 file_name = f"{sub_entity_name}.json"
                 file_path = os.path.join(output_dir, file_name)
@@ -62,8 +68,12 @@ def run_bulk_entity_task(task_id=None):
                 with open(file_path, "w", encoding="utf-8") as f:
                     json.dump(sub_entity_data, f, ensure_ascii=False, indent=4)
 
-        logger.info(f"[{task_id}] Data stored for DB: {db_name}")
+                logger.info(f"Saved {sub_entity_name} data to {file_path}")
+
+        logger.info(f"[TASK COMPLETED] All data stored for DB: {db_name}")
         notify_backend_via_rabbitmq(db_name)
+        return {"status": "success", "db_name": db_name}
 
     except Exception as e:
-        logger.exception(f"[{task_id}] Error during bulk entity fetch: {e}")
+        logger.exception(f"Error during bulk entity fetch for db {db_name}: {e}")
+        return {"status": "error", "db_name": db_name, "error": str(e)}

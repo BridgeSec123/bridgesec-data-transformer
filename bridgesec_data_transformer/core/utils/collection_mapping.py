@@ -31,19 +31,19 @@ RESOURCE_COLLECTION_MAP = {
     # "Email": [
     #     {"Email": "okta_email_domain"}
     # ],
-    # "Sms Template": [
-    #     {"Sms Template": "okta_template_sms"}
-    # ],
+    "Sms Template": [
+        {"Sms Template": "okta_template_sms"}
+    ],
     # "Captcha": [
     #     {"Captchas": "okta_captcha"},
     #     {"Captacha Wide Org Settings": "okta_captcha_org_wide_settings"},
     # ],
-    # "Organization Security": [
-    #     {"Organization Security": "okta_org_configuration"}
-    # ],
-    # "Threat Insights": [
-    #     {"Threat Insights": "okta_threat_insight_settings"}
-    # ],
+    "Organization Security": [
+        {"Organization Security": "okta_org_configuration"}
+    ],
+    "Threat Insights": [
+        {"Threat Insights": "okta_threat_insight_settings"}
+    ],
     # "Authenticator": [
     #     {"Authenticator": "okta_authenticator"},
     #     {"Factor": "okta_factors"},
@@ -82,14 +82,14 @@ RESOURCE_COLLECTION_MAP = {
     ],
     "Administrator Roles": [
         {"Admin Role Custom": "okta_admin_role_custom"},
-        {"Admin Role Targets": "okta_admin_role_targets"},
-        {"Role Subscription": "okta_role_subscription"},
-        {"Resoure set": "okta_resource_set"},
+        # {"Admin Role Targets": "okta_admin_role_targets"},
+        # {"Role Subscription": "okta_role_subscription"},
+        # {"Resoure set": "okta_resource_set"},
     ],
-    #  "Trusted Origins": [
+      "Trusted Origins": [
     #   {"Trusted Origin": "okta_trusted_origin"},
-    #     {"Trusted Server": "okta_trusted_server"},
-    # ],
+        {"Trusted Server": "okta_trusted_server"},
+    ],
     "Inline Hooks": [
         {"Inline Hook": "okta_inline_hook"}
     ],
