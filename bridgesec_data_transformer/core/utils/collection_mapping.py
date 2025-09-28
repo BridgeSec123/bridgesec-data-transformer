@@ -11,9 +11,9 @@ RESOURCE_COLLECTION_MAP = {
     # ],
     "Groups": [
         {"Groups": "okta_group"},
-        {"Group Schema Property": "okta_group_schemas"},
-        {"Group Rules": "okta_group_rules"},
-        {"Group Roles": "okta_group_roles"},
+        {"Group Schema Property": "okta_group_schema_property"},
+        {"Group Rules": "okta_group_rule"},
+        {"Group Roles": "okta_group_role"},
         {"Group Memberships": "okta_group_memberships"},
     ],
     "Brands": [
