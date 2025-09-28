@@ -41,9 +41,9 @@ RESOURCE_COLLECTION_MAP = {
     "Organization Security": [
         {"Organization Security": "okta_org_configuration"}
     ],
-    "Threat Insights": [
-        {"Threat Insights": "okta_threat_insight_settings"}
-    ],
+    # "Threat Insights": [
+    #     {"Threat Insights": "okta_threat_insight_settings"}
+    # ],
     # "Authenticator": [
     #     {"Authenticator": "okta_authenticator"},
     #     {"Factor": "okta_factors"},
@@ -96,12 +96,12 @@ RESOURCE_COLLECTION_MAP = {
     "Event_Hook": [
         {"Event_Hook": "okta_event_hook"}
     ],
-    "Domains": [
-        {"Domain": "okta_domain"}
-    ],
-    "Link": [
-        {"Link Definition": "okta_link_definition"}
-    ],
+    # "Domains": [
+    #     {"Domain": "okta_domain"}
+    # ],
+    # "Link": [
+    #     {"Link Definition": "okta_link_definition"}
+    # ],
     "Applications": [
         {"App Oauth": "okta_app_oauth"},
         {"App Saml": "okta_app_saml"},
