@@ -41,9 +41,9 @@ RESOURCE_COLLECTION_MAP = {
     "Organization Security": [
         {"Organization Security": "okta_org_configuration"}
     ],
-    # "Threat Insights": [
-    #     {"Threat Insights": "okta_threat_insight_settings"}
-    # ],
+    "Threat Insights": [
+        {"Threat Insights": "okta_threat_insight_settings"}
+    ],
     # "Authenticator": [
     #     {"Authenticator": "okta_authenticator"},
     #     {"Factor": "okta_factors"},
@@ -87,8 +87,8 @@ RESOURCE_COLLECTION_MAP = {
         # {"Resoure set": "okta_resource_set"},
     ],
       "Trusted Origins": [
-    #   {"Trusted Origin": "okta_trusted_origin"},
-        {"Trusted Server": "okta_trusted_server"},
+        {"Trusted Origin": "okta_trusted_origin"},
+        # {"Trusted Server": "okta_trusted_server"},
     ],
     "Inline Hooks": [
         {"Inline Hook": "okta_inline_hook"}
