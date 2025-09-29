@@ -128,9 +128,109 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
             logger.warning("No data found to store.")
             return db_name  # No data to insert
 
-        ensure_mongo_connection(db_name)  # Ensure the DB connection exists
+        ensure_mongo_connection(db_name) 
+        
+        SORT_FIELD_MAP = {
+        # App entities - sorted by label
+        "okta_app_oauth": "label",
+        "okta_app_saml": "label",
+        "okta_app_swa": "label",
+        "okta_app_auto_login": "label",
+        "okta_app_bookmark": "label",
+        "okta_app_basic_auth": "label",
+        "okta_app_secure_password_store": "label",
+        "okta_app_shared_credentials": "label",
+        "okta_app_three_field": "label",
+        "apps": "label",
 
-        data_list = [self.model(**data).to_mongo().to_dict() for data in extracted_data]
+        # User entities - sorted by name or profile
+        "okta_users": "profile.firstName",
+        "okta_user": "profile.firstName",
+        "user_admin_roles": "name",
+        "user_factors": "id",
+        "user_types": "name",
+        "user_schema_properties": "name",
+        "user_base_schema_properties": "name",
+        "okta_user_group_memberships": "id",
+        "okta_admin_role_targets": "id",
+
+        # Group entities - sorted by name
+        "okta_groups": "name",
+        "okta_group": "name",
+        "group_memberships": "id",
+        "group_roles": "name",
+        "group_rules": "name",
+        "group_schemas": "name",
+        "okta_group_owners": "id",
+
+        # Policy entities - sorted by name
+        "okta_policy_sign_on": "name",
+        "okta_policy_mfa": "name",
+        "okta_policy_password": "name",
+        "okta_policy_profile_enrollment": "name",
+        "okta_policy_profile_enrollment_apps": "name",
+        "okta_policy_rule_signon": "name",
+        "okta_policy_rule_mfa": "name",
+        "okta_policy_rule_password": "name",
+        "okta_policy_rule_profile_enrollment": "name",
+        "okta_policy_rule_idp_discovery": "name",
+        "okta_app_policy_sign_on": "name",
+        "okta_app_signon_policy_rule": "name",
+
+        # App-related entities - sorted by id or name
+        "okta_app_users": "id",
+        "okta_app_user_schema_property": "name",
+        "okta_app_user_base_schema_property": "name",
+        "okta_apps_group_assignment": "id",
+        "okta_apps_group_assignments": "id",
+        "okta_apps_oauth_redirect_uri": "id",
+        "okta_apps_oauth_post_redirect_uri": "id",
+        "okta_apps_oauth_api_scope": "name",
+        "okta_app_oauth_role_assignment": "id",
+        "apps_access_policy_assignment": "id",
+        "okta_app_saml_settings": "id",
+
+        # Auth Server entities - sorted by name or id
+        "auth_servers": "name",
+        "auth_servers_default": "name",
+        "auth_trusted_servers": "name",
+        "auth_server_policy": "name",
+        "auth_server_policy_rules": "name",
+        "auth_server_claims": "name",
+        "auth_servers_claim_default": "name",
+        "auth_server_scopes": "name",
+
+        # Identity Provider entities - sorted by name
+        "identity_providers": "name",
+        "okta_idp_oidc": "name",
+        "okta_idp_saml": "name",
+        "okta_idp_social": "name",
+
+        # Other entities - sorted by name or id
+        "brands": "name",
+        "okta_theme": "name",
+        "okta_email_domain": "domain",
+        "trusted_origins": "name",
+        "network_zones": "name",
+        "authenticators": "name",
+        "okta_factors": "factorType",
+        "threat_insights": "id",
+        "inline_hooks": "name",
+        "event_hooks": "name",
+        "sms_templates": "name",
+        "okta_captcha": "id",
+        "okta_captcha_org_wide_settings": "id",
+        "behavior": "name",
+        "orgs": "id",
+        "okta_role_subscription": "id",
+        "okta_admin_role_custom": "name",
+        "okta_resource_set": "name",
+        "okta_link_definition": "name"
+    }
+        sort_field = SORT_FIELD_MAP.get(self.entity_type, "name")  # defaulacted_data dynamically
+        sorted_data = sorted(extracted_data, key=lambda x: x.get(sort_field, "")) # Ensure the DB connection exists
+
+        data_list = [self.model(**data).to_mongo().to_dict() for data in sorted_data]
         collection = self.model.objects.using(db_name)._collection
         # Process in batches to avoid MongoDB's document size limits
         for i in range(0, len(data_list), batch_size):

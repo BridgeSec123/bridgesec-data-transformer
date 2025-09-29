@@ -10,6 +10,7 @@ class PasswordHash(EmbeddedDocument):
     work_factor = StringField(required=False)
 
 class User(BaseEntityModel):
+    user_id = StringField(required=True)
     email = StringField(null=True, required=True)
     first_name = StringField(required=True)
     last_name = StringField(required=True)
@@ -56,6 +57,7 @@ class User(BaseEntityModel):
 
 
 class UserType(BaseEntityModel):
+    user_type_id = StringField(required=True)
     name = StringField(required=True)
     description = StringField()
     display_name = StringField()

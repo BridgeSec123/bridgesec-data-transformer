@@ -52,6 +52,7 @@ class BaseAppViewSet(BaseEntityViewSet):
                 extracted_data[entity_name] = []
                 for app_policy in extracted_data.get("okta_app_policy_sign_on", []):
                     policy_id = app_policy.get("id")
+                    policy_name = app_policy.get("name")
 
                     if not policy_id:
                         logger.warning("Missing policy_id in app_policy entry. Skipping this record.")
@@ -64,7 +65,7 @@ class BaseAppViewSet(BaseEntityViewSet):
                         continue
 
                     try:
-                        extracted = viewset_instance.extract_data(data, policy_id)
+                        extracted = viewset_instance.extract_data(data, policy_name)
                     except Exception as e:
                         logger.error(f"Error extracting data for policy_id {policy_id}: {e}")
                         continue
@@ -135,4 +136,4 @@ class BaseAppViewSet(BaseEntityViewSet):
             viewset_instance = APP_ENTITY_VIEWSETS[entity_name]()
             viewset_instance.store_data(data, db_name)
 
-        return extracted_data_cleaned
+        return extracted_data

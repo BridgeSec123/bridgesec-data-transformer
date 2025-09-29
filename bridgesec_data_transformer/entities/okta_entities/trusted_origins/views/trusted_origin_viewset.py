@@ -22,11 +22,19 @@ class TrustedOriginViewSet(BaseEntityViewSet):
         formatted_data = []
 
         for item in extracted_data:
-            scope=item.get("scopes", [])
+            # Get the first scope type if multiple exist, or default to empty string
+            scopes = item.get("scopes", [])
+            scope_value = []
+            if scopes and len(scopes) > 0:
+                # Take the first scope's type and convert to uppercase
+                scopes = scopes[0].get("type", "").upper()
+                scope_value.append(scopes)
+
             formatted_record = {
+                "trusted_id" : item.get("id"),
                 "name": item.get("name"),
                 "origin": item.get("origin"),
-                "scopes": [scope["type"].lower() for scope in item.get("scopes", [])],
+                "scopes": scope_value,  # Now storing as a single string, not a list
                 "active": item.get("status"),
             }
             formatted_data.append(formatted_record)

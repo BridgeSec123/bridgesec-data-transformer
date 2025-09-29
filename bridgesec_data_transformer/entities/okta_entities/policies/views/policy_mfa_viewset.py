@@ -11,6 +11,25 @@ from entities.okta_entities.policies.views.policy_base_viewset import BasePolicy
 
 logger = logging.getLogger(__name__)
 
+def get_group_name_by_id(group_id):
+    """
+    Fetch group name by group ID from Okta API.
+    """
+    try:
+        okta_url = f"{settings.OKTA_API_URL}/api/v1/groups/{group_id}"
+        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+
+        response = requests.get(okta_url, headers=headers)
+        if response.status_code == 200:
+            group_data = response.json()
+            return group_data.get("profile", {}).get("name", group_id)
+        else:
+            logger.warning(f"Failed to fetch group {group_id}: {response.status_code}")
+            return group_id
+    except Exception as e:
+        logger.error(f"Error fetching group name for {group_id}: {e}")
+        return group_id
+
 class PolicyMFAViewSet(BasePolicyViewSet):
     okta_endpoint = "/api/v1/policies"
     entity_type = "okta_policy_mfa"
@@ -74,8 +93,16 @@ class PolicyMFAViewSet(BasePolicyViewSet):
                     if "self" in v.get("enroll", {})
             }
 
+            # Convert group IDs to group names
+            group_ids = groups.get("include", [])
+            group_names = []
+            for group_id in group_ids:
+                group_name = get_group_name_by_id(group_id)
+                group_names.append(group_name)
+
             formatted_record = {
                 "id": record.get("id"),
+                "policy_id": record.get("id"),
                 "name": record.get("name"),
                 "description": record.get("description",""),
                 "duo": record.get("duo", {}),
@@ -83,7 +110,7 @@ class PolicyMFAViewSet(BasePolicyViewSet):
                 "fido_u2f": record.get("fido_u2f",{}),
                 "fido_webauthn": record.get("fido_webauthn", {}),
                 "google_otp": record.get("google_otp", {}),
-                "groups_included": groups.get("include", []),
+                "groups_included": group_names,
                 "hotp": record.get("hotp"),
                 "is_oie": record.get("is_oie"),
                 "okta_call": flattened.get("okta_call", {}),

@@ -8,6 +8,7 @@ class Translation(EmbeddedDocument):
     template = StringField(required=True)
 
 class SmsTemplate(BaseEntityModel):
+    sms_id = StringField(required=True)
     type = StringField(required=True)
     template = StringField(required=True)
     translations = EmbeddedDocumentListField(Translation)

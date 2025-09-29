@@ -16,6 +16,7 @@ class Brand(BaseEntityModel):
     meta = {"collection": "okta_brand"}
 
 class EmailDomain(BaseEntityModel):
+    email_domain_id = StringField(required=True)
     brand_id = StringField(required=True)
     display_name = StringField(required=True)
     domain = StringField(required=True)

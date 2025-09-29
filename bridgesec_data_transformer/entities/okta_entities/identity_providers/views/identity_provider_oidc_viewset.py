@@ -37,6 +37,7 @@ class IdentityProviderOIDCViewSet(BaseIdentityProviderViewSet):
                 client_credentials = protocol.get("credentials", {}).get("client", {})
                 formatted_record = {
                     "name": record.get("name", ""),
+                    "idp_id": record.get("id"),
                     "authorization_url": endpoints.get("authorization", {}).get("url", ""),
                     "authorization_binding": endpoints.get("authorization", {}).get("binding", ""),
                     "token_url": endpoints.get("token", {}).get("url", ""),
@@ -56,8 +57,8 @@ class IdentityProviderOIDCViewSet(BaseIdentityProviderViewSet):
                     "groups_assignment": record.get("groups_assignment", []),
                     "groups_attribute": record.get("groups_attribute", ""),
                     "groups_filter": record.get("groups_filter", []),
-                    "issuer_mode": record.get("issuerMode", ""),
-                    "max_clock_skew": record.get("maxClockSkew", ""),
+                    "issuer_mode": record.get("issuerMode", 0),
+                    "max_clock_skew": record.get("maxClockSkew"),
                     "pkce_required": record.get("pkce_required", ""),
                     "profile_master": provisioning.get("profileMaster", ""),
                     "protocol_type": protocol.get("type", ""),
@@ -67,7 +68,7 @@ class IdentityProviderOIDCViewSet(BaseIdentityProviderViewSet):
                     "status": record.get("status", ""),
                     "subject_match_attribute": subject.get("matchAttribute", ""),
                     "subject_match_type": subject.get("matchType", ""),
-                    "suspended_action": policy.get("suspended",{}).get("action", ""),
+                    "suspended_action": provisioning.get("conditions", {}).get("suspended",{}).get("action", ""),
                     "user_info_binding": endpoints.get("userInfo", {}).get("binding", ""),
                     "user_info_url": endpoints.get("userInfo", {}).get("url", ""),
                     "username_template": policy.get("subject", {}).get("userNameTemplate", {}).get("template", ""),

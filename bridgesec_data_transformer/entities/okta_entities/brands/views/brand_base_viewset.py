@@ -31,27 +31,28 @@ class BaseBrandViewSet(BaseEntityViewSet):
             elif entity_name == "okta_email_domain":
                 extracted_data[entity_name] = []
                 for brand in extracted_data.get("brands", []):
-                    brand_id = brand["brand_id"]
+                    brand_name = brand["name"]
                     data, _, _ = viewset_instance.fetch_from_okta()
                     
-                    extracted = viewset_instance.extract_data(data, brand_id)
+                    extracted = viewset_instance.extract_data(data, brand_name)
                     if extracted:
                         extracted_data.setdefault(entity_name, []).extend(extracted)
                     else:
-                        logger.info(f"No {entity_name} data extracted for brand {brand_id}. Skipping.")
+                        logger.info(f"No {entity_name} data extracted for brand {brand_name}. Skipping.")
             else:
                 for brand in extracted_data.get("brands", []):
                     brand_id = brand.get("brand_id")
+                    brand_name = brand.get("name")
                     if not brand_id:
                         logger.warning("Missing brand_id in brands data, skipping.")
                         continue
 
                     data = viewset_instance.fetch_from_okta(brand_id)
-                    extracted = viewset_instance.extract_data(data, brand_id)
+                    extracted = viewset_instance.extract_data(data, brand_name)
                     if extracted:
                         extracted_data.setdefault(entity_name, []).extend(extracted)
                     else:
-                        logger.info(f"No {entity_name} data extracted for brand {brand_id}. Skipping.")
+                        logger.info(f"No {entity_name} data extracted for brand {brand_name}. Skipping.")
             logger.info(f"Extracted {len(extracted_data[entity_name])} records for {entity_name}.")
 
         for entity_name, data in extracted_data.items():

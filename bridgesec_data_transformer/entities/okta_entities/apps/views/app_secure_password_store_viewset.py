@@ -33,6 +33,7 @@ class AppSecurePasswordStoreViewSet(BaseAppViewSet):
                 userNameTemplate = credentials.get("userNameTemplate", {})
             
                 formatted_record = {
+                    "app_id": record.get("id", ""),
                     "label": record.get("label", ""),
                     "username_field" : app.get("usernameField", ""),
                     "password_field": app.get("passwordField", ""),
@@ -47,7 +48,7 @@ class AppSecurePasswordStoreViewSet(BaseAppViewSet):
                     "enduser_note": notes.get("enduser", ""),
                     "hide_ios": hide.get("iOS", False),
                     "hide_web": hide.get("web", False),
-                    "logo": record.get("logo", ""),
+                    "logo": record.get("logo"),
                     "optional_field1" : app.get("optionalField1", ""),
                     "optional_field1_value" : app.get("optionalField1Value", ""),
                     "optional_field2" : app.get("optionalField2", ""),

@@ -56,12 +56,12 @@ class ThemeViewset(BaseBrandViewSet):
 
             return response_data
     
-    def extract_data(self, okta_data, brand_id=None):
+    def extract_data(self, okta_data, brand_name=None):
         """
         Extract and format the theme records from Okta response.
         """
-        if not brand_id:
-            logger.warning("No brand ID provided, skipping theme fetch")
+        if not brand_name:
+            logger.warning("No brand name provided, skipping theme fetch")
             return []
         
         logger.info("Extracting and formatting customization theme data.")
@@ -70,7 +70,8 @@ class ThemeViewset(BaseBrandViewSet):
         formatted_data = []
         for record in extracted_data:
             formatted_record = {
-                "brand_id": brand_id,
+                "theme_id": record.get("id"),
+                "brand_id": brand_name,
                 "background_image": record.get("backgroundImage", ""),
                 "email_template_touch_point_variant": record.get("emailTemplateTouchPointVariant", ""),
                 "end_user_dashboard_touch_point_variant": record.get("endUserDashboardTouchPointVariant", ""),
@@ -82,7 +83,6 @@ class ThemeViewset(BaseBrandViewSet):
                 "secondary_color_contrast_hex": record.get("secondaryColorContrastHex", ""),
                 "secondary_color_hex": record.get("secondaryColorHex", ""),
                 "sign_in_page_touch_point_variant": record.get("signInPageTouchPointVariant", ""),
-                "theme_id": record.get("id"),
             }
             formatted_data.append(formatted_record)
 

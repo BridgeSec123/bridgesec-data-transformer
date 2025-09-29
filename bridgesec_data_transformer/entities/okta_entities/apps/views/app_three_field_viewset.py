@@ -31,8 +31,11 @@ class AppThreeFieldViewSet(BaseAppViewSet):
                 credentials = record.get("credentials", {})
                 hide = visibility.get("hide", {})
                 userNameTemplate = credentials.get("userNameTemplate", {})
-            
+
+                # Fix invalid template expressions that reference 'source'
+                
                 formatted_record = {
+                    "app_id": record.get("id", ""),
                     "label": record.get("label", ""),
                     "url": app.get("targetURL", ""),
                     "username_selector": app.get("userNameSelector", ""),
@@ -44,13 +47,13 @@ class AppThreeFieldViewSet(BaseAppViewSet):
                     "accessibility_login_redirect_url": accessibility.get("loginRedirectUrl", ""),
                     "accessibility_self_service": accessibility.get("selfService", False),
                     "admin_note": notes.get("admin", ""),
-                    "app_links_json": record.get("appLinks", "{}"), 
+                    "app_links_json": any(visibility.get("appLinks", {}).values()),
                     "auto_submit_toolbar": visibility.get("autoSubmitToolbar", False),
                     "credentials_scheme": credentials.get("scheme", ""),
                     "enduser_note": notes.get("enduser", ""),
                     "hide_ios": hide.get("iOS", False),
                     "hide_web": hide.get("web", False),
-                    "logo": record.get("logo", ""),
+                    "logo": record.get("logo"),
                     "reveal_password" : credentials.get("revealPassword", False),
                     "shared_password" : record.get("shared_password", ""),
                     "shared_username" : record.get("shared_username", ""),

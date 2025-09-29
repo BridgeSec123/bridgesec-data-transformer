@@ -1,5 +1,6 @@
 import logging
 
+from core.utils.entity_mapping import clean_entity_data
 from entities.views.base_view import BaseEntityViewSet
 
 logger = logging.getLogger(__name__)
@@ -29,19 +30,28 @@ class BaseGroupViewSet(BaseEntityViewSet):
                 extracted_data[entity_name] = viewset_instance.extract_data(data)
             else:
                 extracted_data[entity_name] = []
-                for group in extracted_data.get("groups", []):
+                for group in extracted_data.get("group", []):
                     group_id = group["group_id"]
+                    group_name = group["name"]
                     data = viewset_instance.fetch_from_okta(group_id)
                     
-                    extracted = viewset_instance.extract_data(data, group_id)
+                    extracted = viewset_instance.extract_data(data, group_name)
                     if extracted:  # Only add if not empty
                         extracted_data.setdefault(entity_name, []).extend(extracted)
                     else:
-                        logger.info(f"No {entity_name} data extracted for group {group_id}. Skipping.")
+                        logger.info(f"No {entity_name} data extracted for group {group_name}. Skipping.")
 
             logger.info(f"Extracted {len(extracted_data[entity_name])} records for {entity_name}.")
 
-        for entity_name, data in extracted_data.items():
+        extracted_data_cleaned = {
+            entity: clean_entity_data(entity, data)
+            for entity, data in extracted_data.items()
+        }
+
+        logger.info(f"Extracted {len(extracted_data[entity_name])} records for {entity_name}.")
+
+
+        for entity_name, data in extracted_data_cleaned.items():
             viewset_instance = GROUP_ENTITY_VIEWSETS[entity_name]()
             viewset_instance.store_data(data, db_name)
 

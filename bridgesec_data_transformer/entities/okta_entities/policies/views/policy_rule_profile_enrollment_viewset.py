@@ -10,6 +10,7 @@ from entities.okta_entities.policies.policy_serializers import (
     PolicyRuleProfileEnrollmentSerializer,
 )
 from entities.okta_entities.policies.views.policy_base_viewset import BasePolicyViewSet
+from entities.entity_filters import should_skip_policy_rule_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ class PolicyRuleProfileEnrollmentViewSet(BasePolicyViewSet):
 
             return response_data, 200, rate_limit_headers(response)
     
-    def extract_data(self, okta_data, policy_id):
+    def extract_data(self, okta_data, policy_name):
         """
         Override to format the user data by removing the "profile" key.
         """
@@ -63,9 +64,16 @@ class PolicyRuleProfileEnrollmentViewSet(BasePolicyViewSet):
         formatted_data = []
 
         for record in extracted_data:
+            # Skip excluded policy rules
+            rule_name = record.get("name", "")
+            if should_skip_policy_rule_extraction(rule_name):
+                logger.info(f"Skipping excluded profile enrollment rule: {rule_name}")
+                continue
+
             profile_attributes = record.get("actions", {}).get("profileEnrollment", {})
             formatted_record = {
-                "policy_id": policy_id,
+                "policy_profile_rule_id" : record.get("id", ""),
+                "policy_id": policy_name,
                 "unknown_user_action": profile_attributes.get("unknownUserAction", ""),
                 "access": profile_attributes.get("access", ""),
                 "email_verification": profile_attributes.get("activationRequirements", {}).get("emailVerification"),

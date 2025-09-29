@@ -32,6 +32,7 @@ class AdminRoleCustomViewSet(BaseAdministratorViewSet):
 
             formatted_data.append(
                 {
+                    "custom_role_id": record.get("id", ""),
                     "label": label,
                     "description": description,
                     "permissions": permission

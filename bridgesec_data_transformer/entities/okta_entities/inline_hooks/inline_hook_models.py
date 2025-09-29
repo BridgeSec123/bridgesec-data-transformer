@@ -4,6 +4,7 @@ from entities.models.base import BaseEntityModel
 
 
 class InlineHook(BaseEntityModel):
+    inline_hook_id =StringField(required=True)
     name = StringField(required=True)
     version = StringField(required=True)
     type = StringField(required=True)

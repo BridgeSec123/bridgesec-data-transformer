@@ -35,6 +35,7 @@ class IdentityProviderSAMLViewSet(BaseIdentityProviderViewSet):
                 sso = endpoints.get("sso", {})
                 formatted_record = {
                     "name": record.get("name", ""),
+                    "idp_id": record.get("id"),
                     "acs_type": endpoints.get("acs", {}).get("type"),
                     "issuer": credentials.get("trust", {}).get("issuer"),
                     "kid": credentials.get("trust", {}).get("kid"),
@@ -47,7 +48,7 @@ class IdentityProviderSAMLViewSet(BaseIdentityProviderViewSet):
                     "groups_attribute": provisioning.get("groups", {}).get("attribute", ""),
                     "groups_filter": provisioning.get("groups", {}).get("filter", []),
                     "issuer_mode": provisioning.get("issuer", {}).get("mode", ""),
-                    "max_clock_skew": policy.get("maxClockSkew", ""),
+                    "max_clock_skew": policy.get("maxClockSkew", 0),
                     "name_format": protocol.get("settings", {}).get("nameFormat", ""),
                     "profile_master": provisioning.get("profileMaster", ""),
                     "provisioning_action": provisioning.get("action", ""),

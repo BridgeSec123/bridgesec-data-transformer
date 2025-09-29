@@ -4,6 +4,7 @@ from entities.models.base import BaseEntityModel
 
 
 class Behavior(BaseEntityModel):
+    behavior_id = StringField(required=True)
     name = StringField(required=True)
     type = StringField(required=True)
     location_granularity_type = StringField(required=False, null=True)

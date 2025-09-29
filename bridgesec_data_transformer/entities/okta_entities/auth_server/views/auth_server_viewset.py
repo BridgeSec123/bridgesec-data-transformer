@@ -22,6 +22,7 @@ class AuthorizationServerViewSet(BaseAuthServerViewSet):
         formatted_data = []
         for data in extracted_data:
             formatted_record = {
+                "auth_server_name": data.get("name"),
                 "auth_server_id": data.get("id"),
                 "name": data.get("name"),
                 "audiences": data.get("audiences"),

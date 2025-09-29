@@ -22,6 +22,7 @@ class UserTypeViewSet(BaseUserViewSet):
 
         for record in extracted_data:
             formatted_record = {
+                "user_type_id": record.get("id", ""),
                 "name": record.get("name", ""),
                 "display_name": record.get("displayName", ""),
                 "description": record.get("description", "")

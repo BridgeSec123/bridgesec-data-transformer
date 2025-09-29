@@ -44,6 +44,7 @@ class PolicyRuleIDPDiscoveryViewSet(BasePolicyViewSet):
 
         for policy in policies:
             policy_id = policy.get("id")
+            policy_name = policy.get("name")
             if not policy_id:
                 logger.warning("Policy without ID found. Skipping.")
                 continue
@@ -52,34 +53,37 @@ class PolicyRuleIDPDiscoveryViewSet(BasePolicyViewSet):
             rule_response = requests.get(rules_url, headers=headers)
 
             if handle_rate_limit(rule_response):
-                logger.warning(f"Rate limit hit while fetching rules for policy {policy_id}.")
+                logger.warning(
+                    f"Rate limit hit while fetching rules for policy {policy_id}."
+                )
                 continue
 
             if rule_response.status_code != 200:
-                logger.error(f"Failed to fetch rules for policy {policy_id}: {rule_response.text}")
+                logger.error(
+                    f"Failed to fetch rules for policy {policy_id}: {rule_response.text}"
+                )
                 continue
 
             rules_data = rule_response.json()
-            
-            # Add policy_id to each rule
+
+            # Add policy_id + policy_name to each rule
             for rule in rules_data:
                 rule["policy_id"] = policy_id
+                rule["policy_name"] = policy_name
                 all_rules.append(rule)
 
-            logger.info(f"Fetched {len(rules_data)} rules for policy {policy_id}")
 
         return all_rules, 200, rate_limit_headers(response)
-    
+
     def extract_data(self, okta_data):
         """
         Override to format the user data by removing the "profile" key.
         """
         logger.info("Extracting data from Okta response")
-        extracted_data = super().extract_data(okta_data)
-
+        # Don't call super().extract_data() because it loses the policy_id we added
         formatted_data = []
 
-        for record in extracted_data:
+        for record in okta_data:
             conditions = record.get("conditions")
             actions = record.get("actions")
 
@@ -103,22 +107,26 @@ class PolicyRuleIDPDiscoveryViewSet(BasePolicyViewSet):
                 }
                 user_identifier_patterns.append(pattern_data)
             
+            # Get the actual policy_name by fetching policy details from policy_id
+          
+
             formatted_record = {
                 "name": record.get("name"),
-                "policy_id": record.get("policy_id"),
+                "policy_rule_id": record.get("id"),
+                "policy_id": record.get("policy_name"),
                 "app_exclude": conditions.get("app").get("exclude", []),
                 "app_include": conditions.get("app").get("include", []),
                 "idp_id": actions.get("idp").get("providers")[0].get("type", []),
                 "idp_type": actions.get("idp").get("providers")[0].get("type", []),
                 "network_connection": conditions.get("network").get("connection",[]),
-                "network_excludes": record.get("network_excludes",[]),
-                "network_includes": record.get("network_includes",[]),
+                "network_excludes": record.get("network_excludes", []),
+                "network_includes": record.get("network_includes", []),
                 "platform_include": platform_include, 
                 "priority": record.get("priority"),
                 "status": record.get("status"),
                 "user_identifier_attribute": conditions.get("userIdentifier").get("attribute",""),
                 "user_identifier_patterns": user_identifier_patterns,
-                "user_identifier_type": conditions.get("userIdentifier").get("type", [])
+                "user_identifier_type": conditions.get("userIdentifier").get("type", "")
             }
             formatted_data.append(formatted_record)
 

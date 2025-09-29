@@ -24,6 +24,7 @@ class NetworkZoneViewSet(BaseEntityViewSet):
         for item in extracted_data:
             zone_type = item.get("type")
             record = {
+                "network_id" : item.get("id"),
                 "name": item.get("name"),
                 "type": zone_type,
                 "status": item.get("status"),

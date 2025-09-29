@@ -45,6 +45,7 @@ class DeviceMacOS(BaseEntityModel):
     meta = {"collection": "okta_policy_device_assurance_macos"}
 
 class DeviceWindows(BaseEntityModel):
+    device_id = StringField(required=True)
     name = StringField(required=True)
     os_version = StringField(null=True, required=False)
     secure_hardware_present = BooleanField(null=True, required=False)

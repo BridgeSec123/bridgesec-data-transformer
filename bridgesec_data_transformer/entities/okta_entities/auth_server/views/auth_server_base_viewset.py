@@ -25,25 +25,37 @@ class BaseAuthServerViewSet(BaseEntityViewSet):
             
             elif entity_name == "auth_server_policy_rules":
                 extracted_data[entity_name] = []
+                # Create lookup to map auth_server_name back to auth_server_id for API calls
+                auth_server_lookup = {server.get("auth_server_name") or server.get("name"): server.get("auth_server_id")
+                                    for server in extracted_data.get("auth_servers", [])}
+
                 for policy in extracted_data.get("auth_server_policy", []):
-                    auth_server_id = policy.get("auth_server_id")
+                    auth_server_name = policy.get("auth_server_id")  # This is now actually the name
+                    auth_server_id = auth_server_lookup.get(auth_server_name)  # Get actual ID for API call
                     policy_id = policy.get("policy_id")
+                    policy_name = policy.get("name")
+
+                    if not auth_server_id:
+                        logger.warning(f"Could not find auth_server_id for {auth_server_name}, skipping policy rules.")
+                        continue
+
                     data = viewset_instance.fetch_from_okta(auth_server_id, policy_id)
-                    extracted = viewset_instance.extract_data(data, auth_server_id, policy_id)
+                    extracted = viewset_instance.extract_data(data, auth_server_name, policy_name)
                     if extracted:
                         extracted_data[entity_name].extend(extracted)
             
             else:
                 extracted_data[entity_name] = []
-                # Loop through all auth_servers to get auth_server_id
+                # Loop through all auth_servers to get auth_server_id and name
                 for auth_server in extracted_data.get("auth_servers", []):
                     auth_server_id = auth_server.get("auth_server_id")
+                    auth_server_name = auth_server.get("auth_server_name") or auth_server.get("name")
                     if not auth_server_id:
                         logger.warning("Missing auth_server_id in auth_servers data, skipping.")
                         continue
 
                     data = viewset_instance.fetch_from_okta(auth_server_id)
-                    extracted = viewset_instance.extract_data(data, auth_server_id)
+                    extracted = viewset_instance.extract_data(data, auth_server_id, auth_server_name)
 
                     if extracted:
                         extracted_data[entity_name].extend(extracted)

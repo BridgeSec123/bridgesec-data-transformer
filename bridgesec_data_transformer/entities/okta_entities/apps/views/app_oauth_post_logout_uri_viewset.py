@@ -21,7 +21,7 @@ class AppOauthPostRedirectUriViewSet(BaseAppViewSet):
                 uri= record.get("settings", {}).get("oauthClient", {}).get("post_logout_redirect_uris", [])
                 if uri:
                     formatted_record = {
-                        "app_id": record.get("id"),
+                        "app_id": record.get("label"),
                         "uri": uri
                     }
                     logger.info("Extracted and formatted %d Okta OAuth API scope records from Okta", len(formatted_data))

@@ -8,6 +8,7 @@ from django.conf import settings
 from entities.okta_entities.policies.policy_models import PolicySignOn
 from entities.okta_entities.policies.policy_serializers import PolicySignOnSerializer
 from entities.okta_entities.policies.views.policy_base_viewset import BasePolicyViewSet
+from entities.entity_filters import should_skip_policy_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -64,11 +65,18 @@ class PolicySignOnViewSet(BasePolicyViewSet):
         formatted_data = []
 
         for record in extracted_data:
+            # Check if this policy should be excluded
+            policy_name = record.get("name", "")
+            if should_skip_policy_extraction(policy_name):
+                logger.info(f"Skipping policy extraction for name: {policy_name}")
+                continue
+
             groups = record.get("conditions", {}).get("people", {}).get("groups", [])
             formatted_record = {
                 "id": record.get("id"),
-                "name": record.get("name", ""),
-                "description": record.get("description", ""), 
+                "policy_signon_id": record.get("id"),
+                "name": policy_name,
+                "description": record.get("description", ""),
                 "groups_included": groups.get("include", []),
                 "priority": record.get("priority", 0),
                 "status": record.get("status", "")

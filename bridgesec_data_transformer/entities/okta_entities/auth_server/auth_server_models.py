@@ -4,6 +4,7 @@ from entities.models.base import BaseEntityModel
 
 
 class AuthorizationServer(BaseEntityModel):
+    auth_server_name = StringField(required=True)
     auth_server_id = StringField()
     audiences = ListField()
     description = StringField(null=True,required=False)
@@ -16,6 +17,7 @@ class AuthorizationServer(BaseEntityModel):
 
 class AuthorizationServerClaim(BaseEntityModel):
     auth_server_id = StringField()
+    claim_id = StringField()
     claim_type = StringField()
     name = StringField()
     value = StringField()
@@ -46,7 +48,7 @@ class AuthorizationServerDefault(BaseEntityModel):
     meta = {"collection" : "okta_auth_server_default"}
 
 class AuthorizationServerPolicy(BaseEntityModel):
-    policy_id = StringField(required=True)
+    policy_id = StringField(required=True)    
     auth_server_id = StringField(required=True)
     name = StringField(required=True)
     client_whitelist = ListField(required=True)
@@ -58,6 +60,7 @@ class AuthorizationServerPolicy(BaseEntityModel):
 
 class AuthorizationServerPolicyRule(BaseEntityModel):
     auth_server_id = StringField(required=True)
+    policy_rule_id = StringField(required=True)
     grant_type_whitelist = ListField(required=True)
     policy_id = StringField(required=True)
     name = StringField(required=True)
@@ -78,6 +81,7 @@ class AuthorizationServerPolicyRule(BaseEntityModel):
 
 class AuthorizationServerScope(BaseEntityModel):
     auth_server_id = StringField()
+    scope_id = StringField()
     name = StringField()
     consent = StringField(null=True, required=False)
     default = BooleanField(null=True, required=False)

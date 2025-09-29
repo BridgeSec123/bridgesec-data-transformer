@@ -27,6 +27,7 @@ class SmsTemplateViewSet(BaseEntityViewSet):
                     for t in translations
                 ]
             formatted_record = {
+                "sms_id": item.get("id"),
                 "type": item.get("type"),
                 "template": item.get("template"),
                 "translations": formatted_translations

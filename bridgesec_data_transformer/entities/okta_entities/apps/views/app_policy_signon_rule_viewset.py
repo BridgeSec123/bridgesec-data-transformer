@@ -50,7 +50,8 @@ class AppPolicyRuleSignOnViewSet(BaseAppViewSet):
 
             return response_data, 200, rate_limit_headers(response)
 
-    def extract_data(self, okta_data, policy_id):
+
+    def extract_data(self, okta_data, policy_name):
         """
         Override to format the user data by removing the "profile" key.
         """
@@ -66,8 +67,9 @@ class AppPolicyRuleSignOnViewSet(BaseAppViewSet):
             constraints = verificationMethod.get("constraints") or []
             conditions = record.get("conditions") or {}
             formatted_record = {
+                "policy_rule_id": record.get("id", ""),
                 "name": record.get("name", ""),
-                "policy_id": policy_id,
+                "policy_id": policy_name,
                 "access": appsignon.get("access", ""),
                 "constraints": constraints,
                 "custom_expression": record.get("customExpression", ""),

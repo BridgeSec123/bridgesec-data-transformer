@@ -20,7 +20,8 @@ class EventHookViewSet(BaseEntityViewSet):
         extracted_data = super().extract_data(okta_data)
 
         formatted_data = []
-        for record in extracted_data: 
+        for record in extracted_data:
+            event_id = record.get("id"),
             channel = record.get("channel", {})
             formatted_record = {
                 "name": record.get("name"),

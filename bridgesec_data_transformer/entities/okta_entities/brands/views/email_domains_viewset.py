@@ -15,7 +15,7 @@ class EmailDomainViewset(BaseBrandViewSet):
     serializer_class = EmailDomainSerializer
     model = EmailDomain
 
-    def extract_data(self, okta_data, brand_id=None):
+    def extract_data(self, okta_data, brand_name=None):
         """
         Extract and format the email domain records from Okta response.
         """
@@ -25,7 +25,8 @@ class EmailDomainViewset(BaseBrandViewSet):
         formatted_data = []
         for record in extracted_data:
             formatted_record = {
-                "brand_id": brand_id,
+                "email_domain_id": record.get("id", ""),
+                "brand_id": brand_name,
                 "domain": record.get("domain", ""),
                 "display_name": record.get("displayName", ""),
                 "user_name": record.get("userName", ""),

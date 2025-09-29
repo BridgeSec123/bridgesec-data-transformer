@@ -1,5 +1,7 @@
 import logging
 
+import requests
+from django.conf import settings
 from entities.okta_entities.groups.group_models import GroupRule
 from entities.okta_entities.groups.group_serializers import GroupRuleSerializer
 from entities.okta_entities.groups.views.group_base_viewset import BaseGroupViewSet
@@ -17,23 +19,57 @@ class GroupRuleViewSet(BaseGroupViewSet):
     serializer_class = GroupRuleSerializer
     model = GroupRule
 
+    def get_group_names_from_ids(self, group_ids):
+        """
+        Fetch group names by making API calls for each group ID.
+        """
+        if not group_ids:
+            return []
+
+        group_names = []
+        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+
+        for group_id in group_ids:
+            try:
+                group_url = f"{settings.OKTA_API_URL}/api/v1/groups/{group_id}"
+                response = requests.get(group_url, headers=headers)
+                if response.status_code == 200:
+                    group_data = response.json()
+                    group_name = group_data.get("profile", {}).get("name") or group_data.get("name", "")
+                    if group_name:
+                        group_names.append(group_name)
+                    else:
+                        logger.warning(f"No name found for group ID {group_id}")
+                        group_names.append(group_id)
+                else:
+                    logger.warning(f"Failed to fetch group details for ID {group_id}")
+                    group_names.append(group_id)
+            except Exception as e:
+                logger.error(f"Error fetching group details for ID {group_id}: {e}")
+                group_names.append(group_id)
+
+        return group_names
+
     def extract_data(self, okta_data):
         """
         Extract and format group rule data from Okta response.
         """
         logger.info("Extracting group rule data from Okta response.")
-        extracted_data = super().extract_data(okta_data)
 
         extracted_rules = []
         for rule in okta_data:
             conditions = rule.get("conditions", {})
             expressions= conditions.get("expression", {})
             people= conditions.get("people", {})
-            groups_assignments = conditions.get("actions", {}).get("assignUserToGroups", {})
+            groups_assignments = rule.get("actions", {}).get("assignUserToGroups", {})
+            group_ids = groups_assignments.get("groupIds", [])
+            group_names = self.get_group_names_from_ids(group_ids)
+
             rule_entry = {
                 "name": rule.get("name"),
+                "group_rule_id": rule.get("id"),
                 "status": rule.get("status"),
-                "group_assignments": groups_assignments.get("groupIds", []),
+                "group_assignments": group_names,
                 "expression_type": expressions.get("type",""),
                 "expression_value": expressions.get("value",""),
                 "remove_assigned_users": rule.get("removeAssignedUsers",""),

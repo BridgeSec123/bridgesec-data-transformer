@@ -50,16 +50,16 @@ class AuthTrustedServerViewSet(BaseAuthServerViewSet):
             logger.error(f"Failed to fetch trusted servers. Status: {response.status_code}, Response: {content}")
             return []
 
-    def extract_data(self, okta_data, auth_server_id):
+    def extract_data(self, okta_data, auth_server_id=None, auth_server_name=None):
         extracted_data = []
         trusted_ids = []
         for scope in okta_data:
             trusted_ids.append(scope.get("id"))
         extracted_data.append(
             {
-                "auth_server_id": auth_server_id,
+                "auth_server_id": auth_server_name,
                 "trusted": trusted_ids
             }
         )
-        logger.info(f"Extracted {len(extracted_data)} trusted server records for auth server {auth_server_id}.")
+        logger.info(f"Extracted {len(extracted_data)} trusted server records for auth server {auth_server_name}.")
         return extracted_data

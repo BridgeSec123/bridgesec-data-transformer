@@ -25,25 +25,26 @@ class AppAutoLoginViewSet(BaseAppViewSet):
                 signon = settings.get("signOn", {})
                 note = settings.get("notes", {})
                 hide = visibility.get("hide", {})
-                logo_list = record.get("_links", {}).get("logo", [{}])
-                logo = logo_list[0].get("href", "") if logo_list and isinstance(logo_list, list) else ""
+                # logo_list = record.get("_links", {}).get("logo", [{}])
+                # logo = logo_list[0].get("href", "") if logo_list and isinstance(logo_list, list) else ""
                 username_template = credentials.get("userNameTemplate", {})
 
                 # Format the record
                 formatted_record = {
+                    "app_id": record.get("id", ""),
                     "label": record.get("label", ""),
                     "accessibility_error_redirect_url": accessibility.get("errorRedirectUrl", ""),
                     "accessibility_login_redirect_url": accessibility.get("loginRedirectUrl", ""),
                     "accessibility_self_service": accessibility.get("selfService", ""),
                     "admin_note": note.get("admin", ""),
                     "app_links_json": any(visibility.get("appLinks",{}).values()),
-                    "app_settings_json": settings.get("app", "{}"),
+                    "app_settings_json": settings.get("apps", ""),
                     "auto_submit_toolbar": visibility.get("autoSubmitToolbar", ""),
                     "credentials_scheme": credentials.get("scheme", ""),
                     "enduser_note": note.get("enduser", ""),
                     "hide_ios": hide.get("iOS", ""),
                     "hide_web": hide.get("web", ""),
-                    "logo": logo,
+                    "logo": record.get("logo"),
                     "preconfigured_app": record.get("preconfiguredApp", ""),
                     "reveal_password": credentials.get("revealPassword", False),
                     "shared_password": record.get("sharedPassword", ""),

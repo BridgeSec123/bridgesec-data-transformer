@@ -53,7 +53,7 @@ class AdminRoleTargetsViewSet(BaseUserViewSet):
 
             return response_data
 
-    def extract_data(self, okta_data, user_id, role_type):
+    def extract_data(self, okta_data, user_name, role_type):
         extracted_data =super().extract_data(okta_data)
         formatted_data = []
         apps = []
@@ -64,7 +64,7 @@ class AdminRoleTargetsViewSet(BaseUserViewSet):
 
         formatted_data = [{
             "role_type": role_type,
-            "user_id": user_id,
+            "user_id": user_name,
             "apps": apps,
             "groups": []  
         }]

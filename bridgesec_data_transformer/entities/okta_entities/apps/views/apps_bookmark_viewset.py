@@ -30,6 +30,7 @@ class AppBookmarkViewSet(BaseAppViewSet):
                 hide = visibility.get("hide", {})
 
                 formatted_record = {
+                    "app_id": record.get("id", ""),
                     "label": record.get("label", ""),
                     "url": settings.get("app", {}).get("url", ""),
                     "accessibility_error_redirect_url": accessibility.get("errorRedirectUrl", ""),
@@ -42,7 +43,7 @@ class AppBookmarkViewSet(BaseAppViewSet):
                     "enduser_note": note.get("enduser", ""),
                     "hide_ios": hide.get("iOS", ""),
                     "hide_web": hide.get("web", ""),
-                    "logo" : record.get("logo", ""),
+                    "logo" : record.get("logo"),
                     "request_integration": settings.get("app", {}).get("requestIntegration", True),
                     "timeouts": record.get("timeouts", []),
                     "status": record.get("status", "")

@@ -10,6 +10,7 @@ from entities.okta_entities.policies.policy_serializers import (
     PolicyRuleSignOnSerializer,
 )
 from entities.okta_entities.policies.views.policy_base_viewset import BasePolicyViewSet
+from entities.entity_filters import should_skip_policy_rule_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ class PolicyRuleSignOnViewSet(BasePolicyViewSet):
 
             return response_data, 200, rate_limit_headers(response)
 
-    def extract_data(self, okta_data, policy_id):
+    def extract_data(self, okta_data, policy_name):
         """
         Override to format the user data by removing the "profile" key.
         """
@@ -62,17 +63,24 @@ class PolicyRuleSignOnViewSet(BasePolicyViewSet):
         formatted_data = []
 
         for record in extracted_data:
+            # Check if this policy rule should be excluded
+            rule_name = record.get("name", "")
+            if should_skip_policy_rule_extraction(rule_name):
+                logger.info(f"Skipping policy rule extraction for name: {rule_name}")
+                continue
+
             actions = record.get("actions")
             signon = actions.get("signon")
             conditions = record.get("conditions")
             session = signon.get("session")
             formatted_record = {
-                "name": record.get("name", ""),
+                "policy_signon_rule_id": record.get("id"),
+                "name": rule_name,
                 "access": signon.get("access", ""),
                 "auth_type": conditions.get("authContext").get("authType"),
                 "behaviors": conditions.get("behaviors"),
                 "factor_sequence": conditions.get("factorSequence", {}),
-                "identity_provider": conditions.get("identityProvider", ""),
+                "identity_provider": conditions.get("identityProvider", {}).get("provider", ""),
                 "identity_provider_ids": conditions.get("identityProvider", {}).get("id"),
                 "mfa_prompt": signon.get("mfa", {}).get("prompt"),
                 "mfa_lifetime": signon.get("mfa", {}).get("rememberDeviceLifetime"),
@@ -81,7 +89,7 @@ class PolicyRuleSignOnViewSet(BasePolicyViewSet):
                 "network_connection": conditions.get("network", {}).get("connection"),
                 "network_excludes": conditions.get("network", {}).get("exclude", []),
                 "network_includes": conditions.get("network", {}).get("include", []),
-                "policy_id": policy_id,
+                "policy_id": policy_name,
                 "primary_factor": signon.get("primaryFactor", {}),
                 "priority": record.get("priority"),
                 "risk_level": signon.get("risk", ""),

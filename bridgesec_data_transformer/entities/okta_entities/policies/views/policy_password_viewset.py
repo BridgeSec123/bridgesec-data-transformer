@@ -8,6 +8,7 @@ from django.conf import settings
 from entities.okta_entities.policies.policy_models import PolicyPassword
 from entities.okta_entities.policies.policy_serializers import PolicyPasswordSerializer
 from entities.okta_entities.policies.views.policy_base_viewset import BasePolicyViewSet
+from entities.entity_filters import should_skip_policy_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,12 @@ class PolicyPasswordViewSet(BasePolicyViewSet):
         formatted_data = []
 
         for record in extracted_data:
+            # Skip excluded policies
+            policy_name = record.get("name", "")
+            if should_skip_policy_extraction(policy_name):
+                logger.info(f"Skipping excluded policy: {policy_name}")
+                continue
+
             conditions = record.get("conditions", {})
             factors = record.get("settings", {}).get("recovery", {}).get("factors", {})
             password = record.get("settings", {}).get("password",{})
@@ -75,6 +82,7 @@ class PolicyPasswordViewSet(BasePolicyViewSet):
             okta_email = factors.get("okta_email", {})
             formatted_record = {
                 "id": record.get("id"),
+                "policy_id": record.get("id"),
                 "name": record.get("name"),
                 "auth_provider": conditions.get("authProvider", {}).get("provider", ""),
                 "call_recovery": factors.get("okta_call", {}).get("status", ""),

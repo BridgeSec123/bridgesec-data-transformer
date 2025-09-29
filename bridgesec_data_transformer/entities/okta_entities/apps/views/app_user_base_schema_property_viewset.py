@@ -42,19 +42,20 @@ class AppUserBaseSchemaPropertyViewSet(BaseAppViewSet):
 
         for app in apps:
             app_id = app.get("id")
-            if not app_id:
-                logger.warning("App without ID found. Skipping.")
+            app_label = app.get("label")  # <-- store label instead of id
+            if not app_id or not app_label:
+                logger.warning("App without ID or label found. Skipping.")
                 continue
 
             users_url = f"{base_url}/api/v1/meta/schemas/apps/{app_id}/default"
             user_response = requests.get(users_url, headers=headers)
 
             if handle_rate_limit(user_response):
-                logger.warning(f"Rate limit hit while fetching user base schema for app {app_id}. Skipping.")
+                logger.warning(f"Rate limit hit while fetching user base schema for app {app_label}. Skipping.")
                 continue
 
             if user_response.status_code != 200:
-                logger.warning(f"Failed to fetch user base schema for app {app_id}: {user_response.text}")
+                logger.warning(f"Failed to fetch user base schema for app {app_label}: {user_response.text}")
                 continue
 
             user_data = user_response.json()

@@ -16,7 +16,38 @@ class UserGroupMembershipsViewSet(BaseUserViewSet):
     entity_type = "okta_user_group_memberships"
     serializer_class = UserGroupMembershipsSerializer
     model = UserGroupMemberships
-    
+
+    def get_group_names_from_ids(self, group_ids):
+        """
+        Fetch group names by making API calls for each group ID.
+        """
+        if not group_ids:
+            return []
+
+        group_names = []
+        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+
+        for group_id in group_ids:
+            try:
+                group_url = f"{settings.OKTA_API_URL}/api/v1/groups/{group_id}"
+                response = requests.get(group_url, headers=headers)
+                if response.status_code == 200:
+                    group_data = response.json()
+                    group_name = group_data.get("profile", {}).get("name") or group_data.get("name", "")
+                    if group_name:
+                        group_names.append(group_name)
+                    else:
+                        logger.warning(f"No name found for group ID {group_id}")
+                        group_names.append(group_id)
+                else:
+                    logger.warning(f"Failed to fetch group details for ID {group_id}")
+                    group_names.append(group_id)
+            except Exception as e:
+                logger.error(f"Error fetching group details for ID {group_id}: {e}")
+                group_names.append(group_id)
+
+        return group_names
+
     def fetch_from_okta(self,user_id):
         if not self.okta_endpoint:
             logger.error("Okta endpoint not defined")
@@ -49,20 +80,23 @@ class UserGroupMembershipsViewSet(BaseUserViewSet):
 
             return response_data
     
-    def extract_data(self, okta_data, user_id):
+    def extract_data(self, okta_data, user_name):
         extracted_data = super().extract_data(okta_data)
-        groups = []
+        group_ids = []
 
         # Extract group IDs as plain strings
         for record in extracted_data:
             group_id = record.get("id")
             if group_id:
-                groups.append(group_id)
+                group_ids.append(group_id)
+
+        # Convert group IDs to group names
+        group_names = self.get_group_names_from_ids(group_ids)
 
         # Prepare final data without extra formatting
         formatted_data = [{
-            "user_id": user_id,
-            "groups": groups
+            "user_id": user_name,
+            "groups": group_names
         }]
 
-        return formatted_data if groups else []
+        return formatted_data if group_names else []

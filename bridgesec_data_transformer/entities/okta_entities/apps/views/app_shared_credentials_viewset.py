@@ -43,7 +43,7 @@ class AppSharedCredentialsViewSet(BaseAppViewSet):
                 "enduser_note": notes.get("enduser", ""),
                 "hide_ios": hide.get("iOS", ""),
                 "hide_web": hide.get("web", ""),
-                "logo": record.get("logo", ""),
+                "logo": record.get("logo"),
                 "password_field": record.get("passwordField", ""),
                 "preconfigured_app": record.get("preconfiguredApp", ""),
                 "redirect_url": record.get("redirectUrl", ""),

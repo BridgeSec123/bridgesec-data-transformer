@@ -26,7 +26,7 @@ class UserViewSet(BaseUserViewSet):
             profile = record.get("profile", {})
 
             formatted_record={
-                "id": record.get("id"),
+                "user_id": record.get("id"),
                 "first_name": profile.get("firstName", ""),
                 "last_name": profile.get("lastName", ""),
                 "mobile_phone": profile.get("mobilePhone", ""),

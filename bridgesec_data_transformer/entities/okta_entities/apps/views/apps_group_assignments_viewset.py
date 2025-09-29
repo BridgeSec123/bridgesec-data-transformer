@@ -19,50 +19,64 @@ class AppsGroupAssignmentsViewSet(BaseAppViewSet):
     def fetch_from_okta(self):
         """
         Fetch all Okta apps, then fetch group assignments for each app,
-        and group results by app_id.
+        replace app_id with app label, group.id with group name.
         """
         base_url = settings.OKTA_API_URL
         headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
 
+        # Step 1: fetch all apps
         discovery_url = f"{base_url}/api/v1/apps"
         response = requests.get(discovery_url, headers=headers)
 
         if handle_rate_limit(response):
-            logger.warning("Rate limit hit while fetching app IDs.")
             return {"error": "Rate limit hit."}, 429, rate_limit_headers(response)
 
         if response.status_code != 200:
-            logger.error(f"Failed to fetch app list: {response.text}")
             return {"error": f"Failed to fetch apps: {response.text}"}, response.status_code, rate_limit_headers(response)
 
         apps = response.json()
         grouped_assignments = []
 
-        logger.info(f"Found {len(apps)} apps. Fetching group assignments for each...")
-
         for app in apps:
             app_id = app.get("id")
-            if not app_id:
-                logger.warning("App without ID found. Skipping.")
+            app_label = app.get("label")  # <-- store label instead of id
+            if not app_id or not app_label:
                 continue
 
+            # Step 2: fetch groups for this app
             groups_url = f"{base_url}/api/v1/apps/{app_id}/groups"
             group_response = requests.get(groups_url, headers=headers)
 
             if handle_rate_limit(group_response):
-                logger.warning(f"Rate limit hit while fetching groups for app {app_id}. Skipping.")
                 continue
-
             if group_response.status_code != 200:
-                logger.error(f"Failed to fetch group assignments for app {app_id}: {group_response.text}")
                 continue
 
             group_data = group_response.json()
-            logger.info(f"Fetched {len(group_data)} group assignments for app {app_id}.")
+            formatted_groups = []
+
+            # Step 3: resolve each groupId -> groupName
+            for group in group_data:
+                group_id = group.get("id")
+                group_name = None
+
+                if group_id:
+                    group_url = f"{base_url}/api/v1/groups/{group_id}"
+                    group_detail_resp = requests.get(group_url, headers=headers)
+
+                    if group_detail_resp.status_code == 200:
+                        group_detail = group_detail_resp.json()
+                        group_name = group_detail.get("profile", {}).get("name")
+
+                formatted_groups.append({
+                    "id": group_name or group_id,  # replace with name if available
+                    "priority": group.get("priority"),
+                    "profile": group.get("profile", "")
+                })
 
             grouped_assignments.append({
-                "app_id": app_id,
-                "group": group_data,
+                "app_id": app_label,      # <-- use label here
+                "group": formatted_groups,
                 "timeouts": {}
             })
 
@@ -71,34 +85,6 @@ class AppsGroupAssignmentsViewSet(BaseAppViewSet):
     def extract_data(self, okta_data):
         """
         Extracts and formats app_id, group, and timeouts fields from Okta response.
+        (Here we already map app_id -> label and group.id -> name in fetch_from_okta)
         """
-        logger.info("Extracting data from Okta response")
-        # extracted_data = super().extract_data(okta_data) or []
-
-        formatted_data = []
-        for record in okta_data:
-            raw_groups = record.get("group", [])
-            formatted_groups = []
-
-            for group in raw_groups:
-                group_obj = {
-                    "id": group.get("id"),
-                    "priority": group.get("priority")
-                }
-
-                # Include profile only if present
-                profile = group.get("profile")
-                if profile:
-                    group_obj["profile"] = profile
-
-                formatted_groups.append(group_obj)
-            formatted_record = {
-                "app_id": record.get("app_id"),
-                "group": formatted_groups,  # List of group objects
-                "timeouts": record.get("timeouts", {})
-            }
-
-            formatted_data.append(formatted_record)
-
-        logger.info("Final extracted %d group assignment records after formatting and filtering", len(formatted_data))
-        return formatted_data
+        return okta_data

@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 
 class BehaviorSerializer(serializers.Serializer):
+    behavior_id = serializers.CharField(max_length=255)
     name = serializers.CharField(max_length=255)
     type = serializers.CharField(max_length=255)
     location_granularity_type = serializers.CharField(max_length=255, required=False)

@@ -8,6 +8,7 @@ from django.conf import settings
 from entities.okta_entities.apps.apps_models import AppPolicySignOn
 from entities.okta_entities.apps.apps_serializers import AppPolicySignOnSerializer
 from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
+from entities.entity_filters import should_skip_app_signon_policy_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +65,15 @@ class AppPolicySignOnViewSet(BaseAppViewSet):
         formatted_data = []
 
         for record in extracted_data:
-        
+            # Check if this policy should be excluded
+            policy_name = record.get("name", "")
+            if should_skip_app_signon_policy_extraction(policy_name):
+                logger.info(f"Skipping app signon policy extraction for name: {policy_name}")
+                continue
+
             formatted_record = {
                 "id": record.get("id"),
+                "app_policy_id" : record.get("id"),
                 "name": record.get("name"),
                 "description": record.get("description"),
                 "catch_all": record.get("catch_all"),

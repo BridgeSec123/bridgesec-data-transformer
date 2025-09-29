@@ -57,17 +57,40 @@ class PolicyProfileEnrollmentAppsViewSet(BasePolicyViewSet):
 
             return response_data, 200, rate_limit_headers(response)
     
-    def extract_data(self, okta_data, policy_profile_enrollment_id):
+    def extract_data(self, okta_data, policy_profile_enrollment_name):
         """
-        Override to format the user data by removing the "profile" key.
+        Override to extract app names by fetching app details for each app ID.
         """
         logger.info("Extracting data from Okta response")
         extracted_data = super().extract_data(okta_data)
 
-        apps = [record.get("id", "") for record in extracted_data if "id" in record]
+        # Fetch app details for each app ID to get the name
+        app_names = []
+        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+
+        for record in extracted_data:
+            app_id = record.get("id", "")
+            if app_id:
+                # Fetch app details
+                app_url = f"{settings.OKTA_API_URL}/api/v1/apps/{app_id}"
+                try:
+                    response = requests.get(app_url, headers=headers)
+                    if response.status_code == 200:
+                        app_data = response.json()
+                        app_name = app_data.get("label") or app_data.get("name", "")
+                        if app_name:
+                            app_names.append(app_name)
+                    else:
+                        logger.warning(f"Failed to fetch app details for ID {app_id}")
+                        # Fallback to ID if we can't get the name
+                        app_names.append(app_id)
+                except Exception as e:
+                    logger.error(f"Error fetching app details for ID {app_id}: {e}")
+                    app_names.append(app_id)
+
         formatted_data = [{
-            "policy_id": policy_profile_enrollment_id,
-            "apps": apps
+            "policy_id": policy_profile_enrollment_name,
+            "apps": app_names
         }]
         logger.info("Final extracted %d Policy records after formatting and filtering", len(formatted_data))
         return formatted_data

@@ -4,6 +4,7 @@ from entities.models.base import BaseEntityModel
 
 
 class NetworkZone(BaseEntityModel):
+    network_id = StringField(required=True)
     name = StringField(required=True)
     type = StringField(required=True)
     asns = ListField(required=False, null=True)

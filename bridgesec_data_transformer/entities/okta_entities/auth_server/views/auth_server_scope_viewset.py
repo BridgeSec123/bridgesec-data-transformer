@@ -47,11 +47,12 @@ class AuthorizationServerScopeViewSet(BaseAuthServerViewSet):
             logger.error(f"Failed to fetch scopes. Status: {response.status_code}, Response: {content}")
             return []
 
-    def extract_data(self, okta_data, auth_server_id):
+    def extract_data(self, okta_data, auth_server_id=None, auth_server_name=None):
         extracted_data = []
         for scope in okta_data:
             record = {
-                "auth_server_id": auth_server_id,
+                "auth_server_id": auth_server_name,
+                "scope_id" : scope.get("id"),
                 "name": scope.get("name"),
                 "display_name": scope.get("displayName", ""),
                 "description": scope.get("description", ""),

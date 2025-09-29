@@ -32,6 +32,7 @@ class InlineHookEntityViewSet(BaseEntityViewSet):
                 entity_type = channel.get("type", "").lower()
 
                 formatted_record = {
+                    "inline_hook_id" : record.get("id"),
                     "name": record.get("name", ""),
                     "version": record.get("version", ""),
                     "type": record.get("type", ""),

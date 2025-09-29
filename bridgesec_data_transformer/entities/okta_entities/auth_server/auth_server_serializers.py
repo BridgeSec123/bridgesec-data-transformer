@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 
 class AuthorizationServerSerializer(serializers.Serializer):
+    auth_server_name = serializers.CharField()
     auth_server_id = serializers.CharField()
     audiences = serializers.ListField(child=serializers.CharField())
     description = serializers.CharField(required=False)

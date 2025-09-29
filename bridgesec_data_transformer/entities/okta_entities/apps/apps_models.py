@@ -275,6 +275,7 @@ class AppBookMark(BaseEntityModel):
     meta = {"collection" : "okta_app_bookmark"}
 
 class AppAutoLogin(BaseEntityModel):
+    app_id = StringField(required=True)
     label = StringField(required=True)
     accessibility_error_redirect_url = StringField(required=False, null=True)
     accessibility_login_redirect_url = StringField(required=False, null=True)

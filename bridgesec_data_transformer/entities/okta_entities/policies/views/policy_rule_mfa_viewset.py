@@ -50,7 +50,7 @@ class PolicyRuleMFAViewSet(BasePolicyViewSet):
 
             return response_data, 200, rate_limit_headers(response)
     
-    def extract_data(self, okta_data, policy_id):
+    def extract_data(self, okta_data, policy_name=None):
         """
         Override to format the user data by removing the "profile" key.
         """
@@ -63,7 +63,8 @@ class PolicyRuleMFAViewSet(BasePolicyViewSet):
         for record in extracted_data:
             formatted_record = {
                 "name": record.get("name"),
-                "policy_id": policy_id,
+                "policy_rule_id" : record.get("id"),
+                "policy_id": policy_name,
                 "app_exclude": record.get("app_exclude", []),
                 "app_include": record.get("app_include", []),
                 "enroll": record.get("actions", {}).get("enroll", {}).get("self"),

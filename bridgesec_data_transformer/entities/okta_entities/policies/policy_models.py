@@ -4,7 +4,7 @@ from entities.models.base import BaseEntityModel
 
 
 class PolicyMFA(BaseEntityModel):
-    id = StringField(required=True)
+    policy_id = StringField(required=True)
     name = StringField(required=True)
     description = StringField(required=False, null=True)   
     duo = DictField(required=False, null=True)
@@ -41,6 +41,7 @@ class AppIncludeExclude(EmbeddedDocument):
 
 class PolicyRuleMFA(BaseEntityModel):
     name = StringField(required=True)
+    policy_rule_id = StringField(required=True)
     policy_id = StringField(required=True)
     app_exclude = EmbeddedDocumentListField(AppIncludeExclude, required=False, null=True)
     app_include = EmbeddedDocumentListField(AppIncludeExclude, required=False, null=True)
@@ -56,6 +57,7 @@ class PolicyRuleMFA(BaseEntityModel):
 
 
 class PolicyPassword(BaseEntityModel):
+    policy_id = StringField(required=True)
     name = StringField(required=True)
     auth_provider = StringField(required=False)
     call_recovery = StringField(required=False)
@@ -91,6 +93,7 @@ class PolicyPassword(BaseEntityModel):
 
 class PolicyProfileEnrollment(BaseEntityModel):
     id = StringField(required=True)
+    policy_id = StringField(required=True)
     name = StringField(required=True)
     status = StringField(required=False, null=True)
     
@@ -113,6 +116,7 @@ class IdentifierPattern(EmbeddedDocument):
 
 class PolicyRuleIDPDiscovery(BaseEntityModel):
     name = StringField(required=True)
+    policy_rule_id = StringField(required=True)
     policy_id = StringField(required=False, null=True)
     app_exclude = EmbeddedDocumentListField(AppIncludeExclude, required=False, null=True)
     app_include = EmbeddedDocumentListField(AppIncludeExclude, required=False, null=True)
@@ -132,6 +136,7 @@ class PolicyRuleIDPDiscovery(BaseEntityModel):
 
 class PolicyRulePassword(BaseEntityModel):
     name = StringField(required=True)
+    policy_password_id = StringField(required=True)
     policy_id = StringField(required=False, null=True)
     network_connection = StringField(required=False, null=True)
     network_excludes = ListField(StringField(required=False, null=True))
@@ -152,6 +157,7 @@ class ProfileAttributes(EmbeddedDocument):
 
 class PolicyRuleProfileEnrollment(BaseEntityModel):
     policy_id = StringField(required=True)
+    policy_profile_rule_id = StringField(required=True)
     unknown_user_action = StringField(required=True)
     access = StringField(required=False, null=True)
     email_verification = StringField(required=False, null=True)
@@ -165,6 +171,7 @@ class PolicyRuleProfileEnrollment(BaseEntityModel):
     meta = {"collection": "okta_policy_rule_profile_enrollment"}
 
 class PolicySignOn(BaseEntityModel):
+    policy_signon_id = StringField(required=True)
     name = StringField(required=True)
     description = StringField(required=False, null=True)
     groups_included = ListField(StringField(required=False, null=True))
@@ -181,6 +188,7 @@ class FactorSequence(EmbeddedDocument):
     factor_type = StringField(required=True)
 
 class PolicyRuleSignOn(BaseEntityModel):
+    policy_signon_rule_id = StringField(required=True)
     name = StringField(required=True)
     access = StringField(required=False, null=True)
     auth_type = StringField(required=False, null=True)

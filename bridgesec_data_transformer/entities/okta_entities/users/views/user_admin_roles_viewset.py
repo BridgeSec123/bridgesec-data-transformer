@@ -53,7 +53,7 @@ class UserAdminRolesViewSet(BaseUserViewSet):
 
             return response_data
 
-    def extract_data(self, okta_data, user_id):
+    def extract_data(self, okta_data, user_name):
         extracted_data = super().extract_data(okta_data)  
         admin_roles = []
         role_ids = []
@@ -67,7 +67,7 @@ class UserAdminRolesViewSet(BaseUserViewSet):
                     role_ids.append(role_id)
 
         return [{
-            "user_id": user_id,
+            "user_id": user_name,
             "admin_roles": admin_roles,
             "role_ids": role_ids
         }] if admin_roles else None

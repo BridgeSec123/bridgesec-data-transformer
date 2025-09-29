@@ -4,6 +4,7 @@ from entities.models.base import BaseEntityModel
 
 
 class EventHook(BaseEntityModel):
+    event_id = StringField(required=True)
     name = StringField(required=True)
     events = ListField(required=True)
     channel = DictField(required=True)

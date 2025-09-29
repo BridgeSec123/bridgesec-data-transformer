@@ -5,6 +5,7 @@ from entities.models.base import BaseEntityModel
 
 class IdentityProviderOIDC(BaseEntityModel):
     name = StringField(required=True)
+    idp_id = StringField(required=True)
     authorization_url = StringField(required=True)
     authorization_binding = StringField(required=True)
     token_url = StringField(required=True)
@@ -37,12 +38,16 @@ class IdentityProviderOIDC(BaseEntityModel):
     subject_match_attribute = StringField(null = True, required=False)
     subject_match_type = StringField(null = True, required=False)
     suspended_action = StringField(null = True, required=False)
+    user_info_binding = StringField(null = True, required=False)
+    user_info_url = StringField(null = True, required=False)
+    username_template = StringField(null = True, required=False)
     
     meta = {'collection': 'okta_idp_oidc'}
 
 
 class IdentityProviderSAML(BaseEntityModel):
     name = StringField(required=True)
+    idp_id = StringField(required=True)
     sso_url = StringField(required=True)
     issuer = StringField(required=True)
     kid = StringField(required=True)
@@ -78,6 +83,7 @@ class IdentityProviderSAML(BaseEntityModel):
 
 class IdentityProviderSocial(BaseEntityModel):
     name = StringField(required=True)
+    idp_id = StringField(required=True)
     scopes = ListField(StringField(), required=True)
     type = StringField(required=True)
     account_link_action = StringField(null = True, required=False)

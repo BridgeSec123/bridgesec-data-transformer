@@ -10,6 +10,7 @@ from entities.okta_entities.policies.policy_serializers import (
     PolicyProfileEnrollmentSerializer,
 )
 from entities.okta_entities.policies.views.policy_base_viewset import BasePolicyViewSet
+from entities.entity_filters import should_skip_policy_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -67,8 +68,15 @@ class PolicyProfileEnrollmentViewSet(BasePolicyViewSet):
         formatted_data = []
 
         for record in extracted_data:
+            # Skip excluded policies
+            policy_name = record.get("name", "")
+            if should_skip_policy_extraction(policy_name):
+                logger.info(f"Skipping excluded profile enrollment policy: {policy_name}")
+                continue
+
             formatted_record = {
                 "id" : record.get("id"),
+                "policy_id" : record.get("id"),
                 "name": record.get("name", {}),
                 "status": record.get("status", {})
             }

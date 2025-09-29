@@ -28,7 +28,7 @@ class OrgViewSet(BaseEntityViewSet):
             "city": okta_data.get("city", ""),
             "country": okta_data.get("country", ""),
             "end_user_support_help_url": okta_data.get("endUserSupportHelpURL", ""),
-            "logo": okta_data.get("logo", ""),
+            "logo": okta_data.get("logo"),
             "opt_out_communication_emails": okta_data.get("opt_out_communication_emails", False),
             "phone_number": okta_data.get("phoneNumber", ""),
             "postal_code": okta_data.get("postalCode", ""),

@@ -3,6 +3,7 @@ from mongoengine import ListField, StringField
 from entities.models.base import BaseEntityModel
 
 class AdminRoleCustom(BaseEntityModel):
+    custom_role_id = StringField(required=True)
     description = StringField(required=True)
     label = StringField(required=True)
     permissions = ListField(StringField(required=False))

@@ -22,17 +22,18 @@ class AppSwaViewSet(BaseAppViewSet):
         formatted_data = []
         
         for record in extracted_data:
-            if record.get("signOnMode") == "AUTO_LOGIN":
+            if record.get("signOnMode") == "BROWSER_PLUGIN":
                 accessibility = record.get("accessibility", {})
                 visibility = record.get("visibility", {})
                 signon = record.get("settings", {}).get("signOn", {})
                 hide = visibility.get("hide", {})
                 logo_list = record.get("_links", {}).get("logo", [{}])
-                logo = logo_list[0].get("href", "") if logo_list and isinstance(logo_list, list) else ""
+                # logo = logo_list[0].get("href", "") if logo_list and isinstance(logo_list, list) else ""
                 user_template = record.get("credentials", {}).get("userNameTemplate", {})
 
                 # Format the record
                 formatted_record = {
+                    "app_id": record.get("id", ""),
                     "label": record.get("label", ""),
                     "accessibility_error_redirect_url": accessibility.get("errorRedirectUrl", ""),
                     "accessibility_login_redirect_url": accessibility.get("loginRedirectUrl", ""),
@@ -45,7 +46,7 @@ class AppSwaViewSet(BaseAppViewSet):
                     "enduser_note": record.get("enduserNote", ""),
                     "hide_ios": hide.get("iOS", ""),
                     "hide_web": hide.get("web", ""),
-                    "logo": logo,
+                    "logo": record.get("logo"),
                     "password_field": record.get("passwordField", ""),
                     "preconfigured_app": record.get("preconfiguredApp", ""),
                     "redirect_url": signon.get("redirectUrl", ""),

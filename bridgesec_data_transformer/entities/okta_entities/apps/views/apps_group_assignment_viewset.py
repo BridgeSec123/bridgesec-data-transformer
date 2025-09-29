@@ -19,7 +19,7 @@ class AppsGroupAssignmentViewSet(BaseAppViewSet):
     def fetch_from_okta(self):
         """
         Fetch all Okta apps, then fetch group assignments for each app,
-        and group results by app_id.
+        replace app_id with app label, group.id with group name.
         """
         base_url = settings.OKTA_API_URL
         headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
@@ -42,8 +42,9 @@ class AppsGroupAssignmentViewSet(BaseAppViewSet):
 
         for app in apps:
             app_id = app.get("id")
-            if not app_id:
-                logger.warning("App without ID found. Skipping.")
+            app_label = app.get("label")
+            if not app_id or not app_label:
+                logger.warning("App without ID or label found. Skipping.")
                 continue
 
             groups_url = f"{base_url}/api/v1/apps/{app_id}/groups"
@@ -58,11 +59,34 @@ class AppsGroupAssignmentViewSet(BaseAppViewSet):
                 continue
 
             group_data = group_response.json()
-            logger.info(f"Fetched {len(group_data)} group assignments for app {app_id}.")
+            formatted_groups = []
+
+            # Resolve each groupId -> groupName
+            for group in group_data:
+                group_id = group.get("id")
+                group_name = None
+
+                if group_id:
+                    group_url = f"{base_url}/api/v1/groups/{group_id}"
+                    group_detail_resp = requests.get(group_url, headers=headers)
+
+                    if group_detail_resp.status_code == 200:
+                        group_detail = group_detail_resp.json()
+                        group_name = group_detail.get("profile", {}).get("name")
+
+                formatted_group = {
+                    "id": group_name or group_id,
+                    "priority": group.get("priority"),
+                    "profile": group.get("profile", {}),
+                    "retain_assignment": group.get("retain_assignment", "")
+                }
+                formatted_groups.append(formatted_group)
+
+            logger.info(f"Fetched {len(formatted_groups)} group assignments for app {app_label}.")
 
             grouped_assignments.append({
-                "app_id": app_id,
-                "group": group_data,
+                "app_id": app_label,
+                "group": formatted_groups,
                 "timeouts": {}
             })
 
@@ -72,26 +96,27 @@ class AppsGroupAssignmentViewSet(BaseAppViewSet):
         """
         Extracts and flattens data from Okta response to match expected serializer format:
         - One entry per group
-        - Fields: app_id, group_id, priority (dict), profile, retain_assignment, timeouts (list)
+        - Fields: app_id (label), group_id (name), priority (dict), profile, retain_assignment, timeouts (list)
+        (Here we already map app_id -> label and group.id -> name in fetch_from_okta)
         """
         logger.info("Extracting data from Okta response")
 
         formatted_data = []
 
         for record in okta_data:
-            app_id = record.get("app_id")
+            app_label = record.get("app_id")  # This is actually app_label now
             raw_groups = record.get("group", [])
 
             for group in raw_groups:
                 formatted_record = {
-                    "app_id": app_id,
-                    "group_id": group.get("id"),
-                    "priority": group.get("priority", ""),  
+                    "app_id": app_label,  # Store app label
+                    "group_id": group.get("id"),  # This is actually group name now
+                    "priority": group.get("priority", ""),
                     "profile": group.get("profile", {}),
-                    "retain_assignment": group.get("retain_assignment", ""), 
+                    "retain_assignment": group.get("retain_assignment", ""),
                     "timeouts": record.get("timeouts", [])
                 }
-                
+
 
                 formatted_data.append(formatted_record)
 

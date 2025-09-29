@@ -35,6 +35,9 @@ class IdentityProviderOIDCSerializer(serializers.Serializer):
     subject_match_attribute = serializers.CharField(required=False),
     subject_match_type = serializers.CharField(required=False)
     suspended_action = serializers.CharField(required=False)
+    user_info_binding = serializers.CharField(required=False)
+    username_template = serializers.CharField(required=False)
+    user_info_url = serializers.CharField(required=False)
     
 
 class IdentityProviderSAMLSerializer(serializers.Serializer):

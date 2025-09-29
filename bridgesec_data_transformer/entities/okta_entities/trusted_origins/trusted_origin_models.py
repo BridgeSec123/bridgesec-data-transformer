@@ -4,6 +4,7 @@ from entities.models.base import BaseEntityModel
 
 
 class TrustedOrigin(BaseEntityModel):
+    trusted_id = StringField(required=True)
     name = StringField(required=True)
     origin = StringField(required=True)
     scopes = ListField(StringField(), required=True)

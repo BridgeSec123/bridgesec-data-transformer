@@ -56,12 +56,13 @@ class BaseUserViewSet(BaseEntityViewSet):
 
                 for item in user_admin_roles_data:
                     user_id = item.get("user_id")
+                    user_name = item.get("user_name")
                     role_types = item.get("admin_roles", [])
                     role_ids = item.get("role_ids", [])
 
                     for role_type, role_id in zip(role_types, role_ids):
                         data = viewset_instance.fetch_from_okta(user_id=user_id, role_id=role_id)
-                        extracted = viewset_instance.extract_data(data, user_id=user_id, role_type=role_type)
+                        extracted = viewset_instance.extract_data(data, user_name)
                         if extracted:
                             role_targets_data.extend(extracted)
 
@@ -88,11 +89,12 @@ class BaseUserViewSet(BaseEntityViewSet):
 
                 for item in users_data:
                     user_id = item.get("user_id")
+                    user_name = item.get("first_name")
                     if not user_id:
                         continue
 
                     data = viewset_instance.fetch_from_okta(user_id=user_id)
-                    extracted = viewset_instance.extract_data(data, user_id=user_id)
+                    extracted = viewset_instance.extract_data(data, user_name)
 
                     if extracted:
                         group_membership_data.extend(extracted)

@@ -32,6 +32,7 @@ class GroupOwner(BaseEntityModel):
 
 class GroupRole(BaseEntityModel):
     group_id = StringField(required=True)
+    group_role_id = StringField(required=True)
     role_type = StringField(required=True)
     disable_notifications = BooleanField(required=False, null=True)
     resource_set_id = StringField(required=False, null=True)
@@ -44,6 +45,7 @@ class GroupRole(BaseEntityModel):
 
 class GroupRule(BaseEntityModel):
     name = StringField(required=True)
+    group_rule_id = StringField(required=True)
     expression_value = StringField(required=True)
     group_assignments = ListField(required=True)
     status = StringField(required=False, null=True)
