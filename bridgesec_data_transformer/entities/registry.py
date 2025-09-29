@@ -81,8 +81,8 @@ ENTITY_VIEWSETS = {
       "identity_providers": BaseIdentityProviderViewSet,
      "behavior": BehaviorViewSet, 
      "orgs": OrgViewSet,
-      "authenticators": BaseAuthenticatorViewSet,
-       "groups": BaseGroupViewSet,
+    "authenticators": BaseAuthenticatorViewSet,
+    "groups": BaseGroupViewSet,
       "brands": BaseBrandViewSet,
         "sms_templates": SmsTemplateViewSet,
        "threat_insights": ThreatInsightViewSet,
@@ -102,7 +102,7 @@ ENTITY_VIEWSETS = {
 
 GROUP_ENTITY_VIEWSETS = {
     "group": GroupEntityViewSet,
-    "group_memberships": GroupMembershipViewSet,
+    # "group_memberships": GroupMembershipViewSet,
     # "group_owners": GroupOwnerViewSet,
      "group_roles": GroupRoleViewSet,
     "group_rules": GroupRuleViewSet,
@@ -187,7 +187,7 @@ APP_ENTITY_VIEWSETS = {
     "okta_app_bookmark": AppBookmarkViewSet,
     "okta_app_auto_login": AppAutoLoginViewSet,
     "okta_app_basic_auth": AppBasicAuthViewSet,
-      "okta_app_swa": AppSwaViewSet,
+    "okta_app_swa": AppSwaViewSet,
     "okta_app_users": AppUserViewSet,
      "okta_app_user_base_schema_property": AppUserBaseSchemaPropertyViewSet,
      "okta_app_user_schema_property": AppUserSchemaPropertyViewSet,
