@@ -188,7 +188,7 @@ APP_ENTITY_VIEWSETS = {
     "okta_app_auto_login": AppAutoLoginViewSet,
     "okta_app_basic_auth": AppBasicAuthViewSet,
     "okta_app_swa": AppSwaViewSet,
-    "okta_app_users": AppUserViewSet,
+    # "okta_app_users": AppUserViewSet,
      "okta_app_user_base_schema_property": AppUserBaseSchemaPropertyViewSet,
      "okta_app_user_schema_property": AppUserSchemaPropertyViewSet,
     "okta_app_secure_password_store": AppSecurePasswordStoreViewSet,
