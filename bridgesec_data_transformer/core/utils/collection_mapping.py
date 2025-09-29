@@ -99,9 +99,9 @@ RESOURCE_COLLECTION_MAP = {
     # "Domains": [
     #     {"Domain": "okta_domain"}
     # ],
-    # "Link": [
-    #     {"Link Definition": "okta_link_definition"}
-    # ],
+    "Link": [
+        {"Link Definition": "okta_link_definition"}
+    ],
     "Applications": [
         {"App Oauth": "okta_app_oauth"},
         {"App Saml": "okta_app_saml"},
