@@ -40,13 +40,13 @@ EXCLUDED_GROUP_NAMES = [
 EXCLUDED_POLICY_NAMES = [
     "Default Policy",
     "default-policy",
-    "active-directory-policy"
+    "Active Directory Policy"
 ]
 
 # Policy rule names to exclude from data extraction
 EXCLUDED_POLICY_RULE_NAMES = [
     "Default Rule",
-    "default-rule"
+    "default-rule",
 ]
 
 # App Signon Policy names to exclude from data extraction

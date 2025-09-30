@@ -9,6 +9,7 @@ from entities.okta_entities.policies.policy_serializers import (
     PolicyRuleIDPDiscoverySerializer,
 )
 from entities.okta_entities.policies.views.policy_base_viewset import BasePolicyViewSet
+from entities.entity_filters import should_skip_policy_rule_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,12 @@ class PolicyRuleIDPDiscoveryViewSet(BasePolicyViewSet):
         formatted_data = []
 
         for record in okta_data:
+            # Skip excluded policy rules
+            rule_name = record.get("name", "")
+            if should_skip_policy_rule_extraction(rule_name):
+                logger.info(f"Skipping excluded policy rule: {rule_name}")
+                continue
+
             conditions = record.get("conditions")
             actions = record.get("actions")
 

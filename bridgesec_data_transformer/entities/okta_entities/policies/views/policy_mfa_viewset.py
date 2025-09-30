@@ -8,6 +8,7 @@ from django.conf import settings
 from entities.okta_entities.policies.policy_models import PolicyMFA
 from entities.okta_entities.policies.policy_serializers import PolicyMFASerializer
 from entities.okta_entities.policies.views.policy_base_viewset import BasePolicyViewSet
+from entities.entity_filters import should_skip_policy_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,12 @@ class PolicyMFAViewSet(BasePolicyViewSet):
         # allowed_fields = set(User._fields.keys())
 
         for record in extracted_data:
+            # Skip excluded policies
+            policy_name = record.get("name", "")
+            if should_skip_policy_extraction(policy_name):
+                logger.info(f"Skipping excluded policy: {policy_name}")
+                continue
+
             groups = record.get("conditions", {}).get("people", {}).get("groups", {})
             factors = record.get("settings", {}).get("factors", {})
 
