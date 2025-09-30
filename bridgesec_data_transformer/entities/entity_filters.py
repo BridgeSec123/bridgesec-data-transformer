@@ -55,6 +55,12 @@ EXCLUDED_APP_SIGNON_POLICY_NAMES = [
     "Okta Admin Console"
 ]
 
+# Network Zone names to exclude from data extraction
+EXCLUDED_NETWORK_ZONE_NAMES = [
+    "DefaultEnhancedDynamicZone",
+    "DefaultExemptIpZone"
+]
+
 def should_skip_app_extraction(app_label):
     """
     Check if an app should be skipped based on its label.
@@ -129,3 +135,18 @@ def should_skip_app_signon_policy_extraction(policy_name):
         return False
 
     return policy_name in EXCLUDED_APP_SIGNON_POLICY_NAMES
+
+def should_skip_network_zone_extraction(zone_name):
+    """
+    Check if a network zone should be skipped based on its name.
+
+    Args:
+        zone_name (str): The name of the network zone to check
+
+    Returns:
+        bool: True if the network zone should be skipped, False otherwise
+    """
+    if not zone_name:
+        return False
+
+    return zone_name in EXCLUDED_NETWORK_ZONE_NAMES

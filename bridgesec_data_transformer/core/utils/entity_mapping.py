@@ -75,7 +75,7 @@ ENTITY_TYPE_MAPPING = {
     },
     "event_hooks": {
         "okta_endpoint": "/api/v1/eventHooks",
-        "attributes": ["name", "events", "channel"],
+        "attributes": ["id", "name", "events", "channel"],
     },
     "okta_idp_oidc": IDP_BASE_CONFIG,
     "okta_idp_saml": IDP_BASE_CONFIG,
@@ -125,6 +125,8 @@ ENTITY_TYPE_MAPPING = {
             "proxies",
             "ipServiceCategories",
             "locations",
+            "status",
+            "usage"
         ],
     },
     "behavior": {
@@ -458,8 +460,8 @@ ENTITY_UNIQUE_FIELDS = {
 EXCLUDED_OUTPUT_FIELDS = {
     "okta_policy_profile_enrollment": ["id"],
     # "okta_app_policy_sign_on" : ["id"],
-    "auth_server_policy": ["policy_id"],
-    "auth_servers": ["auth_server_id"],
+    # "auth_server_policy": ["policy_id"],
+    # "auth_servers": ["auth_server_id"],
     "groups": ["group_id"],
      "okta_policy_mfa": ["id"],
     "okta_policy_password": ["id"],

@@ -21,9 +21,9 @@ class EventHookViewSet(BaseEntityViewSet):
 
         formatted_data = []
         for record in extracted_data:
-            event_id = record.get("id"),
             channel = record.get("channel", {})
             formatted_record = {
+                "event_id" : record.get("id"),
                 "name": record.get("name"),
                 "events": record.get("events", {}).get("items", []),
                 "channel": {
@@ -35,7 +35,9 @@ class EventHookViewSet(BaseEntityViewSet):
             auth_scheme = record.get("channel", {}).get("config", {}).get("authScheme")
             if auth_scheme:
                 formatted_record["auth"] = {
-                    "type": auth_scheme.get("type")
+                    "type": auth_scheme.get("type"),
+                    "key" :  auth_scheme.get("key"),
+                    "value": auth_scheme.get("value", "your-secret-key"),
                 }
 
             # Extract headers (if present) from channel → config → headers

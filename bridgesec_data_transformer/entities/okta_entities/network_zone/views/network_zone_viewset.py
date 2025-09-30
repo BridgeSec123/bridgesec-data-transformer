@@ -3,6 +3,7 @@ import logging
 from rest_framework import status
 from rest_framework.response import Response
 
+from entities.entity_filters import should_skip_network_zone_extraction
 from entities.okta_entities.network_zone.network_zone_models import NetworkZone
 from entities.okta_entities.network_zone.network_zone_serializer import (
     NetworkZoneSerializer,
@@ -22,10 +23,17 @@ class NetworkZoneViewSet(BaseEntityViewSet):
         formatted_data = []
 
         for item in extracted_data:
+            zone_name = item.get("name")
+
+            # Skip excluded network zones
+            if should_skip_network_zone_extraction(zone_name):
+                logger.info("Skipping excluded network zone: %s", zone_name)
+                continue
+
             zone_type = item.get("type")
             record = {
                 "network_id" : item.get("id"),
-                "name": item.get("name"),
+                "name": zone_name,
                 "type": zone_type,
                 "status": item.get("status"),
                 "usage": item.get("usage"),
@@ -34,9 +42,9 @@ class NetworkZoneViewSet(BaseEntityViewSet):
             # Handle IP type fields
             if zone_type == "IP":
                 if item.get("gateways"):
-                    record["gateways"] = item.get("gateways")
+                    record["gateways"] = [gateway.get("value") for gateway in item.get("gateways")]
                 if item.get("proxies"):
-                    record["proxies"] = item.get("proxies")
+                    record["proxies"] = [proxy.get("value") for proxy in item.get("proxies")]
 
             # Handle DYNAMIC and DYNAMIC_V2 types
             if zone_type in ["DYNAMIC", "DYNAMIC_V2"]:

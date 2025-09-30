@@ -50,7 +50,9 @@ class InlineHookEntityViewSet(BaseEntityViewSet):
                     auth_scheme = record.get("channel", {}).get("config", {}).get("authScheme", {})
                     if auth_scheme:
                         formatted_record["auth"] = {
-                            "type": auth_scheme.get("type")
+                            "type": auth_scheme.get("type"),
+                            "key": auth_scheme.get("key"),
+                            "value" : auth_scheme.get("value", "your_secret_token"),
                         }
                     
                     # Extract headers (if present) from channel → config → headers
@@ -64,11 +66,17 @@ class InlineHookEntityViewSet(BaseEntityViewSet):
                             formatted_record["auth"]["value"] = header.get("value")
                 
                 elif entity_type == "oauth":
+                    channel_with_secret = channel.copy()
+                    config = channel_with_secret.get("config", {}).copy()
+                    config["clientSecret"] = "your_secret"
+                    channel_with_secret["config"] = config
+
                     formatted_record.update({
                         "status": record.get("status", "ACTIVE"),
-                        "channel_json": channel
+                        "channel_json": channel_with_secret
                     })
-                
+
+                    
                 formatted_data.append(formatted_record)
             logger.info("Extracted and formatted %d inline hooks records from Okta", len(formatted_data))
             
