@@ -255,9 +255,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 source_collection = source_db[coll]
                 target_collection = new_db[coll]
 
-                docs = list(source_collection.find({}))
-                for doc in docs:
-                    doc.pop("_id", None)
+                docs = list(source_collection.find({}, {"_id": 0}))
                 if docs:
                     target_collection.insert_many(docs)
 

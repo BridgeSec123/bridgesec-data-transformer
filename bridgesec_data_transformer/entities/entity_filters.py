@@ -12,6 +12,17 @@ EXCLUDED_APP_LABELS = [
     "Okta Access Certification Reviews"
 ]
 
+EXCLUDED_SAML_LABELS = [
+    "Workday"
+]
+
+# Three Field App labels to exclude from data extraction
+EXCLUDED_THREE_FIELD_LABELS = [
+    "Microsoft Office 365",
+    "Microsoft Office 365 (4)",
+    "Microsoft Office 365 (5)"
+]
+
 # Group names to exclude from data extraction
 EXCLUDED_GROUP_NAMES = [
     "Read-only Domain Controllers",
@@ -75,6 +86,21 @@ def should_skip_app_extraction(app_label):
         return False
 
     return app_label in EXCLUDED_APP_LABELS
+
+def should_skip_app_saml_extraction(app_label):
+    """
+    Check if an app should be skipped based on its label.
+
+    Args:
+        app_label (str): The label of the app to check
+
+    Returns:
+        bool: True if the app should be skipped, False otherwise
+    """
+    if not app_label:
+        return False
+
+    return app_label in EXCLUDED_SAML_LABELS
 
 def should_skip_group_extraction(group_name):
     """
@@ -150,3 +176,18 @@ def should_skip_network_zone_extraction(zone_name):
         return False
 
     return zone_name in EXCLUDED_NETWORK_ZONE_NAMES
+
+def should_skip_app_three_field_extraction(app_label):
+    """
+    Check if a three field app should be skipped based on its label.
+
+    Args:
+        app_label (str): The label of the app to check
+
+    Returns:
+        bool: True if the app should be skipped, False otherwise
+    """
+    if not app_label:
+        return False
+
+    return app_label in EXCLUDED_THREE_FIELD_LABELS

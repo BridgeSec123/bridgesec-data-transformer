@@ -38,7 +38,7 @@ class AppAutoLoginViewSet(BaseAppViewSet):
                     "accessibility_self_service": accessibility.get("selfService", ""),
                     "admin_note": note.get("admin", ""),
                     "app_links_json": any(visibility.get("appLinks",{}).values()),
-                    "app_settings_json": settings.get("apps", ""),
+                    "app_settings_json": settings.get("apps", "{}"),
                     "auto_submit_toolbar": visibility.get("autoSubmitToolbar", ""),
                     "credentials_scheme": credentials.get("scheme", ""),
                     "enduser_note": note.get("enduser", ""),

@@ -43,7 +43,7 @@ class IdentityProviderSocialViewSet(BaseIdentityProviderViewSet):
                     "client_id": credentials.get("client", {}).get("client_id", "ex_client_id"),
                     "client_secret": credentials.get("client", {}).get("client_secret", "ex_client_secret"),
                     "deprovisioned_action": (provisioning.get("conditions") or {}).get("deprovisioned", {}).get("action"),
-                    "groups_action": (provisioning.get("groups") or {}).get("action", "None"),
+                    "groups_action": (provisioning.get("groups") or {}).get("action", "NONE"),
                     "groups_assignments": (provisioning.get("groups") or {}).get("assignments", []),
                     "groups_attribute": (provisioning.get("groups") or {}).get("attribute"),
                     "groups_filter": (provisioning.get("groups") or {}).get("filter", []),
@@ -55,7 +55,7 @@ class IdentityProviderSocialViewSet(BaseIdentityProviderViewSet):
                     "status": record.get("status", ""),
                     "subject_match_attribute": policy.get("subject", {}).get("matchAttribute", ""),
                     "subject_match_type": policy.get("subject", {}).get("matchType", ""),
-                    "suspended_action": provisioning.get("conditions", {}).get("suspended", {}).get("action", "None"),
+                    "suspended_action": provisioning.get("conditions", {}).get("suspended", {}).get("action", "NONE"),
                     "username_template": policy.get("subject", {}).get("userNameTemplate", {}).get("template"),
                 }
                 formatted_data.append(formatted_record)

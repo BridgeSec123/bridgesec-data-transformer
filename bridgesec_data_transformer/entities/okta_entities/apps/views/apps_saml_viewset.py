@@ -7,6 +7,7 @@ from entities.okta_entities.apps.apps_serializers import (
     AppSAMLSerializer,
 )
 from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
+from entities.entity_filters import should_skip_app_saml_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,12 @@ class AppSAMLViewSet(BaseAppViewSet):
         
         for record in extracted_data:
             if record.get("signOnMode") == "SAML_2_0":
+                # Check if this app label should be excluded
+                app_label = record.get("label", "")
+                if should_skip_app_saml_extraction(app_label):
+                    logger.info(f"Skipping app extraction for label: {app_label}")
+                    continue
+
                 accessibility = record.get("accessibility", {})
                 visibility = record.get("visibility", {})
                 settings = record.get("settings", {})
