@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 
 from entities.serializers.restore_serializer import RestoreDataSerializer
-from core.utils.collection_mapping import RESOURCE_COLLECTION_MAP
+from core.utils.collection_mapping import RESOURCE_COLLECTION_MAP, ENTITY_ID_MAPPING
 from core.utils.mongo_utils import get_dynamic_db, ensure_mongo_connection
 from core.utils.db_utils import extract_time, get_collection_name, get_latest_db
 from django.conf import settings
@@ -276,4 +276,75 @@ class BulkEntityViewSet(viewsets.ViewSet):
             import traceback
             traceback.print_exc()
             return Response({"error": str(e)}, status=500)
+
+    def _fetch_and_prepare(self, service, entity_name, date, id_field):
+        """
+        Fetch records for given entity and date, sort by label,
+        and return lookup dict by ID.
+        """
+        records = service.fetch(date, entity_name)
+        records.sort(key=lambda x: x.get("label", ""))
+        return {r.get(id_field): r for r in records}
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path=r"compare-json/(?P<entity_name>[^/.]+)/(?P<old_date>\d{4}-\d{2}-\d{2})/(?P<new_date>\d{4}-\d{2}-\d{2})",
+    )
+    def compare_json(self, request, entity_name=None, old_date=None, new_date=None):
+        """
+        Compare two datasets based on ID field, sorted by label.
+        Missing records are represented as empty JSON {}.
+        """
+        try:
+            # For testing: fallback to request params if path params not set
+            entity_name = entity_name or request.query_params.get("entity_name")
+            old_date = old_date or request.query_params.get("old_date")
+            new_date = new_date or request.query_params.get("new_date")
+
+            if not entity_name or not old_date or not new_date:
+                return Response({"error": "Provide entity_name, old_date, new_date"},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+            if entity_name not in ENTITY_ID_MAPPING:
+                return Response(
+                    {"error": f"Entity '{entity_name}' not supported. Available entities: {list(ENTITY_ID_MAPPING.keys())}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validate date formats
+            datetime.strptime(old_date, "%Y-%m-%d")
+            datetime.strptime(new_date, "%Y-%m-%d")
+
+            id_field = ENTITY_ID_MAPPING[entity_name]
+            service = EntityDataService()
+
+            # DRY: fetch + sort + lookup
+            old_lookup = self._fetch_and_prepare(service, entity_name, old_date, id_field)
+            new_lookup = self._fetch_and_prepare(service, entity_name, new_date, id_field)
+
+            seen = set()
+            all_ids = []
+            for record_id in list(old_lookup.keys()) + list(new_lookup.keys()):
+                if record_id not in seen:
+                    seen.add(record_id)
+                    all_ids.append(record_id)
+  
+
+            # Build flat array of [old_record, new_record] pairs
+            comparison_result = []
+            for record_id in all_ids:
+                comparison_result.append([
+                    old_lookup.get(record_id, {}),
+                    new_lookup.get(record_id, {})
+                ])
+
+            return Response(comparison_result, status=status.HTTP_200_OK)
+
+        except ValueError as e:
+            return Response({"error": f"Invalid date format: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

@@ -46,7 +46,7 @@ RESOURCE_COLLECTION_MAP = {
     ],
     # "Authenticator": [
     #     {"Authenticator": "okta_authenticator"},
-    #     {"Factor": "okta_factors"},
+    # +    {"Factor": "okta_factors"},
     # ],
     "Authorization Servers": [
         {"Auth Server": "okta_auth_server"},
@@ -126,4 +126,84 @@ RESOURCE_COLLECTION_MAP = {
         # {"APP Oauth Post Logout Redirect Uri": "okta_app_oauth_post_logout_redirect_uri"},
         # {"App OAuth Redirect Uri": "okta_app_oauth_redirect_uri"},
     ]
+}
+
+# Entity ID mapping for comparison - maps entity name to its unique ID field
+ENTITY_ID_MAPPING = {
+    # Groups
+    "Groups": "group_id",
+    "Group Schema Property": "id",
+    "Group Rules": "group_rule_id",
+    "Group Roles": "group_role_id",
+    "Group Memberships": "id",
+
+    # Brands
+    "Brand": "brand_id",
+
+    # Device Assurance Policies
+    "Policy Device Assurance Android": "device_id",
+    "Policy Device Assurance IOS": "device_id",
+    "Policy Device Assurance Macos": "device_id",
+    "Policy Device Assurance Windows": "device_id",
+
+    # SMS Template
+    "Sms Template": "sms_id",
+
+    # Organization Security
+    "Organization Security": "id",
+
+    # Threat Insights
+    "Threat Insights": "id",
+
+    # Authorization Servers
+    "Auth Server": "auth_server_id",
+
+    # Identity Providers
+    "IDP OIDC": "idp_id",
+    "IDP SAML": "idp_id",
+    "IDP SOCIAL": "idp_id",
+
+    # Policies
+    "Policy MFA": "policy_id",
+    "Policy Password": "policy_id",
+    "Policy Profile Enrollment": "policy_id",
+    "Policy Sign On": "policy_id",
+
+    # Network Zone
+    "Network Zone": "network_id",
+
+    # Behavior
+    "Behavior": "behavior_id",
+
+    # Administrator Roles
+    "Admin Role Custom": "custom_role_id",
+
+    # Trusted Origins
+    "Trusted Origin": "trusted_id",
+
+    # Inline Hooks
+    "Inline Hook": "inline_hook_id",
+
+    # Event Hooks
+    "Event_Hook": "event_id",
+
+    # Link
+    "Link Definition": "id",
+
+    # Applications
+    "App Oauth": "app_id",
+    "App Saml": "app_id",
+    "App Group Assignments": "app_id",
+    "App Access Policy Assignment": "app_id",
+    "App Signon Policy": "app_id",
+    "App Group Assignment": "app_id",
+    "App Bookmark": "app_id",
+    "App Auto Login": "app_id",
+    "App Three Field": "app_id",
+    "App Secure Password Store": "app_id",
+    "App User Schema Property": "app_id",
+    "App User Base Schema Property": "app_id",
+    "App Basic Auth": "app_id",
+    "App Swa": "app_id",
+    "App User": "id",
 }

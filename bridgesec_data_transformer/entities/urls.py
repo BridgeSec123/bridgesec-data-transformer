@@ -23,5 +23,6 @@ urlpatterns = [
     # path("fetch_db/", BulkEntityViewSet.as_view({"get": "list_databases"}), name="fetch-db"),
     path("resources/", BulkEntityViewSet.as_view({"get": "get_resource_names"}), name="resources"),
     path("data/<str:date_str>/<str:entity_name>/", BulkEntityViewSet.as_view({"get": "get_resource_data"}), name="data"),
-    path("restore/<str:date_str>/<str:entity_name>/", BulkEntityViewSet.as_view({"post": "restore_modified_data"}), name="restore-data")  
+    path("restore/<str:date_str>/<str:entity_name>/", BulkEntityViewSet.as_view({"post": "restore_modified_data"}), name="restore-data"),
+    path("compare-json/<str:entity_name>/<str:old_date>/<str:new_date>/", BulkEntityViewSet.as_view({"get": "compare_json"}), name="compare-json")
 ]

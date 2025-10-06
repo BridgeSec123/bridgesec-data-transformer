@@ -83,19 +83,23 @@ class PolicySignonDataBuilder:
             # Debug: Log what we're assigning
             logger.info(f"Policy '{policy_name}' getting priority {priority}")
 
-            # Get all rules for this policy and assign same priority
+            # Get all rules for this policy
             matching_rules = [rule for rule in policy_rules if rule.get("policy_id") == policy_name]
             logger.info(f"Found {len(matching_rules)} rules for policy '{policy_name}'")
 
+            # Sort rules by their original priority to maintain order
+            matching_rules.sort(key=lambda r: r.get("priority", 999))
+
+            # Reassign rule priorities starting from 1 (scoped within this policy)
             processed_rules = []
-            for rule in matching_rules:
+            for index, rule in enumerate(matching_rules, start=1):
                 rule_name = rule.get("name", "")
                 original_priority = rule.get("priority", "")
-                logger.info(f"  Rule '{rule_name}' changing from priority {original_priority} to {priority}")
+                logger.info(f"  Rule '{rule_name}' changing from priority {original_priority} to {index}")
 
                 processed_rules.append({
                     **rule,
-                    "priority": priority  # Force same priority as parent policy
+                    "priority": index  # Rule priorities start at 1 within each policy
                 })
 
             result = {
