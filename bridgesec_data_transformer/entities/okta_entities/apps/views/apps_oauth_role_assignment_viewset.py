@@ -4,11 +4,9 @@ import requests
 from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
-
 from entities.okta_entities.apps.apps_models import AppOAuthRoleAssignment
-from entities.okta_entities.apps.apps_serializers import (
-    AppOAuthRoleAssignmentSerializer,
-)
+from entities.okta_entities.apps.apps_serializers import \
+    AppOAuthRoleAssignmentSerializer
 from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 
 logger = logging.getLogger(__name__)
@@ -52,12 +50,19 @@ class AppOauthRoleAssignmentViewSet(BaseAppViewSet):
 
             return response_data, 200, rate_limit_headers(response)
 
-    def extract_data(self, okta_data, client_id):
+    def extract_data(self, okta_data, parent_record=None):
             """
-            Override to format the user data by removing the "profile" key.
+            Format the OAuth role assignment data.
+            Receives parent_record (OAuth app object) to extract client_id.
             """
             logger.info("Extracting data from Okta response")
             extracted_data = super().extract_data(okta_data)
+
+            # Extract client_id from parent OAuth app record
+            client_id = parent_record.get("client_id") if parent_record else None
+            if not client_id:
+                logger.warning("No client_id found in parent record")
+                return []
 
             formatted_data = []
 
@@ -66,7 +71,7 @@ class AppOauthRoleAssignmentViewSet(BaseAppViewSet):
                     "client_id": client_id,
                     "type": record.get("type", ""),
                     "resource_set": record.get("resource_set", ""),
-                    "role":record.get("role", "")
+                    "role": record.get("role", "")
                 }
                 formatted_data.append(formatted_record)
 

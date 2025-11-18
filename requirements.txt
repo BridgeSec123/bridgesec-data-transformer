@@ -15,5 +15,8 @@ pika
 gunicorn
 python-jose
 django-cors-headers
-PyJWT==1.7.1
+PyJWT[crypto]>=2.8.0
+cryptography>=41.0.0
 whitenoise
+apscheduler
+deepdiff

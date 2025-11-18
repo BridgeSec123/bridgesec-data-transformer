@@ -96,7 +96,7 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
         # logger.info(f"Extracted {len(extracted_data)} records for entity: {self.entity_type}")
         return extracted_data
 
-    def store_data(self, extracted_data, db_name, batch_size=200):
+    def store_data(self, extracted_data, db_name, batch_size=2000):
         """
         Store the extracted data in a dynamically named MongoDB database.
         """
@@ -181,13 +181,13 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
         "okta_app_users": "id",
         "okta_app_user_schema_property": "name",
         "okta_app_user_base_schema_property": "name",
-        "okta_apps_group_assignment": "id",
-        "okta_apps_group_assignments": "id",
+        "okta_app_group_assignment": "id",
+        "okta_app_group_assignments": "id",
         "okta_apps_oauth_redirect_uri": "id",
         "okta_apps_oauth_post_redirect_uri": "id",
-        "okta_apps_oauth_api_scope": "name",
+        "okta_app_oauth_api_scope": "name",
         "okta_app_oauth_role_assignment": "id",
-        "apps_access_policy_assignment": "id",
+        "okta_app_access_policy_assignment": "id",
         "okta_app_saml_settings": "id",
 
         # Auth Server entities - sorted by name or id

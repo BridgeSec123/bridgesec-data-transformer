@@ -1,0 +1,29 @@
+import logging
+
+from entities.views.base_view import BaseEntityViewSet
+from entities.okta_entities.rate_limits.rate_limit_models import RateLimitAdminNotification
+from entities.okta_entities.rate_limits.rate_limit_serializer import RateLimitAdminNotificationSerializer
+
+logger = logging.getLogger(__name__)
+
+
+class RateLimitAdminNotificationViewSet(BaseEntityViewSet):
+    okta_endpoint = "/api/v1/rate-limit-settings/admin-notifications"
+    entity_type = "rate_limit_admin_notifications"
+    serializer_class = RateLimitAdminNotificationSerializer
+    model = RateLimitAdminNotification
+
+    def extract_data(self, okta_data):
+        """Extract and format rate limit admin notification data from Okta response"""
+        formatted_data = []
+
+        # Check if okta_data is a list or single object
+        items = okta_data if isinstance(okta_data, list) else [okta_data]
+
+        for item in items:
+            formatted_data.append({
+                "notifications_enabled": item.get("notificationsEnabled", "")
+            })
+
+        logger.info("Extracted %d Rate Limit Admin Notification records", len(formatted_data))
+        return formatted_data

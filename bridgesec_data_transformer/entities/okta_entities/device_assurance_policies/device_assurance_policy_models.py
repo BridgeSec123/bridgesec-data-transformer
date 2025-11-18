@@ -4,6 +4,7 @@ from entities.models.base import BaseEntityModel
 
 
 class DeviceAndroid(BaseEntityModel):
+    device_id = StringField(required=True)
     name = StringField(required=True)
     os_version = StringField(null=True, required=False)
     disk_encryption_type = ListField(StringField(), null=True, required=False)
@@ -14,6 +15,7 @@ class DeviceAndroid(BaseEntityModel):
     meta = {"collection": "okta_policy_device_assurance_android"}
 
 class DeviceIos(BaseEntityModel):
+    device_id = StringField(required=True)
     name = StringField(required=True)
     os_version = StringField(null=True, required=False)
     jailbreak = BooleanField(null=True, required=False)
@@ -22,6 +24,7 @@ class DeviceIos(BaseEntityModel):
     meta = {"collection": "okta_policy_device_assurance_ios"}
 
 class DeviceMacOS(BaseEntityModel):
+    device_id = StringField(required=True)
     name = StringField(required=True)
     os_version = StringField(null=True, required=False)
     disk_encryption_type = ListField(StringField(), null=True, required=False)

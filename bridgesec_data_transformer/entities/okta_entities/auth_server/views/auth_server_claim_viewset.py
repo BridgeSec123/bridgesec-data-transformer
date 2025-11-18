@@ -44,11 +44,11 @@ class AuthorizationServerClaimViewSet(BaseAuthServerViewSet):
             logger.error(f"Failed to fetch Claims for Authorization Server ID: {auth_server_id}. Status Code: {response.status_code}, Response: {response.text}")
             return []
 
-    def extract_data(self, okta_data, auth_server_id=None, auth_server_name=None):
+    def extract_data(self, okta_data, auth_server_id=None):
         extracted = []
         for item in okta_data:
             record = {
-                "auth_server_id": auth_server_name,
+                "auth_server_id": auth_server_id,
                 "claim_id" : item.get("id"),
                 "claim_type": item.get("claimType"),
                 "name": item.get("name"),

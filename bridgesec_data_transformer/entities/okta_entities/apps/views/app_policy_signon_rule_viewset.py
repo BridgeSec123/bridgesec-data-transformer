@@ -4,9 +4,9 @@ import requests
 from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
-
 from entities.okta_entities.apps.apps_models import AppPolicySignOnRule
-from entities.okta_entities.apps.apps_serializers import AppPolicySignOnRuleSerializer
+from entities.okta_entities.apps.apps_serializers import \
+    AppPolicySignOnRuleSerializer
 from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 
 logger = logging.getLogger(__name__)
@@ -51,12 +51,15 @@ class AppPolicyRuleSignOnViewSet(BaseAppViewSet):
             return response_data, 200, rate_limit_headers(response)
 
 
-    def extract_data(self, okta_data, policy_name):
-        """
-        Override to format the user data by removing the "profile" key.
-        """
-        logger.info("Extracting data from Okta response")
+    def extract_data(self, okta_data, parent_record=None):
+        logger.info("Extracting data from Okta response for app signon policy rules")
         extracted_data = super().extract_data(okta_data)
+
+        # Extract policy_id from parent policy record
+        policy_id = parent_record.get("app_policy_id") if parent_record else None
+        if not policy_id:
+            logger.warning("No policy_id found in parent record. Skipping.")
+            return []
 
         formatted_data = []
 
@@ -69,7 +72,7 @@ class AppPolicyRuleSignOnViewSet(BaseAppViewSet):
             formatted_record = {
                 "policy_rule_id": record.get("id", ""),
                 "name": record.get("name", ""),
-                "policy_id": policy_name,
+                "policy_id": policy_id,
                 "access": appsignon.get("access", ""),
                 "constraints": constraints,
                 "custom_expression": record.get("customExpression", ""),

@@ -26,6 +26,7 @@ class DeviceIOSViewSet(BaseDeviceAssurancePolicyViewSet):
         for record in okta_data:
             if record.get("platform") == "IOS":
                 formatted_record = {
+                    "device_id": record.get("id", ""),
                     "name": record.get("name"),
                     "os_version": record.get("osVersion", {}).get("minimum", ""),
                     "jailbreak": record.get("jailbreak", False),

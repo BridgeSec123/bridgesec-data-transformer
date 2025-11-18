@@ -1,39 +1,51 @@
+import copy
 import json
+import logging
 import os
-import re
-from datetime import datetime, timedelta
+from datetime import datetime
 
-
-from entities.serializers.restore_serializer import RestoreDataSerializer
-from core.utils.collection_mapping import RESOURCE_COLLECTION_MAP, ENTITY_ID_MAPPING
-from core.utils.mongo_utils import get_dynamic_db, ensure_mongo_connection
-from core.utils.db_utils import extract_time, get_collection_name, get_latest_db
+import requests
+from core.authentication import OktaTokenAuthentication
+from core.tasks.bulk_tasks import run_bulk_entity_task
+from core.utils.collection_mapping import (ENTITY_ID_MAPPING,
+                                           NON_EDITABLE_FIELDS,
+                                           RESOURCE_COLLECTION_MAP)
+from core.utils.restore_utils import (
+    store_restored_data_with_metadata,
+    extract_terraform_target_params,
+    fetch_and_merge_restored_data,
+    remove_metadata_fields
+    
+)
+from core.utils.db_utils import (ENTITIES_WITH_BUILDERS, extract_time,
+                                 get_collection_diff, get_collection_name,
+                                 get_latest_db)
+from core.utils.jwt_utils import get_user_from_request
+from core.utils.model_registry import MODEL_REGISTRY
+from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
+from core.utils.schema_extractor import get_ui_backend_mapping
+from core.utils.serializer_registry import SERIALIZER_REGISTRY
 from django.conf import settings
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
+from entities.registry import ENTITY_VIEWSETS
+from entities.serializers.restore_serializer import RestoreDataSerializer
+from entities.services.resouce_data_service import EntityDataService
 from pymongo import MongoClient
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.response import Response
-from core.tasks.bulk_tasks import run_bulk_entity_task
-from celery import shared_task
-
 from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from core.authentication import CustomJWTAuthentication
-from entities.registry import ENTITY_VIEWSETS
-from entities.services.resouce_data_service import EntityDataService
-import requests
-import logging
+from rest_framework.response import Response
 
 logger = logging.getLogger(__name__)
 
-mongo_client = settings.MONGO_CLIENT 
+mongo_client = settings.MONGO_CLIENT
 server_url = settings.SERVER_URL
 
+
 class BulkEntityViewSet(viewsets.ViewSet):
-    authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    authentication_classes = []
+    permission_classes = []
     serializer_class = RestoreDataSerializer
 
     @swagger_auto_schema(
@@ -46,7 +58,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
         Triggers a background task to fetch fresh data for all registered entities and store them in a dynamic MongoDB.
         """
         run_bulk_entity_task.delay()
-    
+
         return Response(
             {"message": "Data fetch task triggered successfully"},
             status=status.HTTP_201_CREATED,
@@ -160,8 +172,18 @@ class BulkEntityViewSet(viewsets.ViewSet):
     )
     def get_resource_data(self, request, date_str, entity_name):
         """
-        Fetch data from Mongo using pymongo → no ensure_mongo_connection needed.
+        Fetch resource data and merge with restored changes if available.
+
+        Flow:
+        1. Fetch original data from source DB (Policy MFA with nested rules)
+        2. Check for restored collections in today's DB
+        3. If restored data exists for specific policy_id, merge it
+        4. Remove metadata fields (restored_by, restored_from, restored_at)
+        5. Return merged data with non_editable_fields
         """
+        # Normalize entity name (remove extra spaces from URL encoding)
+        entity_name = " ".join(entity_name.split())
+
         if not date_str or not entity_name:
             return Response(
                 {"error": "Missing 'date' or 'entity_type' parameter"},
@@ -169,15 +191,63 @@ class BulkEntityViewSet(viewsets.ViewSet):
             )
 
         try:
+            # Validate date format
             datetime.strptime(date_str, "%Y-%m-%d")
 
+            # Step 1: Fetch original data (with nested arrays for builder entities like Policy MFA)
             service = EntityDataService()
-            data = service.fetch(date_str, entity_name)
+            original_data = service.fetch(date_str, entity_name)
+            logger.info(f"Fetched {len(original_data)} original records for {entity_name}")
 
-            return Response(data, status=status.HTTP_200_OK)
+            # Get collection metadata
+            collection_name = get_collection_name(entity_name)
+            id_field = ENTITY_ID_MAPPING.get(entity_name)
+
+            if not collection_name or not id_field:
+                # Missing configuration, return original data only
+                logger.warning(f"Missing collection_name or id_field for {entity_name}")
+                return Response({
+                    "data": original_data,
+                    "non_editable_fields": NON_EDITABLE_FIELDS.get(entity_name, [])
+                }, status=status.HTTP_200_OK)
+
+            # Step 2 & 3: Check today's DB for restored collections and merge
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            db_name = get_latest_db(mongo_client, today_str)
+
+            if db_name:
+                db = mongo_client[db_name]
+                logger.info(f"Checking for restored data in database: {db_name}")
+
+                # Fetch and merge restored data (uses functions from restore_utils.py)
+                # This handles:
+                # - Checking if _okta_policy_mfa exists
+                # - Fetching latest versions by policy_id
+                # - Rebuilding nested arrays from _okta_policy_rule_mfa
+                # - Merging restored changes with original data (field-level merge)
+                original_data = fetch_and_merge_restored_data(
+                    db, entity_name, collection_name, id_field, original_data
+                )
+                logger.info(f"Merge complete: {len(original_data)} records")
+            else:
+                logger.info(f"No database found for today ({today_str}), using original data only")
+
+            # Step 4: Remove metadata fields (restored_by, restored_from, restored_at, _id)
+            remove_metadata_fields(original_data)
+            logger.info("Removed metadata fields from response")
+
+            # Step 5: Return merged data with non_editable_fields
+            non_editable_fields = NON_EDITABLE_FIELDS.get(entity_name, [])
+
+            return Response({
+                "data": original_data,
+                "non_editable_fields": non_editable_fields
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
+            logger.error(f"Error in get_resource_data: {str(e)}", exc_info=True)
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
     @swagger_auto_schema(
         method="post",
@@ -207,6 +277,32 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     status=400,
                 )
 
+            # Validate data before storing in MongoDB
+            # serializer_class = SERIALIZER_REGISTRY.get(entity_name)
+            # if serializer_class:
+            #     validation_errors = []
+            #     for index, record in enumerate(modified_data):
+            #         serializer = serializer_class(data=record)
+            #         if not serializer.is_valid():
+            #             validation_errors.append({
+            #                 "record_index": index,
+            #                 "record_data": record,
+            #                 "errors": serializer.errors
+            #             })
+
+            #     if validation_errors:
+            #         return Response(
+            #             {
+            #                 "error": "Validation failed for one or more records",
+            #                 "validation_errors": validation_errors,
+            #                 "total_errors": len(validation_errors),
+            #                 "total_records": len(modified_data)
+            #             },
+            #             status=status.HTTP_400_BAD_REQUEST,
+            #         )
+            # else:
+            #     logger.warning(f"No serializer found for entity '{entity_name}'. Skipping validation.")
+
             # resolve collection name
             collection_name = get_collection_name(entity_name)
             if not collection_name:
@@ -225,126 +321,232 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     status=404,
                 )
 
-            source_db = mongo_client[source_db_name]
-            new_db_name = get_dynamic_db()
-            new_db = mongo_client[new_db_name]
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            current_db_name = get_latest_db(mongo_client, today_str)
 
-            if collection_name in source_db.list_collection_names():
-                source_collection = source_db[collection_name]
-                target_collection = new_db[collection_name]
+            if not current_db_name:
+                current_db_name = get_dynamic_db()
+                logger.info(f"No database found for today. Created new database: {current_db_name}")
 
-                for doc in modified_data:
-                    doc.pop("_id", None)
+            current_db = mongo_client[current_db_name]
 
-                if modified_data:
-                    target_collection.insert_many(modified_data)
-                
-            tf_response = requests.post(f"{server_url}/api/", json={"db_name":new_db_name, "collection_name": collection_name},headers={"Content-Type": "application/json"}  ) 
+            # Clean up _id fields
+            for doc in modified_data:
+                doc.pop("_id", None)
+
+            # Store restored data (handles both simple and nested entities)
+            data_for_storage = copy.deepcopy(modified_data)
+            restored_by = get_user_from_request(request)
+
+            stored_data = store_restored_data_with_metadata(
+                current_db, entity_name, collection_name,
+                data_for_storage, restored_by, source_db_name
+            )
+
+            # Extract target parameters for Terraform API
+            # Uses original data (with nested arrays intact) to extract all IDs
+            params = extract_terraform_target_params(collection_name, modified_data)
+
+            # Send data to Terraform API
+            tf_response = requests.post(
+                f"{server_url}/api/",
+                params=params,
+                json={"data": modified_data},
+                headers={"Content-Type": "application/json"},
+            )
 
             try:
                 tf_data = tf_response.json()
             except Exception:
                 tf_data = {"message": "Unknown response from TF repo"}
 
-                # extract message
             tf_message = tf_data.get("message", "No message returned")
-            
-            for coll in source_db.list_collection_names():
-                if coll == collection_name:
-                    continue  # already handled
-                source_collection = source_db[coll]
-                target_collection = new_db[coll]
-
-                docs = list(source_collection.find({}, {"_id": 0}))
-                if docs:
-                    target_collection.insert_many(docs)
 
             return Response(
                 {
                     "tf_message": tf_message,
                     "message": "Modified data restored successfully.",
-                    "restored_db": new_db_name,
-                    "collection_modified": collection_name,
+                    "restored_db": current_db_name,
+                    "collection": f"_{collection_name}",
                     "record_count": len(modified_data),
-                    "total_collections": len(source_db.list_collection_names()),
                 },
                 status=status.HTTP_201_CREATED,
             )
-            
 
         except Exception as e:
             import traceback
             traceback.print_exc()
             return Response({"error": str(e)}, status=500)
 
-    def _fetch_and_prepare(self, service, entity_name, date, id_field):
-        """
-        Fetch records for given entity and date, sort by label,
-        and return lookup dict by ID.
-        """
-        records = service.fetch(date, entity_name)
-        records.sort(key=lambda x: x.get("label", ""))
-        return {r.get(id_field): r for r in records}
-
+    @swagger_auto_schema(
+        operation_description="Get entity schema for dynamic form generation in frontend",
+        responses={
+            200: openapi.Response("Entity schema with field definitions"),
+            404: "Entity not found"
+        }
+    )
     @action(
         detail=False,
         methods=["get"],
-        url_path=r"compare-json/(?P<entity_name>[^/.]+)/(?P<old_date>\d{4}-\d{2}-\d{2})/(?P<new_date>\d{4}-\d{2}-\d{2})",
+        url_path=r"entity-schema/(?P<entity_name>[^/.]+)"
     )
-    def compare_json(self, request, entity_name=None, old_date=None, new_date=None):
+    def get_entity_schema(self, request, entity_name=None):
         """
-        Compare two datasets based on ID field, sorted by label.
-        Missing records are represented as empty JSON {}.
+        Return simple UI to backend field mapping.
+        Frontend uses this to dynamically build forms with UI-friendly field names.
+        Returns format: {"App Id": "app_id", "Label": "label", ...}
         """
         try:
-            # For testing: fallback to request params if path params not set
-            entity_name = entity_name or request.query_params.get("entity_name")
-            old_date = old_date or request.query_params.get("old_date")
-            new_date = new_date or request.query_params.get("new_date")
+            # Get model class from registry
+            model_class = MODEL_REGISTRY.get(entity_name)
+            if not model_class:
+                return Response({
+                    "error": f"Entity '{entity_name}' not found",
+                    "available_entities": sorted(MODEL_REGISTRY.keys())
+                }, status=status.HTTP_404_NOT_FOUND)
 
-            if not entity_name or not old_date or not new_date:
-                return Response({"error": "Provide entity_name, old_date, new_date"},
-                                status=status.HTTP_400_BAD_REQUEST)
+            # Get simple UI to backend mapping
+            mapping = get_ui_backend_mapping(model_class)
 
-            if entity_name not in ENTITY_ID_MAPPING:
-                return Response(
-                    {"error": f"Entity '{entity_name}' not supported. Available entities: {list(ENTITY_ID_MAPPING.keys())}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            # Add non-editable fields configuration to response
+            non_editable_fields = NON_EDITABLE_FIELDS.get(entity_name, [])
 
-            # Validate date formats
-            datetime.strptime(old_date, "%Y-%m-%d")
-            datetime.strptime(new_date, "%Y-%m-%d")
+            return Response({
+                "schema": mapping,
+                "non_editable_fields": non_editable_fields
+            }, status=status.HTTP_200_OK)
 
-            id_field = ENTITY_ID_MAPPING[entity_name]
-            service = EntityDataService()
-
-            # DRY: fetch + sort + lookup
-            old_lookup = self._fetch_and_prepare(service, entity_name, old_date, id_field)
-            new_lookup = self._fetch_and_prepare(service, entity_name, new_date, id_field)
-
-            seen = set()
-            all_ids = []
-            for record_id in list(old_lookup.keys()) + list(new_lookup.keys()):
-                if record_id not in seen:
-                    seen.add(record_id)
-                    all_ids.append(record_id)
-  
-
-            # Build flat array of [old_record, new_record] pairs
-            comparison_result = []
-            for record_id in all_ids:
-                comparison_result.append([
-                    old_lookup.get(record_id, {}),
-                    new_lookup.get(record_id, {})
-                ])
-
-            return Response(comparison_result, status=status.HTTP_200_OK)
-
-        except ValueError as e:
-            return Response({"error": f"Invalid date format: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             import traceback
             traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                "date1",
+                openapi.IN_QUERY,
+                description="First date in YYYY-MM-DD format",
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+            openapi.Parameter(
+                "date2",
+                openapi.IN_QUERY,
+                description="Second date in YYYY-MM-DD format",
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+        ]
+    )
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path=r"diff-collections/(?P<entity_name>[^/.]+)",
+    )
+    def diff_collections(self, request, entity_name=None):
+        """
+        Compare two collection snapshots by date.
+        """
+        try:
+            # Get query parameters
+            date1 = request.query_params.get("date1")
+            date2 = request.query_params.get("date2")
+
+            # Validation
+            if not entity_name:
+                return Response(
+                    {"error": "Path parameter 'entity_name' is required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if not date1 or not date2:
+                return Response(
+                    {"error": "Query parameters 'date1' and 'date2' are required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if entity_name not in ENTITY_ID_MAPPING:
+                return Response(
+                    {
+                        "error": f"Entity '{entity_name}' not supported",
+                        "available_entities": sorted(ENTITY_ID_MAPPING.keys())
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validate date formats
+            try:
+                datetime.strptime(date1, "%Y-%m-%d")
+                datetime.strptime(date2, "%Y-%m-%d")
+            except ValueError:
+                return Response(
+                    {"error": "Invalid date format. Use YYYY-MM-DD"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Get ID field for this entity
+            id_field = ENTITY_ID_MAPPING[entity_name]
+
+            # Use EntityDataService to get rebuilt data with nested arrays
+            service = EntityDataService()
+            old_docs = service.fetch(date1, entity_name)
+            new_docs = service.fetch(date2, entity_name)
+
+            if not old_docs and not new_docs:
+                return Response(
+                    {
+                        "error": f"No data found for entity '{entity_name}' on either date",
+                        "date1": date1,
+                        "date2": date2
+                    },
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Get structured diff with nested array comparison for entities with builders
+            diff_result = get_collection_diff(
+                old_docs,
+                new_docs,
+                id_field,
+                entity_name=entity_name,
+                date1=date1,
+                date2=date2
+            )
+
+            # Add non-editable fields configuration to response
+            non_editable_fields = NON_EDITABLE_FIELDS.get(entity_name, [])
+            diff_result["non_editable_fields"] = non_editable_fields
+
+            return Response(diff_result, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            logger.error(f"Error in diff_collections: {str(e)}")
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+# db_name = get_dynamic_db()
+#         # Loop through all registered entity viewsets dynamically
+#         for entity_name, viewset_class in ENTITY_VIEWSETS.items():
+#             viewset_instance = viewset_class()
+
+#         # Fetch and extract data using the base class methods
+#         extracted_data = viewset_instance.fetch_and_store_data(db_name)
+#         if not extracted_data: # If no data returned
+#             return Response(
+#                 {"error": f"Failed to fetch {entity_name} data"},
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#             )
+#         # Setup output directory
+#         output_dir = os.path.join(settings.BASE_DIR, "output", db_name)
+#         os.makedirs(output_dir, exist_ok=True)
+
+#         for sub_entity_name, sub_entity_data in extracted_data.items():
+#             file_name = f"{sub_entity_name}.json"
+#             file_path = os.path.join(output_dir, file_name)
+
+#         with open(file_path, "w", encoding="utf-8") as f:
+#             json.dump(sub_entity_data, f, ensure_ascii=False, indent=4)

@@ -47,13 +47,13 @@ class AuthorizationServerPolicyRuleViewSet(BaseAuthServerViewSet):
             logger.error(f"Failed to fetch policy rules for auth server. Status: {response.status_code}, Response: {content}")
             return []
 
-    def extract_data(self, okta_data, auth_server_name=None, policy_name=None):
+    def extract_data(self, okta_data, auth_server_id=None, policy_id=None):
         extracted_data = []
         for rule in okta_data:
             record = {
-                "auth_server_id": auth_server_name,
+                "auth_server_id": auth_server_id,
                 "policy_rule_id": rule.get("id"),
-                "policy_id": policy_name,
+                "policy_id": policy_id,
                 "name": rule.get("name"),
                 "priority": rule.get("priority"),
                 "grant_type_whitelist": rule.get("conditions", {}).get("grantTypes", {}).get("include", []),

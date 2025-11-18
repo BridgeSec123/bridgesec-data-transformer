@@ -1,6 +1,18 @@
-from mongoengine import BooleanField, StringField
+from mongoengine import BooleanField, IntField, StringField
 
 from entities.models.base import BaseEntityModel
+
+
+class EmailSmtpServer(BaseEntityModel):
+    smtp_id = StringField(required=True)
+    alias = StringField(required=True)
+    host = StringField(required=True)
+    port = IntField(required=True)
+    username = StringField(required=True)
+    password = StringField(required=True)
+    enabled = BooleanField(required=False)
+
+    meta = {"collection": "okta_email_smtp_server"}
 
 
 class EmailCustomization(BaseEntityModel):

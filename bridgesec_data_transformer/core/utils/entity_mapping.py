@@ -260,7 +260,7 @@ ENTITY_TYPE_MAPPING = {
             "status",
         ],
     },
-    "okta_apps_group_assignments": {
+    "okta_app_group_assignments": {
         "okta_endpoint": "/api/v1/apps/{{appId}}/groups",
         "attributes": ["app_id", "group", "timeouts"],
     },
@@ -296,7 +296,7 @@ ENTITY_TYPE_MAPPING = {
         "okta_endpoint": "/api/v1/meta/schemas/user/linkedObjects",
         "attributes": ["id", "primary", "associated"],
     },
-    "okta_apps_group_assignment": {
+    "okta_app_group_assignment": {
         "okta_endpoint": "/api/v1/apps/{appId}/groups",
         "attributes": ["app_id", "group", "timeouts"],
     },
@@ -401,7 +401,7 @@ ENTITY_TYPE_MAPPING = {
             "credentials",
         ],
     },
-    "okta_apps_oauth_api_scope": {
+    "okta_app_oauth_api_scope": {
         "okta_endpoint": "/api/v1/apps/{app_id}/grants",
         "attributes": ["issuer", "scopeId"],
     },

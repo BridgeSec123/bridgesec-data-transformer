@@ -1,7 +1,9 @@
 
-from mongoengine import BooleanField, IntField, StringField, ListField, DictField, EmbeddedDocumentListField, EmbeddedDocument
-
 from entities.models.base import BaseEntityModel
+from mongoengine import (BooleanField, DictField, EmbeddedDocument,
+                         EmbeddedDocumentListField, IntField, ListField,
+                         StringField)
+
 
 class GroupsClaim(EmbeddedDocument):
     name = StringField(required=True)

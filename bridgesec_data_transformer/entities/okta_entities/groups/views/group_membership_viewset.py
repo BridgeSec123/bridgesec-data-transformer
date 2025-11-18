@@ -92,7 +92,7 @@ class GroupMembershipViewSet(BaseGroupViewSet):
             logger.error(f"Failed to fetch group memberships. Status Code: {response.status_code}, Response: {response.text}")
             return []
     
-    def extract_data(self, okta_data, group_name):
+    def extract_data(self, okta_data, group_id):
         """
         Extract and format group membership data from Okta response.
         """
@@ -101,12 +101,12 @@ class GroupMembershipViewSet(BaseGroupViewSet):
         user_ids = [record.get("id", "") for record in extracted_data if "id" in record]
 
         # Convert user IDs to user names
-        user_names = self.get_user_names_from_ids(user_ids)
+        # user_names = self.get_user_names_from_ids(user_ids)
 
         # Structure data correctly
         formatted_data = [{
-            "group_id": group_name,
-            "users": user_names
+            "group_id": group_id,
+            "users": user_ids
         }]
         
         return formatted_data

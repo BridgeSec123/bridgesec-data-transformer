@@ -101,7 +101,7 @@ class PolicyProfileEnrollment(BaseEntityModel):
 
 class PolicyProfileEnrollmentApps(BaseEntityModel):
     policy_id = StringField(required=True)
-    apps = ListField(StringField(required=False, null=True))
+    app_id = ListField(StringField(required=False, null=True))
     
     meta = {"collection": "okta_policy_profile_enrollment_apps"}
 

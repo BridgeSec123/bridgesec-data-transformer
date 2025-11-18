@@ -44,11 +44,11 @@ class AuthorizationServerPolicyViewSet(BaseAuthServerViewSet):
             logger.error(f"Failed to fetch policies for Authorization Server ID: {auth_server_id}. Status Code: {response.status_code}, Response: {response.text}")
             return []
 
-    def extract_data(self, okta_data, auth_server_id=None, auth_server_name=None):
+    def extract_data(self, okta_data, auth_server_id=None):
         extracted = []
         for item in okta_data:
             record = {
-                "auth_server_id": auth_server_name,
+                "auth_server_id": auth_server_id,
                 "policy_id": item.get("id"),
                 "name": item.get("name", ""),
                 "client_whitelist": item.get("conditions", {}).get("clients", {}).get("include", []),

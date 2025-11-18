@@ -113,7 +113,7 @@ class PolicyMFAViewSet(BasePolicyViewSet):
                 "name": record.get("name"),
                 "description": record.get("description",""),
                 "duo": record.get("duo", {}),
-                "external_idps": record.get("external_idps", {}),
+                "external_idps": record.get("external_idps", [{}]),
                 "fido_u2f": record.get("fido_u2f",{}),
                 "fido_webauthn": record.get("fido_webauthn", {}),
                 "google_otp": record.get("google_otp", {}),

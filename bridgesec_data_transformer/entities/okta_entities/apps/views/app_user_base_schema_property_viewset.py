@@ -16,79 +16,60 @@ class AppUserBaseSchemaPropertyViewSet(BaseAppViewSet):
     serializer_class = AppUserBaseSchemaPropertySerializer
     model = AppUserBaseSchemaProperty
 
-    def fetch_from_okta(self):
+    def fetch_from_okta(self, app_id):
         """
-        Fetch all Okta apps, then fetch user base schema properties for each app,
-        and group results by app_id.
+        Fetch user base schema for a specific app from Okta.
         """
         base_url = settings.OKTA_API_URL
         headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
 
-        discovery_url = f"{base_url}/api/v1/apps"
-        response = requests.get(discovery_url, headers=headers)
+        # API call to get user base schema for this app
+        schema_url = f"{base_url}/api/v1/meta/schemas/apps/{app_id}/default"
+        logger.info(f"Fetching user base schema for app_id: {app_id}")
+
+        response = requests.get(schema_url, headers=headers)
 
         if handle_rate_limit(response):
-            logger.warning("Rate limit hit while fetching app IDs.")
+            logger.warning(f"Rate limit hit for app_id: {app_id}")
             return {"error": "Rate limit hit."}, 429, rate_limit_headers(response)
 
         if response.status_code != 200:
-            logger.error(f"Failed to fetch app list: {response.text}")
-            return {"error": f"Failed to fetch apps: {response.text}"}, response.status_code, rate_limit_headers(response)
+            logger.error(f"Failed to fetch user base schema for app {app_id}: {response.text}")
+            return {"error": f"Failed to fetch user base schema: {response.text}"}, response.status_code, rate_limit_headers(response)
 
-        apps = response.json()
-        users_data = []
+        schema_data = response.json()
+        logger.info(f"Fetched user base schema for app_id: {app_id}")
 
-        logger.info(f"Found {len(apps)} apps. Fetching user base schema properties for each...")
+        return schema_data, 200, rate_limit_headers(response)
 
-        for app in apps:
-            app_id = app.get("id")
-            app_label = app.get("label")  # <-- store label instead of id
-            if not app_id or not app_label:
-                logger.warning("App without ID or label found. Skipping.")
-                continue
+    def extract_data(self, okta_data, app=None):
+        """
+        Formats user base schema property data.
+        """
+        if not app:
+            logger.warning("No app info provided for formatting")
+            return []
 
-            users_url = f"{base_url}/api/v1/meta/schemas/apps/{app_id}/default"
-            user_response = requests.get(users_url, headers=headers)
+        app_id = app.get("app_id")
 
-            if handle_rate_limit(user_response):
-                logger.warning(f"Rate limit hit while fetching user base schema for app {app_label}. Skipping.")
-                continue
+        user = okta_data
+        base = user.get("definitions", {}).get("base", {})
 
-            if user_response.status_code != 200:
-                logger.warning(f"Failed to fetch user base schema for app {app_label}: {user_response.text}")
-                continue
+        # Get required field safely
+        required_fields = base.get("required", [])
+        is_required = bool(required_fields[0]) if required_fields else False
 
-            user_data = user_response.json()
-            logger.info(f"Fetched user base schema properties for app {app_id}.")
+        formatted_record = {
+            "app_id": app_id,
+            "index": user.get("name", ""),
+            "title": user.get("title", ""),
+            "type": user.get("type", ""),
+            "master": base.get("properties", {}).get("userName", {}).get("master", {}).get("type", ""),
+            "pattern": user.get("pattern", ""),
+            "permissions": user.get("permissions", ""),
+            "required": is_required,
+            "user_type": user.get("userType", "default")
+        }
 
-            users_data.append({
-                "app_id": app_id,
-                "user": user_data
-            })
-
-        return users_data, 200, rate_limit_headers(response)
-
-    def extract_data(self, okta_data):
-        logger.info("Extracting data from Okta response")
-
-        formatted_data = []
-
-        for record in okta_data:
-            app_id = record.get("app_id")
-            user= record.get("user", {})
-            base = user.get("definitions", {}).get("base", {})
-            formatted_record = {
-                "app_id": app_id,
-                "index": user.get("name", ""),
-                "title": user.get("title", ""),  
-                "type": user.get("type", ""),
-                "master": base.get("properties", {}).get("userName", {}).get("master", {}).get("type", ""),
-                "pattern": user.get("pattern", ""),
-                "permissions": user.get("permissions", ""),
-                "required": True if base.get("required", "")[0] else False,
-                "user_type": user.get("userType", "default")
-            }
-            formatted_data.append(formatted_record)
-
-        logger.info("Final extracted %d app user base schema properties records after formatting and flattening", len(formatted_data))
-        return formatted_data
+        logger.info(f"Formatted user base schema property for app: {app_id}")
+        return [formatted_record]

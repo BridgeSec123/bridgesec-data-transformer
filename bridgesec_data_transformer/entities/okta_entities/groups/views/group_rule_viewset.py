@@ -63,13 +63,13 @@ class GroupRuleViewSet(BaseGroupViewSet):
             people= conditions.get("people", {})
             groups_assignments = rule.get("actions", {}).get("assignUserToGroups", {})
             group_ids = groups_assignments.get("groupIds", [])
-            group_names = self.get_group_names_from_ids(group_ids)
+            # group_names = self.get_group_names_from_ids(group_ids)
 
             rule_entry = {
                 "name": rule.get("name"),
                 "group_rule_id": rule.get("id"),
                 "status": rule.get("status"),
-                "group_assignments": group_names,
+                "group_assignments": group_ids,
                 "expression_type": expressions.get("type",""),
                 "expression_value": expressions.get("value",""),
                 "remove_assigned_users": rule.get("removeAssignedUsers",""),

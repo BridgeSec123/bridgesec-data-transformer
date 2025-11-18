@@ -27,6 +27,7 @@ class DeviceMacOSViewSet(BaseDeviceAssurancePolicyViewSet):
             if record.get("platform") == "MACOS":
                 third_party_signal_providers = record.get("thirdPartySignalProviders", {})
                 formatted_record = {
+                    "device_id": record.get("id", ""),
                     "name": record.get("name"),
                     "os_version": record.get("osVersion", {}).get("minimum", ""),
                     "disk_encryption_type": record.get("diskEncryptionType", {}).get("include", []),

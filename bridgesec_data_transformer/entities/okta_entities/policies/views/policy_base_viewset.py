@@ -1,7 +1,6 @@
 import logging
 
 from core.utils.entity_mapping import clean_entity_data
-
 from entities.views.base_view import BaseEntityViewSet
 
 logger = logging.getLogger(__name__)
@@ -23,45 +22,45 @@ class BasePolicyViewSet(BaseEntityViewSet):
                 extracted_data[entity_name] = []
                 for profile_enrollment in extracted_data.get("okta_policy_profile_enrollment", []):
                     policy_profile_enrollment_id = profile_enrollment["id"]
-                    policy_profile_enrollment_name = profile_enrollment["name"]
+                    # policy_profile_enrollment_name = profile_enrollment["name"]
                     data, _, _ = viewset_instance.fetch_from_okta(policy_profile_enrollment_id)
                     
-                    extracted = viewset_instance.extract_data(data, policy_profile_enrollment_name)
+                    extracted = viewset_instance.extract_data(data, policy_profile_enrollment_id)
                     if extracted:  # Only add if not empty
                         extracted_data.setdefault(entity_name, []).extend(extracted)
                     else:
-                        logger.info(f"No {entity_name} data extracted for POlicy {policy_profile_enrollment_name}. Skipping.")
+                        logger.info(f"No {entity_name} data extracted for POlicy {policy_profile_enrollment_id}. Skipping.")
                         
             elif entity_name == "okta_policy_rule_mfa":
                 extracted_data[entity_name] = []
                 for policy in extracted_data.get("okta_policy_mfa", []):
                     policy_id = policy["id"]
-                    policy_name = policy["name"]
+                    # policy_name = policy["name"]
                     data, _, _ = viewset_instance.fetch_from_okta(policy_id)
                     
-                    extracted = viewset_instance.extract_data(data, policy_name)         
+                    extracted = viewset_instance.extract_data(data, policy_id)         
                     if extracted:  # Only add if not empty
                         extracted_data.setdefault(entity_name, []).extend(extracted)
                     else:
-                        logger.info(f"No {entity_name} data extracted for POlicy {policy_name}. Skipping.")
+                        logger.info(f"No {entity_name} data extracted for POlicy {policy_id}. Skipping.")
             elif entity_name == "okta_policy_rule_password":
                 for policy in extracted_data.get("okta_policy_password", []):
                     policy_id = policy["id"]
-                    policy_name = policy["name"]
+                    # policy_name = policy["name"]
                     data, _, _ = viewset_instance.fetch_from_okta(policy_id)
                     
-                    extracted = viewset_instance.extract_data(data, policy_name)         
+                    extracted = viewset_instance.extract_data(data, policy_id)         
                     if extracted:  # Only add if not empty
                         extracted_data.setdefault(entity_name, []).extend(extracted)
                     else:
-                        logger.info(f"No {entity_name} data extracted for Policy {policy_name}. Skipping.")
+                        logger.info(f"No {entity_name} data extracted for Policy {policy_id}. Skipping.")
             elif entity_name == "okta_policy_rule_signon":
                 for policy in extracted_data.get("okta_policy_signon", []):
                     policy_id = policy["id"]
                     policy_name = policy["name"]
                     data, _, _ = viewset_instance.fetch_from_okta(policy_id)
                     
-                    extracted = viewset_instance.extract_data(data, policy_name)         
+                    extracted = viewset_instance.extract_data(data, policy_id)         
                     if extracted:  # Only add if not empty
                         extracted_data.setdefault(entity_name, []).extend(extracted)
                     else:

@@ -54,7 +54,7 @@ class PolicyRuleProfileEnrollmentViewSet(BasePolicyViewSet):
 
             return response_data, 200, rate_limit_headers(response)
     
-    def extract_data(self, okta_data, policy_name):
+    def extract_data(self, okta_data, policy_profile_enrollment_id):
         """
         Override to format the user data by removing the "profile" key.
         """
@@ -73,7 +73,7 @@ class PolicyRuleProfileEnrollmentViewSet(BasePolicyViewSet):
             profile_attributes = record.get("actions", {}).get("profileEnrollment", {})
             formatted_record = {
                 "policy_profile_rule_id" : record.get("id", ""),
-                "policy_id": policy_name,
+                "policy_id": policy_profile_enrollment_id,
                 "unknown_user_action": profile_attributes.get("unknownUserAction", ""),
                 "access": profile_attributes.get("access", ""),
                 "email_verification": profile_attributes.get("activationRequirements", {}).get("emailVerification"),

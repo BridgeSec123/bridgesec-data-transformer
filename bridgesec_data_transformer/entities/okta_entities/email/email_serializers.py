@@ -1,6 +1,16 @@
 from rest_framework import serializers
 
 
+class EmailSmtpServerSerializer(serializers.Serializer):
+    smtp_id = serializers.CharField(max_length=255, required=True)
+    alias = serializers.CharField(max_length=255, required=True)
+    host = serializers.CharField(max_length=255, required=True)
+    port = serializers.IntegerField(required=True)
+    username = serializers.CharField(max_length=255, required=True)
+    password = serializers.CharField(max_length=255, required=True)
+    enabled = serializers.BooleanField(required=False)
+
+
 class EmailCustomizationSerializer(serializers.Serializer):
     brand_id = serializers.CharField(max_length=255, required=False)
     template_name = serializers.CharField(max_length=255, required=False)

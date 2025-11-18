@@ -1,51 +1,48 @@
-from typing import Dict, Any, List, Optional
-from pymongo import MongoClient
-from django.conf import settings
-from datetime import datetime, timedelta
 import logging
 
-logging.basicConfig(level=logging.INFO)
+from entities.services.service_utils import fetch_collection
+
 logger = logging.getLogger(__name__)
 
-# Import utility functions from core.utils
+
 class AuthServer:
     """
     Builds nested JSON per Auth Server with scopes, claims, policies, and rules.
+    Fetches data directly from DB collections without merging.
     """
 
     def build(self, db):
-        logger.info("Fetching collections for Auth Server nested builder...")
+        logger.info("Fetching Auth Server data from DB...")
 
-        # Check available collections
-        collections = db.list_collection_names()
-        logger.info(f"Available collections: {collections}")
+        # Fetch parent auth servers from DB
+        auth_servers = fetch_collection(db, "okta_auth_server")
+        logger.info(f"Found {len(auth_servers)} auth servers")
 
-        # Directly retrieve already formatted docs (without _id)
-        authorization_server_list = list(db["okta_auth_server"].find({}, {"_id": 0}))
-        scopes = list(db["okta_auth_server_scope"].find({}, {"_id": 0}))
-        claims = list(db["okta_auth_server_claim"].find({}, {"_id": 0}))
-        policies = list(db["okta_auth_server_policy"].find({}, {"_id": 0}))
-        rules = list(db["okta_auth_server_policy_rule"].find({}, {"_id": 0}))
-        trusted_Server = list(db["okta_trusted_server"].find({}, {"_id": 0}))
+        # Fetch all child collections from DB
+        scopes = fetch_collection(db, "okta_auth_server_scope")
+        claims = fetch_collection(db, "okta_auth_server_claim")
+        policies = fetch_collection(db, "okta_auth_server_policy")
+        rules = fetch_collection(db, "okta_auth_server_policy_rule")
+        trusted_servers = fetch_collection(db, "okta_trusted_server")
 
-        logger.info(f"Found {len(authorization_server_list)} auth servers, {len(scopes)} scopes, {len(claims)} claims, {len(policies)} policies, {len(rules)} rules, {len(trusted_Server)} servers")
+        logger.info(f"Found {len(scopes)} scopes, {len(claims)} claims, {len(policies)} policies, {len(rules)} rules, {len(trusted_servers)} trusted servers")
 
+        # Build nested structure
         results = []
-        for server in authorization_server_list:
-            server_id = server.get("name")
-            logger.info(f"Building nested data for auth server: {server_id}")
+        for server in auth_servers:
+            server_id = server.get("auth_server_id")
 
             formatted = {
-                **server,  # take all fields as already formatted in DB
-                "authorization_server_scopes": [scope for scope in scopes if scope.get("auth_server_id") == server_id] or [],
-                "authorization_server_claims": [claim for claim in claims if claim.get("auth_server_id") == server_id] or [],
-                "authorization_server_accessPolicies": [policy for policy in policies if policy.get("auth_server_id") == server_id] or [],
-                "authorization_server_accessPoliciesRules": [rule for rule in rules if rule.get("auth_server_id") == server_id] or [],
-                "authorization_server_trusted_servers": [server for server in trusted_Server if server.get("auth_server_id") == server_id] or [],
+                **server,  # Include all server fields
+                "authorization_server_scopes": [scope for scope in scopes if scope.get("auth_server_id") == server_id],
+                "authorization_server_claims": [claim for claim in claims if claim.get("auth_server_id") == server_id],
+                "authorization_server_accessPolicies": [policy for policy in policies if policy.get("auth_server_id") == server_id],
+                "authorization_server_accessPoliciesRules": [rule for rule in rules if rule.get("auth_server_id") == server_id],
+                "authorization_server_trusted_servers": [trusted for trusted in trusted_servers if trusted.get("auth_server_id") == server_id],
             }
 
             logger.info(f"Auth server {server_id} has {len(formatted['authorization_server_scopes'])} scopes, {len(formatted['authorization_server_claims'])} claims, {len(formatted['authorization_server_accessPolicies'])} policies, {len(formatted['authorization_server_accessPoliciesRules'])} rules")
             results.append(formatted)
 
-        logger.info(f" Built nested Auth Server data for {len(results)} servers")
-        return  results
+        logger.info(f"Built nested Auth Server data for {len(results)} servers")
+        return results

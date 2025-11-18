@@ -26,6 +26,7 @@ class DeviceAndroidViewSet(BaseDeviceAssurancePolicyViewSet):
         for record in okta_data:
             if record.get("platform") == "ANDROID":
                 formatted_record = {
+                    "device_id": record.get("id", ""),
                     "name": record.get("name"),
                     "os_version": record.get("osVersion", {}).get("minimum", ""),
                     "disk_encryption_type": record.get("diskEncryptionType", {}).get("include", []),

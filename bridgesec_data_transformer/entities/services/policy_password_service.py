@@ -1,44 +1,41 @@
-from typing import Dict, Any, List, Optional
-from pymongo import MongoClient
-from django.conf import settings
-from datetime import datetime, timedelta
 import logging
 
-logger = logging.getLogger(__name__)
+from entities.services.service_utils import fetch_collection
 
-# Import utility functions from core.utils
-from core.utils.db_utils import get_collection_name, get_latest_db
+logger = logging.getLogger(__name__)
 
 
 class PolicyPasswordDataBuilder:
     """
     Builds nested JSON per Policy Password with policy password rules.
+    Fetches data directly from DB collections without merging.
     """
 
     def build(self, db):
-        logger.info("Fetching collections for Policy Password nested builder...")
+        logger.info("Fetching Policy Password data from DB...")
 
-        # Check available collections
-        collections = db.list_collection_names()
-        logger.info(f"Available collections: {collections}")
+        # Fetch parent policies from DB
+        policies = fetch_collection(db, "okta_policy_password")
+        logger.info(f"Found {len(policies)} Password policies")
 
-        # Directly retrieve already formatted docs (without _id)
-        policies = list(db["okta_policy_password"].find({}, {"_id": 0}))
-        policy_password_rules = list(db["okta_policy_rule_password"].find({}, {"_id": 0}))
+        # Fetch policy rules from DB
+        all_policy_rules = fetch_collection(db, "okta_policy_rule_password")
+        logger.info(f"Found {len(all_policy_rules)} Password policy rules")
 
-        logger.info(f"Found {len(policies)} Password policies, {len(policy_password_rules)} policy password rules")
-
+        # Build nested structure
         results = []
         for policy in policies:
-            policy_name = policy.get("name")
-            logger.info(f"Building nested data for Password policy: {policy_name}")
+            policy_id = policy.get("policy_id") or policy.get("name")
+
+            # Find all rules for this policy
+            policy_rules = [rule for rule in all_policy_rules if rule.get("policy_id") == policy_id]
 
             formatted = {
-                **policy,  # take all fields as already formatted in DB
-                "policy_password_rules": [rule for rule in policy_password_rules if rule.get("policy_id") == policy_name] or []
+                **policy,  # Include all policy fields
+                "policy_password_rules": policy_rules,
             }
 
-            logger.info(f"Password policy {policy_name} has {len(formatted['policy_password_rules'])} policy password rules")
+            logger.info(f"Password policy {policy_id} has {len(policy_rules)} policy password rules")
             results.append(formatted)
 
         logger.info(f"Built nested Policy Password data for {len(results)} policies")

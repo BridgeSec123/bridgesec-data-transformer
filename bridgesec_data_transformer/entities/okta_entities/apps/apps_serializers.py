@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+
 class AppOauthSerializer(serializers.Serializer):
     app_id = serializers.CharField(required=True)
     label = serializers.CharField(required=True)
@@ -49,6 +50,17 @@ class AppOauthSerializer(serializers.Serializer):
     user_name_template_suffix = serializers.CharField(required=False, allow_null=True)
     user_name_template_type = serializers.CharField(required=False, allow_null=True)
     wildcard_redirect = serializers.CharField(required=False, allow_null=True)
+
+    def validate(self, data):
+        app_type = data.get('type')
+        if app_type in ['browser', 'web']:
+            redirect_uris = data.get('redirect_uris')
+            if not redirect_uris or (isinstance(redirect_uris, list) and len(redirect_uris) == 0):
+                raise serializers.ValidationError({
+                    'redirect_uris': 'This field is required for web type applications and must contain at least one URI.'
+                })
+        
+        return data
 
 class AppSAMLSerializer(serializers.Serializer):
     label = serializers.CharField(required=True)
@@ -210,6 +222,15 @@ class AppBookMarkSerializer(serializers.Serializer):
     status = serializers.CharField(required=False, allow_null=True, default="ACTIVE")
     timeouts = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
 
+    def validate(self, data):
+        url = data.get('url')
+        if not url:
+            raise serializers.ValidationError({
+                'url': 'This field is required for bookmark applications.'
+            })
+
+        return data
+
 class AppAutoLoginSerializer(serializers.Serializer):
     label = serializers.CharField(required=True)
     accessibility_error_redirect_url = serializers.CharField(required=False, allow_null=True)
@@ -237,6 +258,15 @@ class AppAutoLoginSerializer(serializers.Serializer):
     user_name_template_suffix = serializers.CharField(required=False, allow_null=True)
     user_name_template_type = serializers.CharField(required=False, allow_null=True)
 
+    def validate(self, data):
+        sign_on_url = data.get('sign_on_url')
+        if not sign_on_url:
+            raise serializers.ValidationError({
+                'sign_on_url': 'This field is required for auto login applications.'
+            })
+
+        return data
+
 class AppBasicAuthSerializer(serializers.Serializer):
     auth_url = serializers.CharField(required=True)
     label = serializers.CharField(required=True)
@@ -253,6 +283,22 @@ class AppBasicAuthSerializer(serializers.Serializer):
     logo = serializers.CharField(required=False, allow_null=True)
     status = serializers.CharField(required=False, allow_null=True, default="ACTIVE")
     timeouts = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+
+    def validate(self, data):
+        url = data.get('url')
+        auth_url = data.get('auth_url')
+
+        if not url:
+            raise serializers.ValidationError({
+                'url': 'This field is required for basic auth applications.'
+            })
+
+        if not auth_url:
+            raise serializers.ValidationError({
+                'auth_url': 'This field is required for basic auth applications.'
+            })
+
+        return data
 
 
 class AppSwaSerializer(serializers.Serializer):

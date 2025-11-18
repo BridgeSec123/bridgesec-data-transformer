@@ -3,122 +3,85 @@ import logging
 import requests
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
-
 from entities.okta_entities.apps.apps_models import AppGroupAssignment
-from entities.okta_entities.apps.apps_serializers import AppGroupAssignmentSerializer
+from entities.okta_entities.apps.apps_serializers import \
+    AppGroupAssignmentSerializer
 from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 
 logger = logging.getLogger(__name__)
 
 class AppsGroupAssignmentViewSet(BaseAppViewSet):  
     okta_endpoint = "/api/v1/apps/{appId}/groups"
-    entity_type = "okta_apps_group_assignment"
+    entity_type = "okta_app_group_assignment"
     serializer_class = AppGroupAssignmentSerializer
     model = AppGroupAssignment
 
-    def fetch_from_okta(self):
+    def fetch_from_okta(self, app_id):
         """
-        Fetch all Okta apps, then fetch group assignments for each app,
-        replace app_id with app label, group.id with group name.
+        Fetch group assignments for a specific app from Okta.
         """
         base_url = settings.OKTA_API_URL
         headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
 
-        discovery_url = f"{base_url}/api/v1/apps"
-        response = requests.get(discovery_url, headers=headers)
+        # API call to get groups for this app
+        groups_url = f"{base_url}/api/v1/apps/{app_id}/groups"
+        logger.info(f"Fetching group assignments for app_id: {app_id}")
+
+        response = requests.get(groups_url, headers=headers)
 
         if handle_rate_limit(response):
-            logger.warning("Rate limit hit while fetching app IDs.")
+            logger.warning(f"Rate limit hit for app_id: {app_id}")
             return {"error": "Rate limit hit."}, 429, rate_limit_headers(response)
 
         if response.status_code != 200:
-            logger.error(f"Failed to fetch app list: {response.text}")
-            return {"error": f"Failed to fetch apps: {response.text}"}, response.status_code, rate_limit_headers(response)
+            logger.error(f"Failed to fetch groups for app {app_id}: {response.text}")
+            return {"error": f"Failed to fetch groups: {response.text}"}, response.status_code, rate_limit_headers(response)
 
-        apps = response.json()
-        grouped_assignments = []
+        group_data = response.json()
+        logger.info(f"Fetched {len(group_data)} groups for app_id: {app_id}")
 
-        logger.info(f"Found {len(apps)} apps. Fetching group assignments for each...")
+        return group_data, 200, rate_limit_headers(response)
 
-        for app in apps:
-            app_id = app.get("id")
-            app_label = app.get("label")
-            if not app_id or not app_label:
-                logger.warning("App without ID or label found. Skipping.")
-                continue
+    def extract_data(self, okta_data, app=None):
+        """
+        Formats group assignment data. Fetches group names for each group ID.
+        """
+        if not app:
+            logger.warning("No app info provided for formatting")
+            return []
 
-            groups_url = f"{base_url}/api/v1/apps/{app_id}/groups"
-            group_response = requests.get(groups_url, headers=headers)
+        app_id = app.get("app_id")
+        app_label = app.get("label", app_id)  # Use label if available, otherwise app_id
 
-            if handle_rate_limit(group_response):
-                logger.warning(f"Rate limit hit while fetching groups for app {app_id}. Skipping.")
-                continue
+        base_url = settings.OKTA_API_URL
+        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
 
-            if group_response.status_code != 200:
-                logger.error(f"Failed to fetch group assignments for app {app_id}: {group_response.text}")
-                continue
+        formatted_data = []
+        for group in okta_data:
+            group_id = group.get("id")
+            group_name = None
 
-            group_data = group_response.json()
-            formatted_groups = []
-
-            # Resolve each groupId -> groupName
-            for group in group_data:
-                group_id = group.get("id")
-                group_name = None
-
-                if group_id:
-                    group_url = f"{base_url}/api/v1/groups/{group_id}"
+            if group_id:
+                group_url = f"{base_url}/api/v1/groups/{group_id}"
+                try:
                     group_detail_resp = requests.get(group_url, headers=headers)
 
                     if group_detail_resp.status_code == 200:
                         group_detail = group_detail_resp.json()
                         group_name = group_detail.get("profile", {}).get("name")
+                        logger.debug(f"Resolved group {group_id} to name: {group_name}")
+                except Exception as e:
+                    logger.warning(f"Failed to fetch group name for {group_id}: {e}")
 
-                formatted_group = {
-                    "id": group_name or group_id,
-                    "priority": group.get("priority"),
-                    "profile": group.get("profile", {}),
-                    "retain_assignment": group.get("retain_assignment", "")
-                }
-                formatted_groups.append(formatted_group)
-
-            logger.info(f"Fetched {len(formatted_groups)} group assignments for app {app_label}.")
-
-            grouped_assignments.append({
-                "app_id": app_label,
-                "group": formatted_groups,
+            formatted_record = {
+                "app_id": app_id,
+                "group_id": group_id,
+                "priority": group.get("priority", ""),
+                "profile": group.get("profile", {}),
+                "retain_assignment": group.get("retain_assignment", ""),
                 "timeouts": {}
-            })
+            }
+            formatted_data.append(formatted_record)
 
-        return grouped_assignments, 200, rate_limit_headers(response)
-
-    def extract_data(self, okta_data):
-        """
-        Extracts and flattens data from Okta response to match expected serializer format:
-        - One entry per group
-        - Fields: app_id (label), group_id (name), priority (dict), profile, retain_assignment, timeouts (list)
-        (Here we already map app_id -> label and group.id -> name in fetch_from_okta)
-        """
-        logger.info("Extracting data from Okta response")
-
-        formatted_data = []
-
-        for record in okta_data:
-            app_label = record.get("app_id")  # This is actually app_label now
-            raw_groups = record.get("group", [])
-
-            for group in raw_groups:
-                formatted_record = {
-                    "app_id": app_label,  # Store app label
-                    "group_id": group.get("id"),  # This is actually group name now
-                    "priority": group.get("priority", ""),
-                    "profile": group.get("profile", {}),
-                    "retain_assignment": group.get("retain_assignment", ""),
-                    "timeouts": record.get("timeouts", [])
-                }
-
-
-                formatted_data.append(formatted_record)
-
-        logger.info("Final extracted %d apps group assignment records after formatting and flattening", len(formatted_data))
+        logger.info(f"Formatted {len(formatted_data)} group assignments for app: {app_label}")
         return formatted_data

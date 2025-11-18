@@ -32,14 +32,14 @@ class BaseGroupViewSet(BaseEntityViewSet):
                 extracted_data[entity_name] = []
                 for group in extracted_data.get("group", []):
                     group_id = group["group_id"]
-                    group_name = group["name"]
+                    # group_name = group["name"]
                     data = viewset_instance.fetch_from_okta(group_id)
                     
-                    extracted = viewset_instance.extract_data(data, group_name)
+                    extracted = viewset_instance.extract_data(data, group_id)
                     if extracted:  # Only add if not empty
                         extracted_data.setdefault(entity_name, []).extend(extracted)
                     else:
-                        logger.info(f"No {entity_name} data extracted for group {group_name}. Skipping.")
+                        logger.info(f"No {entity_name} data extracted for group {group_id}. Skipping.")
 
             logger.info(f"Extracted {len(extracted_data[entity_name])} records for {entity_name}.")
 

@@ -84,7 +84,7 @@ class PolicyProfileEnrollmentSerializer(serializers.Serializer):
 
 class PolicyProfileEnrollmentAppsSerializer(serializers.Serializer):
     policy_id = serializers.CharField(max_length=255)
-    apps = serializers.ListField(child=serializers.CharField(max_length=255))
+    app_id = serializers.ListField(child=serializers.CharField(max_length=255))
 
 class PolicyRuleIDPDiscoverySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)

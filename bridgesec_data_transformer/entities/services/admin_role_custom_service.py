@@ -1,44 +1,41 @@
-from typing import Dict, Any, List, Optional
-from pymongo import MongoClient
-from django.conf import settings
-from datetime import datetime, timedelta
 import logging
 
-logger = logging.getLogger(__name__)
+from entities.services.service_utils import fetch_collection
 
-# Import utility functions from core.utils
-from core.utils.db_utils import get_collection_name, get_latest_db
+logger = logging.getLogger(__name__)
 
 
 class AdminRoleCustomDataBuilder:
     """
     Builds nested JSON per Admin Role Custom with resource sets.
+    Fetches data directly from DB collections without merging.
     """
 
     def build(self, db):
-        logger.info("Fetching collections for Admin Role Custom nested builder...")
+        logger.info("Fetching Admin Role Custom data from DB...")
 
-        # Check available collections
-        collections = db.list_collection_names()
-        logger.info(f"Available collections: {collections}")
+        # Fetch parent roles from DB
+        roles = fetch_collection(db, "okta_admin_role_custom")
+        logger.info(f"Found {len(roles)} Admin Role Custom roles")
 
-        # Directly retrieve already formatted docs (without _id)
-        admin_roles = list(db["okta_admin_role_custom"].find({}, {"_id": 0}))
-        resource_sets = list(db["okta_resource_set"].find({}, {"_id": 0}))
+        # Fetch resource sets from DB
+        all_resource_sets = fetch_collection(db, "okta_resource_set")
+        logger.info(f"Found {len(all_resource_sets)} resource sets")
 
-        logger.info(f"Found {len(admin_roles)} Admin Role Custom roles, {len(resource_sets)} resource sets")
-
+        # Build nested structure
         results = []
-        for role in admin_roles:
-            role_name = role.get("name")
-            logger.info(f"Building nested data for Admin Role Custom: {role_name}")
+        for role in roles:
+            role_id = role.get("custom_role_id") or role.get("name")
+
+            # Find all resource sets for this role
+            resource_sets = [resource for resource in all_resource_sets if resource.get("role_id") == role_id]
 
             formatted = {
-                **role,  # take all fields as already formatted in DB
-                "resource_sets": [resource for resource in resource_sets if resource.get("role_id") == role_name],
+                **role,  # Include all role fields
+                "resource_sets": resource_sets,
             }
 
-            logger.info(f"Admin Role Custom {role_name} has {len(formatted['resource_sets'])} resource sets")
+            logger.info(f"Admin Role Custom {role_id} has {len(resource_sets)} resource sets")
             results.append(formatted)
 
         logger.info(f"Built nested Admin Role Custom data for {len(results)} roles")

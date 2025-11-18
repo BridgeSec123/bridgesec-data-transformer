@@ -1,9 +1,9 @@
 import logging
 
+from entities.entity_filters import should_skip_app_extraction
 from entities.okta_entities.apps.apps_models import AppOauth
 from entities.okta_entities.apps.apps_serializers import AppOauthSerializer
 from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
-from entities.entity_filters import should_skip_app_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class AppOauthViewSet(BaseAppViewSet):
 
                 jwks_formatted = []
                 if oauthClient.get("token_endpoint_auth_method") == "private_key_jwt":
-                    jwks_data = oauthClient_settings.get("jwks", {}).get("keys", [])  # <-- keys inside jwks
+                    jwks_data = oauthClient_settings.get("jwks", {}).get("keys", [])
                     for key in jwks_data:
                         jwks_entry = {
                             "kty": key.get("kty"),
@@ -74,8 +74,8 @@ class AppOauthViewSet(BaseAppViewSet):
                     "accessibility_login_redirect_url": accessibility.get("loginRedirectUrl", ""),
                     "accessibility_self_service": accessibility.get("selfService", False),
                     "admin_note": notes.get("admin", ""),
-                    "app_links_json": any(visibility.get("appLinks",{}).values()),  # store as string if needed
-                    "app_settings_json": settings.get("apps", "{}"),  # recommend converting to JSON string if using StringField
+                    "app_links_json": any(visibility.get("appLinks",{}).values()),  
+                    "app_settings_json": settings.get("apps", "{}"),
                     "authentication_policy": authentication_policy,
                     "auto_key_rotation": oauthClient.get("autoKeyRotation", False),
                     "auto_submit_toolbar": visibility.get("autoSubmitToolbar", False),
@@ -84,8 +84,8 @@ class AppOauthViewSet(BaseAppViewSet):
                     "client_uri": oauthClient_settings.get("client_uri", ""),
                     "consent_method": oauthClient_settings.get("consent_method", ""),
                     "enduser_note": notes.get("enduser", ""),
-                    "grant_types": oauthClient_settings.get("grant_types", []) or [],  # ensure list
-                    "groups_claim": link.get("groups", []) if isinstance(link.get("groups", []), list) else [],  # list of dicts
+                    "grant_types": oauthClient_settings.get("grant_types", []) or [],
+                    "groups_claim": link.get("groups", []) if isinstance(link.get("groups", []), list) else [],
                     "hide_ios": hide.get("iOS", False),
                     "hide_web": hide.get("web", False),
                     "implicit_assignment": settings.get("implicitAssignment", False),
@@ -100,7 +100,7 @@ class AppOauthViewSet(BaseAppViewSet):
                     "omit_secret": record.get("omitSecret", False),
                     "pkce_required": oauthClient.get("pkce_required", False),
                     "policy_uri": link.get("policies", {}).get("hef", ""),
-                    "post_logout_redirect_uris": oauthClient.get("post_logout_redirect_uris", []) or [],
+                    "post_logout_redirect_uris": oauthClient_settings.get("post_logout_redirect_uris", []) or [],
                     "profile": record.get("profile", "{}"),
                     "redirect_uris": oauthClient_settings.get("redirect_uris", []) or [],
                     "refresh_token_leeway": refresh_token.get("leeway", 0),
@@ -116,7 +116,7 @@ class AppOauthViewSet(BaseAppViewSet):
                     "user_name_template_type": userNameTemplate.get("type", ""),
                     "wildcard_redirect": oauthClient_settings.get("wildcard_redirect", "")
                 }
-
+                # based on the app type we can set some mandatory fields checks.
                 if type == "web":
                     if not formatted_record.get("grant_types"):
                         formatted_record["grant_types"] = ["authorization_code"]
@@ -134,11 +134,8 @@ class AppOauthViewSet(BaseAppViewSet):
                         formatted_record["token_endpoint_auth_method"] = "private_key_jwt"
                     if not formatted_record.get("jwks"):
                         formatted_record["jwks"] = []
-            
-
+        
                 formatted_data.append(formatted_record)
         logger.info("Extracted and formatted %d apps oauth records from Okta", len(formatted_data))
-
-        
         return formatted_data
 

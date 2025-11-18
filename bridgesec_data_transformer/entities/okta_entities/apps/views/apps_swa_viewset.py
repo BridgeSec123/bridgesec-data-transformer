@@ -24,7 +24,6 @@ class AppSwaViewSet(BaseAppViewSet):
         
         for record in extracted_data:
             if record.get("signOnMode") == "BROWSER_PLUGIN":
-                # Check if this app label should be excluded
                 app_label = record.get("label", "")
                 if should_skip_app_three_field_extraction(app_label):
                     logger.info(f"Skipping SWA app extraction for label: {app_label}")

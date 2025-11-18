@@ -41,7 +41,7 @@ class GroupRoleViewSet(BaseGroupViewSet):
             logger.error(f"Failed to fetch group roles. Status Code: {response.status_code}, Response: {response.text}")
             return []
 
-    def extract_data(self, okta_data, group_name):
+    def extract_data(self, okta_data, group_id):
         """
         Extract and format group role data from Okta response.
         """
@@ -52,7 +52,7 @@ class GroupRoleViewSet(BaseGroupViewSet):
         for role in extracted_data:
             role_type = role.get("type") or role.get("roleType")  # "type" is for standard roles, "roleType" for custom
             role_entry = {
-                "group_id": group_name,
+                "group_id": group_id,
                 "group_role_id" : role.get("id"),
                 "role_type": role_type,
                 "disable_notifications": role.get("disableNotifications", False),

@@ -1,13 +1,9 @@
 import logging
 
-from entities.okta_entities.apps.apps_models import (
-    AppSAML,
-)
-from entities.okta_entities.apps.apps_serializers import (
-    AppSAMLSerializer,
-)
-from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 from entities.entity_filters import should_skip_app_saml_extraction
+from entities.okta_entities.apps.apps_models import AppSAML
+from entities.okta_entities.apps.apps_serializers import AppSAMLSerializer
+from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +20,6 @@ class AppSAMLViewSet(BaseAppViewSet):
         
         for record in extracted_data:
             if record.get("signOnMode") == "SAML_2_0":
-                # Check if this app label should be excluded
                 app_label = record.get("label", "")
                 if should_skip_app_saml_extraction(app_label):
                     logger.info(f"Skipping app extraction for label: {app_label}")
@@ -37,12 +32,10 @@ class AppSAMLViewSet(BaseAppViewSet):
                 signon = settings.get("signOn", {})
                 hide = visibility.get("hide", {})
                 userNameTemplate=record.get("credentials", {}).get("userNameTemplate", {})
-                
                 raw_statements = signon.get("attributeStatements", [])
                 attribute_statements = []
 
                 for s in raw_statements:
-                    # normalize only if actual keys exist
                     attribute_statements.append({
                         "filter_type": s.get("filterType"),
                         "filter_value": s.get("filterValue")
@@ -56,8 +49,8 @@ class AppSAMLViewSet(BaseAppViewSet):
                     "accessibility_self_service": accessibility.get("selfService", False),
                     "acs_endpoints": signon.get("acsEndpoints", []),
                     "admin_note": note.get("admin", ""),
-                    "app_links_json":  any(visibility.get("appLinks",{}).values()),
-                    "app_settings_json": any(visibility.get("appLinks", {}).values()),
+                    "app_links_json":  visibility.get("appLinks",{}),
+                    "app_settings_json": visibility.get("appLinks", {}),
                     "attribute_statements": attribute_statements,
                     "audience": signon.get("audience", ""),
                     "authentication_policy": record.get("authentication_policy", ""),
