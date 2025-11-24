@@ -67,7 +67,8 @@ class OktaCallbackView(APIView):
         session["email"] = user.email
         session["role"] = user.role
         session["id_token"] = id_token
-        session.set_expiry(3600)  
+        session["okta_access_token"] = access_token  # Store Okta access token for API calls
+        session.set_expiry(3600)
         session.save()
         
         response = HttpResponseRedirect(settings.FRONTEND_REDIRECT_URL)

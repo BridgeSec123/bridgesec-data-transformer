@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
 from entities.okta_entities.apps.apps_models import AppUser
@@ -15,12 +16,12 @@ class AppUserViewSet(BaseAppViewSet):
     serializer_class = AppUserSerializer
     model = AppUser
 
-    def fetch_from_okta(self, app_id):
+    def fetch_from_okta(self, app_id, request=None):
         """
         Fetch users for a specific app from Okta.
         """
         base_url = settings.OKTA_API_URL
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
 
         # API call to get users for this app
         users_url = f"{base_url}/api/v1/apps/{app_id}/users"

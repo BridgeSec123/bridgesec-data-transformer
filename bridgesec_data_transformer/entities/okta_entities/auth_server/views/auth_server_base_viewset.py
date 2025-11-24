@@ -1,7 +1,6 @@
 import logging
 
 from core.utils.entity_mapping import clean_entity_data
-
 from entities.views.base_view import BaseEntityViewSet
 
 logger = logging.getLogger(__name__)

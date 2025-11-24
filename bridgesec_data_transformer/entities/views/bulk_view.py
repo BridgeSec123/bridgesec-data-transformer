@@ -5,24 +5,21 @@ import os
 from datetime import datetime
 
 import requests
-from core.authentication import OktaTokenAuthentication
+# from core.authentication import OktaTokenAuthentication
 from core.tasks.bulk_tasks import run_bulk_entity_task
 from core.utils.collection_mapping import (ENTITY_ID_MAPPING,
                                            NON_EDITABLE_FIELDS,
                                            RESOURCE_COLLECTION_MAP)
-from core.utils.restore_utils import (
-    store_restored_data_with_metadata,
-    extract_terraform_target_params,
-    fetch_and_merge_restored_data,
-    remove_metadata_fields
-    
-)
 from core.utils.db_utils import (ENTITIES_WITH_BUILDERS, extract_time,
                                  get_collection_diff, get_collection_name,
                                  get_latest_db)
 from core.utils.jwt_utils import get_user_from_request
 from core.utils.model_registry import MODEL_REGISTRY
 from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
+from core.utils.restore_utils import (extract_terraform_target_params,
+                                      fetch_and_merge_restored_data,
+                                      remove_metadata_fields,
+                                      store_restored_data_with_metadata)
 from core.utils.schema_extractor import get_ui_backend_mapping
 from core.utils.serializer_registry import SERIALIZER_REGISTRY
 from django.conf import settings

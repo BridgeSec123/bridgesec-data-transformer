@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
 
@@ -16,12 +17,12 @@ class AppUserBaseSchemaPropertyViewSet(BaseAppViewSet):
     serializer_class = AppUserBaseSchemaPropertySerializer
     model = AppUserBaseSchemaProperty
 
-    def fetch_from_okta(self, app_id):
+    def fetch_from_okta(self, app_id, request=None):
         """
         Fetch user base schema for a specific app from Okta.
         """
         base_url = settings.OKTA_API_URL
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
 
         # API call to get user base schema for this app
         schema_url = f"{base_url}/api/v1/meta/schemas/apps/{app_id}/default"

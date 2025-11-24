@@ -31,17 +31,17 @@ class BaseAppViewSet(BaseEntityViewSet):
     serializer_class = None
     model = None
 
-    def fetch_and_store_data(self, db_name):
+    def fetch_and_store_data(self, db_name, request=None):
         logger.info("Starting fetch and store process for applications and sub-entities.")
         extracted_data = {}
 
         from entities.registry import APP_ENTITY_VIEWSETS
 
         # Step 1: Fetch all apps ONCE and store them
-        all_apps = [] 
+        all_apps = []
         try:
             logger.info("Fetching all applications from Okta...")
-            apps_response, _, _ = self.fetch_from_okta()
+            apps_response, _, _ = self.fetch_from_okta(request=request)
             # Store raw apps data (not extracted) for iteration
             all_apps = apps_response if isinstance(apps_response, list) else []
             extracted_data["all_apps"] = all_apps  # Store for later use
@@ -80,7 +80,7 @@ class BaseAppViewSet(BaseEntityViewSet):
                         logger.warning(f"Missing app_id in app entry. Skipping.")
                         continue
                     try:
-                        data, _, _ = viewset_instance.fetch_from_okta(app_id)
+                        data, _, _ = viewset_instance.fetch_from_okta(app_id, request=request)
                         app_info = {"app_id": app_id, "label": app_label}
                         extracted = viewset_instance.extract_data(data, app_info)
                         if extracted:
@@ -126,7 +126,7 @@ class BaseAppViewSet(BaseEntityViewSet):
 
                         try:
                             # Fetch data from Okta and pass parent_record to extract_data
-                            data, _, _ = viewset_instance.fetch_from_okta(record_id)
+                            data, _, _ = viewset_instance.fetch_from_okta(record_id, request=request)
                             extracted = viewset_instance.extract_data(data, parent_record)
 
                             if extracted:
@@ -147,7 +147,7 @@ class BaseAppViewSet(BaseEntityViewSet):
 
             # Default logic for regular entities
             try:
-                okta_response, _, _ = viewset_instance.fetch_from_okta()
+                okta_response, _, _ = viewset_instance.fetch_from_okta(request=request)
                 entity_data = viewset_instance.extract_data(okta_response)
                 extracted_data[entity_name].extend(entity_data)
                 logger.info(f"Completed {entity_name}: {len(entity_data)} records")

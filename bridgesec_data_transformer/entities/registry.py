@@ -92,8 +92,8 @@ from entities.okta_entities.users.views import (AdminRoleTargetsViewSet,
 
 # Dictionary to register all entity viewsets
 ENTITY_VIEWSETS = {
-    "users": BaseUserViewSet,
-    "identity_providers": BaseIdentityProviderViewSet,
+    #  "users": BaseUserViewSet,
+     "identity_providers": BaseIdentityProviderViewSet,
     "behavior": BehaviorViewSet, 
     "orgs": OrgViewSet,
     "authenticators": BaseAuthenticatorViewSet,
@@ -113,11 +113,11 @@ ENTITY_VIEWSETS = {
     "links": BaseLinkViewSet,
     "captchas": BaseCaptchaViewSet,
     "emails": BaseEmailViewSet,
-    # "rate_limits": BaseRateLimitViewSet,
-    # "entitlements": BaseEntitlementViewSet,
-    # "requests": BaseRequestConditionViewSet,
-    # "catalogs": BaseCatalogViewSet,
-    # "campaigns": CampaignViewSet
+    "rate_limits": BaseRateLimitViewSet,
+    "entitlements": BaseEntitlementViewSet,
+    "requests": BaseRequestConditionViewSet,
+    "catalogs": BaseCatalogViewSet,
+    "campaigns": CampaignViewSet
 }
 
 GROUP_ENTITY_VIEWSETS = {
