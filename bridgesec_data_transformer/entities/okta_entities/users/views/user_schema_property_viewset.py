@@ -17,7 +17,13 @@ class UserSchemaPropertyViewSet(BaseUserViewSet):
 
     def extract_data(self, okta_data):
         # return super().extract_data(okta_data)
-        login = okta_data.get("definitions").get("base").get("properties").get("login")
+        if not okta_data or not isinstance(okta_data, dict):
+            return []
+
+        login = okta_data.get("definitions", {}).get("base", {}).get("properties", {}).get("login")
+        if not login:
+            return []
+
         user_type = okta_data.get("_links", {}).get("self", {}).get("href", "")
         user_type_id = user_type.rsplit("/", 1)[-1] if user_type else ""
 

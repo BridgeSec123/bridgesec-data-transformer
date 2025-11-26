@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
@@ -17,7 +18,7 @@ class UserGroupMembershipsViewSet(BaseUserViewSet):
     serializer_class = UserGroupMembershipsSerializer
     model = UserGroupMemberships
 
-    def get_group_names_from_ids(self, group_ids):
+    def get_group_names_from_ids(self, group_ids, request=None):
         """
         Fetch group names by making API calls for each group ID.
         """
@@ -25,7 +26,7 @@ class UserGroupMembershipsViewSet(BaseUserViewSet):
             return []
 
         group_names = []
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
 
         for group_id in group_ids:
             try:
@@ -48,13 +49,13 @@ class UserGroupMembershipsViewSet(BaseUserViewSet):
 
         return group_names
 
-    def fetch_from_okta(self,user_id):
+    def fetch_from_okta(self, user_id, request=None):
         if not self.okta_endpoint:
             logger.error("Okta endpoint not defined")
             return {"error": "Okta endpoint not defined"}, 500
 
         okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(user_id=user_id)}"
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
         
         logger.info(f"Fetching data from Okta endpoint: {self.okta_endpoint}")
         
@@ -80,7 +81,7 @@ class UserGroupMembershipsViewSet(BaseUserViewSet):
 
             return response_data
     
-    def extract_data(self, okta_data, user_name):
+    def extract_data(self, okta_data, user_name, request=None):
         extracted_data = super().extract_data(okta_data)
         group_ids = []
 
@@ -91,7 +92,7 @@ class UserGroupMembershipsViewSet(BaseUserViewSet):
                 group_ids.append(group_id)
 
         # Convert group IDs to group names
-        group_names = self.get_group_names_from_ids(group_ids)
+        group_names = self.get_group_names_from_ids(group_ids, request=request)
 
         # Prepare final data without extra formatting
         formatted_data = [{

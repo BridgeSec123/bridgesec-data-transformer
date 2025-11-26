@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
@@ -18,11 +19,11 @@ class UserFactorViewSet(BaseUserViewSet):
     entity_type = "user_factors"
     serializer_class = UserFactorSerializer
     model = UserFactor
-    
-    def fetch_from_okta(self, user_id):
+
+    def fetch_from_okta(self, user_id, request=None):
         """
         Fetch group membership details for a specific group from Okta.
-        
+
         :param group_id: The Okta Group ID for which to fetch membership data.
         :return: JSON response from Okta API.
         """
@@ -35,7 +36,7 @@ class UserFactorViewSet(BaseUserViewSet):
             return {"error": "Okta endpoint not defined"}, 500
 
         okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(user_id=user_id)}"
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
         
         logger.info(f"Fetching data from Okta endpoint: {self.okta_endpoint}")
         

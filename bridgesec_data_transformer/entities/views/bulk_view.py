@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 
 import requests
-# from core.authentication import OktaTokenAuthentication
+from core.authentication import CustomJWTAuthentication
 from core.tasks.bulk_tasks import run_bulk_entity_task
 from core.utils.collection_mapping import (ENTITY_ID_MAPPING,
                                            NON_EDITABLE_FIELDS,
@@ -41,8 +41,8 @@ server_url = settings.SERVER_URL
 
 
 class BulkEntityViewSet(viewsets.ViewSet):
-    authentication_classes = []
-    permission_classes = []
+    authentication_classes = [CustomJWTAuthentication]
+    permission_classes = [IsAuthenticated]
     serializer_class = RestoreDataSerializer
 
     @swagger_auto_schema(
@@ -54,7 +54,19 @@ class BulkEntityViewSet(viewsets.ViewSet):
         """
         Triggers a background task to fetch fresh data for all registered entities and store them in a dynamic MongoDB.
         """
-        run_bulk_entity_task.delay()
+        # Get Okta access token and granted scopes from session to pass to background task
+        okta_access_token = None
+        okta_granted_scopes = []
+        if hasattr(request, 'session'):
+            okta_access_token = request.session.get('okta_access_token')
+            okta_granted_scopes = request.session.get('okta_granted_scopes', [])
+            logger.info(f"Passing {len(okta_granted_scopes)} scopes to bulk task: {okta_granted_scopes}")
+
+        # Pass access token and scopes to Celery task for Bearer token authentication
+        run_bulk_entity_task.delay(
+            okta_access_token=okta_access_token,
+            okta_granted_scopes=okta_granted_scopes
+        )
 
         return Response(
             {"message": "Data fetch task triggered successfully"},

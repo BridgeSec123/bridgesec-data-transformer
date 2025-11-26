@@ -4,7 +4,12 @@ from datetime import datetime
 import requests
 from core.utils.entity_mapping import extract_entity_data
 from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
-from core.utils.okta_helpers import get_okta_headers
+from core.utils.okta_helpers import (
+    build_okta_url,
+    get_okta_headers,
+    get_required_scope_for_endpoint,
+    validate_scope_for_endpoint,
+)
 from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
@@ -56,15 +61,19 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
         """Fetch data from Okta API dynamically."""
         if not self.okta_endpoint:
             logger.error("Okta endpoint not defined")
-            return {"error": "Okta endpoint not defined"}, 500
+            return {"error": "Okta endpoint not defined"}, 500, {}
 
-        okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint}"
+        # Build URL properly to avoid double slashes
+        okta_url = build_okta_url(self.okta_endpoint)
 
         # Get appropriate Okta headers (uses session token if available, otherwise static token)
         headers = get_okta_headers(request)
 
+        # Validate scope before making request
+        is_valid, required_scopes, granted_scopes, missing_scopes = validate_scope_for_endpoint(request, okta_url)
+
         logger.info(f"Fetching data from Okta endpoint: {self.okta_endpoint}")
-        
+
         while True:  # Keep retrying if rate limited
             response = requests.get(okta_url, headers=headers)
 
@@ -72,13 +81,36 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
                 logger.warning("Rate limit reached. Retrying...")
                 continue  # Retry after waiting
 
+            # Handle 401/403 errors with scope information
+            if response.status_code in [401, 403]:
+                error_data = response.json() if response.content else {}
+                error_summary = error_data.get("errorSummary", "Access denied")
+
+                scope_hint = ""
+                if missing_scopes:
+                    scope_hint = (
+                        f" Missing scopes: {missing_scopes}. "
+                        f"Please grant these scopes in Okta Admin Console → Applications → Your App → Okta API Scopes."
+                    )
+
+                error_message = f"Okta API access denied: {error_summary}.{scope_hint}"
+                logger.error(error_message)
+
+                return {
+                    "error": "okta_api_access_denied",
+                    "message": error_message,
+                    "required_scopes": required_scopes,
+                    "missing_scopes": missing_scopes,
+                    "endpoint": self.okta_endpoint
+                }, response.status_code, rate_limit_headers(response)
+
             if response.status_code != 200:
-                logger.error(f"Failed to fetch data from Okta: {response.text}")
+                logger.error(f"Failed to fetch data from Okta: status_code={response.status_code}, response={response.text}, url={okta_url}")
                 return {"error": f"Failed to fetch data from Okta API: {response.text}"}, response.status_code, rate_limit_headers(response)
 
             response_data = response.json()
             logger.info(f"Successfully fetched data from Okta ({len(response_data)} records)")
-            
+
             # Check if pagination is needed
             next_url = response.links.get("next", {}).get("url")
             if next_url:

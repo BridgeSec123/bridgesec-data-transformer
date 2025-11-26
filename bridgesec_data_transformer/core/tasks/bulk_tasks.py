@@ -1,14 +1,39 @@
-from celery import shared_task
-from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
-from django.conf import settings
-from entities.registry import ENTITY_VIEWSETS
-import os
 import json
 import logging
+import os
+
 import pika
+from celery import shared_task
+from django.conf import settings
+
+from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
+from entities.registry import ENTITY_VIEWSETS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class MockRequest:
+    """
+    Mock request object to pass Okta access token to viewsets in background tasks.
+    This allows Bearer token authentication in Celery tasks without a real Django request.
+    """
+
+    def __init__(self, okta_access_token=None, okta_granted_scopes=None):
+        self.session = MockSession(okta_access_token, okta_granted_scopes)
+
+
+class MockSession:
+    """Mock session to hold Okta access token for background tasks."""
+
+    def __init__(self, okta_access_token=None, okta_granted_scopes=None):
+        self._data = {
+            'okta_access_token': okta_access_token,
+            'okta_granted_scopes': okta_granted_scopes or [],
+        }
+
+    def get(self, key, default=None):
+        return self._data.get(key, default)
 
 
 def notify_backend_via_rabbitmq(db_name):
@@ -37,9 +62,31 @@ def notify_backend_via_rabbitmq(db_name):
 
 
 @shared_task
-def run_bulk_entity_task():
+def run_bulk_entity_task(okta_access_token=None, okta_granted_scopes=None):
+    """
+    Background task to fetch data from all Okta entities and store in MongoDB.
+
+    Args:
+        okta_access_token: Optional OAuth access token from user session.
+                          If provided, uses Bearer token authentication.
+                          If None, falls back to SSWS API token.
+        okta_granted_scopes: List of OAuth scopes granted to the access token.
+    """
     db_name = get_dynamic_db()
     logger.info(f"[TASK START] run_bulk_entity_task triggered with db_name={db_name}")
+
+    # Log authentication method being used
+    if okta_access_token:
+        logger.info("Using Bearer token authentication (user's OAuth token)")
+        logger.info(f"Granted scopes: {okta_granted_scopes}")
+    else:
+        logger.info("Using SSWS token authentication (static API token fallback)")
+
+    # Create mock request object to pass token and scopes to viewsets
+    mock_request = MockRequest(
+        okta_access_token=okta_access_token,
+        okta_granted_scopes=okta_granted_scopes
+    ) if okta_access_token else None
 
     try:
         # Ensure MongoDB connection
@@ -50,7 +97,9 @@ def run_bulk_entity_task():
         for entity_name, viewset_class in ENTITY_VIEWSETS.items():
             logger.info(f"Processing entity: {entity_name}")
             viewset_instance = viewset_class()
-            extracted_data = viewset_instance.fetch_and_store_data(db_name)
+
+            # Pass mock request with access token to enable Bearer authentication
+            extracted_data = viewset_instance.fetch_and_store_data(db_name, request=mock_request)
 
             if not extracted_data:
                 logger.error(f"Failed to fetch {entity_name} data")

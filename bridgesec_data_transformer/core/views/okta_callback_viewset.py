@@ -1,19 +1,41 @@
+import base64
+import json
+import logging
+
 import requests
 from django.conf import settings
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from core.utils.jwt_utils import generate_jwt_token
-from core.models.user import User
-from bson import ObjectId
-from jose import jwt
 from django.http import HttpResponseRedirect
+from jose import jwt
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from core.models.user import User
+from core.utils.jwt_utils import generate_jwt_token
+
+logger = logging.getLogger(__name__)
+
 
 class OktaCallbackView(APIView):
     def get(self, request):
         code = request.GET.get("code")
-    
-        token_url = f"{settings.OKTA_ISSUER}/v1/token"
+        error = request.GET.get("error")
+        error_description = request.GET.get("error_description")
+
+        # Handle OAuth errors from Okta
+        if error:
+            return Response(
+                {"error": error, "error_description": error_description},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not code:
+            return Response(
+                {"error": "Authorization code not received"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        token_url = f"{settings.OKTA_ISSUER}/oauth2/v1/token"
         data = {
             "grant_type": "authorization_code",
             "code": code,
@@ -22,21 +44,43 @@ class OktaCallbackView(APIView):
             "client_secret": settings.OKTA_SECRET_KEY,
         }
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
+
         token_resp = requests.post(token_url, data=data, headers=headers)
         token_data = token_resp.json()
+
+        # Check for token exchange errors
+        if "error" in token_data:
+            return Response(
+                {
+                    "error": token_data.get("error"),
+                    "error_description": token_data.get("error_description", "Token exchange failed")
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         id_token = token_data.get("id_token")
         access_token = token_data.get("access_token")
 
+        logger.info(f"OKTA ACCESS TOKEN: {access_token}")
+
         if not id_token or not access_token:
-            return Response({"error": "Token not received"}, status=400)
-        
-        # Decode token
-        jwks_url = f"{settings.OKTA_ISSUER}/v1/keys"
+            return Response({"error": "Token not received"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Extract granted scopes from access token
+        granted_scopes = self._extract_scopes_from_token(access_token)
+
+        # Decode and verify ID token
+        jwks_url = f"{settings.OKTA_ISSUER}/oauth2/v1/keys"
         jwks = requests.get(jwks_url).json()
         unverified_header = jwt.get_unverified_header(id_token)
         kid = unverified_header["kid"]
 
-        key = next(k for k in jwks["keys"] if k["kid"] == kid)
+        key = next((k for k in jwks["keys"] if k["kid"] == kid), None)
+        if not key:
+            return Response(
+                {"error": "Token verification failed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         payload = jwt.decode(
             id_token,
@@ -44,33 +88,57 @@ class OktaCallbackView(APIView):
             algorithms=["RS256"],
             audience=settings.OKTA_CLIENT_ID,
             issuer=settings.OKTA_ISSUER,
-            access_token=access_token 
+            access_token=access_token
         )
 
         email = payload.get("email") or payload.get("sub")
-        username = email  # or however you want to define username
+        username = email
 
         if not email:
-            return Response({"error": "Email is required from Okta"}, status=400)
+            return Response(
+                {"error": "Email is required from Okta"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         user = User.objects(email=email).first()
         if not user:
             user = User(email=email, username=username, role="admin")
             user.save()
 
-        # Generate custom access token
+        # Generate custom access token for application
         jwt_token = generate_jwt_token(user)
 
+        # Store session data
         session = request.session
         session["user_id"] = str(user.id)
         session["username"] = user.username
         session["email"] = user.email
         session["role"] = user.role
         session["id_token"] = id_token
-        session["okta_access_token"] = access_token  # Store Okta access token for API calls
+        session["okta_access_token"] = access_token
+        session["okta_granted_scopes"] = granted_scopes
         session.set_expiry(3600)
         session.save()
-        
+
         response = HttpResponseRedirect(settings.FRONTEND_REDIRECT_URL)
         response.set_cookie("access_token", jwt_token, httponly=False, secure=False, samesite="Lax")
         return response
+
+    def _extract_scopes_from_token(self, access_token):
+        """Extract scopes from the access token payload."""
+        try:
+            # Split token and decode payload (middle part)
+            parts = access_token.split('.')
+            if len(parts) != 3:
+                return []
+
+            # Add padding if needed for base64 decoding
+            payload_b64 = parts[1]
+            padding = 4 - len(payload_b64) % 4
+            if padding != 4:
+                payload_b64 += '=' * padding
+
+            payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+            return payload.get('scp', [])
+        except Exception:
+            return []

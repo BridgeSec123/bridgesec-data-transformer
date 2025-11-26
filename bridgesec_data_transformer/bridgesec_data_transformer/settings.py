@@ -19,7 +19,6 @@ from core.utils.mongo_utils import connect_to_mongo
 from mongoengine import connect
 from pymongo import MongoClient
 
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -28,7 +27,7 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 
 OKTA_API_URL = env("OKTA_API_URL")
-OKTA_API_TOKEN = env("OKTA_API_TOKEN")
+OKTA_API_TOKEN = env("OKTA_API_TOKEN", default=None)
 OKTA_CLIENT_ID = env("OKTA_CLIENT_ID")
 OKTA_REDIRECT_URI = env("OKTA_REDIRECT_URI")
 OKTA_ISSUER = env("OKTA_ISSUER")
@@ -36,6 +35,87 @@ OKTA_SECRET_KEY = env("OKTA_SECRET_KEY")
 FRONTEND_REDIRECT_URL = env("FRONTEND_REDIRECT_URL")
 FRONTEND_URL = env("FRONTEND_URL")
 SERVER_URL = env("SERVER_URL")
+
+# Okta OAuth Scopes for API access
+# These scopes are requested during login to access Okta Admin APIs
+OKTA_SCOPES = " ".join([
+    # OpenID Connect scopes
+    "openid",
+    "email",
+    "profile",
+    # Okta Admin API scopes
+    "okta.users.read",
+    "okta.apps.read",
+    "okta.groups.read",
+    # "okta.policies.read",
+    # "okta.authorizationServers.read",
+    # "okta.idps.read",
+    # "okta.brands.read",
+    # "okta.authenticators.read",
+    # "okta.orgs.read",
+    # "okta.eventHooks.read",
+    # "okta.inlineHooks.read",
+    # "okta.behaviors.read",
+    # "okta.deviceAssurance.read",
+    # "okta.emailServers.read",
+    # "okta.emailDomains.read",
+    # "okta.networkZones.read",
+    # "okta.trustedOrigins.read",
+    # "okta.templates.read",
+    # "okta.threatInsights.read",
+    # "okta.rateLimits.read",
+    "okta.roles.read",
+    # "okta.resourceSets.read",
+    # "okta.captchas.read",
+    "okta.schemas.read",
+    "okta.userTypes.read",
+    # "okta.clients.read",
+    "okta.factors.read",
+    # "okta.logs.read",
+    # "okta.devices.read",
+])
+
+# Mapping of Okta API endpoints to required scopes (for error handling)
+# Values can be a single scope string or a list of scopes for endpoints that need multiple permissions
+OKTA_API_SCOPE_MAP = {
+    # Users endpoint requires multiple scopes for all sub-entities
+    "/users": [
+        "okta.users.read",
+        "okta.roles.read",
+        "okta.schemas.read",
+        "okta.userTypes.read",
+        "okta.factors.read",
+    ],
+    "/apps": "okta.apps.read",
+    "/groups": "okta.groups.read",
+    # "/policies": "okta.policies.read",
+    # "/authorizationServers": "okta.authorizationServers.read",
+    # "/idps": "okta.idps.read",
+    # "/brands": "okta.brands.read",
+    # "/authenticators": "okta.authenticators.read",
+    # "/org": "okta.orgs.read",
+    # "/eventHooks": "okta.eventHooks.read",
+    # "/inlineHooks": "okta.inlineHooks.read",
+    # "/behaviors": "okta.behaviors.read",
+    # "/device-assurances": "okta.deviceAssurance.read",
+    # "/email-servers": "okta.emailServers.read",
+    # "/email-domains": "okta.emailDomains.read",
+    # "/zones": "okta.networkZones.read",
+    # "/trustedOrigins": "okta.trustedOrigins.read",
+    # "/templates": "okta.templates.read",
+    # "/threats": "okta.threatInsights.read",
+    # "/rate-limit": "okta.rateLimits.read",
+    # "/principal-rate-limits": "okta.rateLimits.read",
+    "/iam/roles": "okta.roles.read",
+    # "/iam/resource-sets": "okta.resourceSets.read",
+    # "/captchas": "okta.captchas.read",
+    "/meta/schemas": "okta.schemas.read",
+    "/meta/types": "okta.userTypes.read",
+    # "/oauth2/v1/clients": "okta.clients.read",
+    "/factors": "okta.factors.read",
+    # "/logs": "okta.logs.read",
+    # "/devices": "okta.devices.read",
+}
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
@@ -49,7 +129,8 @@ DEBUG = False
 ALLOWED_HOSTS = [
     '.onrender.com',
     '127.0.0.1',
-    '31.97.229.6'
+    '31.97.229.6',
+    "localhost"
 ]
 
 # Application definition
@@ -269,7 +350,7 @@ REST_FRAMEWORK = {
 
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,
