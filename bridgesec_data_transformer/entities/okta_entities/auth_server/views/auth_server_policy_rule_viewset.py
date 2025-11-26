@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from django.conf import settings
 
 from entities.okta_entities.auth_server.auth_server_models import (
@@ -21,13 +22,13 @@ class AuthorizationServerPolicyRuleViewSet(BaseAuthServerViewSet):
     okta_endpoint = "api/v1/authorizationServers/{auth_server_id}/policies/{policy_id}/rules"
     entity_type = "auth_server_policy_rules"
 
-    def fetch_from_okta(self, auth_server_id, policy_id):
+    def fetch_from_okta(self, auth_server_id, policy_id, request=None):
         if not auth_server_id or not policy_id:
             logger.error("Both Auth Server ID and Policy ID are required to fetch policy rules.")
             return []
 
         url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(auth_server_id=auth_server_id, policy_id=policy_id)}"
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
 
         logger.info(f"Fetching policy rules from Okta API: {url}")
         response = requests.get(url, headers=headers)

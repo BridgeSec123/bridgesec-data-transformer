@@ -10,7 +10,7 @@ class BaseGroupViewSet(BaseEntityViewSet):
     Base ViewSet to handle fetching and storing both Group and Group Membership data dynamically.
     """
 
-    def fetch_and_store_data(self, db_name):
+    def fetch_and_store_data(self, db_name, request=None):
         """
         Fetch groups and their memberships from Okta, store them in a structured dictionary,
         and pass them to the respective viewsets for storing.
@@ -26,14 +26,14 @@ class BaseGroupViewSet(BaseEntityViewSet):
             viewset_instance = viewset_class()
 
             if entity_name == "group" or entity_name == "group_schemas" or entity_name == "group_rules":
-                data, status_code, rate_limit = viewset_instance.fetch_from_okta()
+                data, status_code, rate_limit = viewset_instance.fetch_from_okta(request=request)
                 extracted_data[entity_name] = viewset_instance.extract_data(data)
             else:
                 extracted_data[entity_name] = []
                 for group in extracted_data.get("group", []):
                     group_id = group["group_id"]
                     # group_name = group["name"]
-                    data = viewset_instance.fetch_from_okta(group_id)
+                    data = viewset_instance.fetch_from_okta(group_id, request=request)
                     
                     extracted = viewset_instance.extract_data(data, group_id)
                     if extracted:  # Only add if not empty

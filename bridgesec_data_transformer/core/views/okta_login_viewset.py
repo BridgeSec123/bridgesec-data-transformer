@@ -11,7 +11,7 @@ class OktaLoginView(APIView):
         encoded_scopes = quote(settings.OKTA_SCOPES, safe='')
 
         authorize_url = (
-            f"{settings.OKTA_ISSUER}/v1/authorize?"
+            f"{settings.OKTA_ISSUER}/oauth2/v1/authorize?"
             f"client_id={settings.OKTA_CLIENT_ID}&"
             f"response_type=code&"
             f"scope={encoded_scopes}&"

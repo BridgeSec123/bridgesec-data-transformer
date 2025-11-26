@@ -38,11 +38,11 @@ class AuthenticatorViewSet(BaseEntityViewSet):
         logger.info(f"Extracted {len(formatted_data)} authenticators from Okta response")
         return formatted_data
     
-    def fetch_and_store_data(self, db_name):
+    def fetch_and_store_data(self, db_name, request=None):
         """Fetch data from Okta and store in MongoDB."""
         try:
             # Step 1: Fetch data from Okta
-            okta_response, status_code, headers = self.fetch_from_okta()
+            okta_response, status_code, headers = self.fetch_from_okta(request=request)
             logger.info("Fetched authenticators data from Okta")
 
             # Step 2: Extract and format data

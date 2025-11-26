@@ -27,10 +27,10 @@ class ThreatInsightViewSet(BaseEntityViewSet):
         logger.info("Extracted %d Threat InSights records", len(formatted_data))
         return formatted_data
     
-    def fetch_and_store_data(self, db_name):
+    def fetch_and_store_data(self, db_name, request=None):
         try:
         # Step 1: Fetch data from Okta
-            okta_response, status_code, headers = self.fetch_from_okta()
+            okta_response, status_code, headers = self.fetch_from_okta(request=request)
             logger.info("Fetched Threat InSights data from Okta")
 
             # Step 2: Extract and format data

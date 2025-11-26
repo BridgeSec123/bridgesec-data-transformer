@@ -10,7 +10,7 @@ class BaseAuthServerViewSet(BaseEntityViewSet):
     Base ViewSet to handle fetching and storing both Auth Servers and Sub-Entities data dynamically.
     """
 
-    def fetch_and_store_data(self, db_name):
+    def fetch_and_store_data(self, db_name, request=None):
         logger.info("Starting fetch and store process for auth server and sub-entities.")
         extracted_data = {}
 
@@ -19,7 +19,7 @@ class BaseAuthServerViewSet(BaseEntityViewSet):
             viewset_instance = viewset_class()
 
             if entity_name == "auth_servers" or entity_name == "auth_servers_default":
-                data, status_code, rate_limit = viewset_instance.fetch_from_okta()
+                data, status_code, rate_limit = viewset_instance.fetch_from_okta(request=request)
                 extracted_data[entity_name] = viewset_instance.extract_data(data)
             
             elif entity_name == "auth_server_policy_rules":
@@ -38,7 +38,7 @@ class BaseAuthServerViewSet(BaseEntityViewSet):
                         logger.warning(f"Could not find auth_server_id for {auth_server_id}, skipping policy rules.")
                         continue
 
-                    data = viewset_instance.fetch_from_okta(auth_server_id, policy_id)
+                    data = viewset_instance.fetch_from_okta(auth_server_id, policy_id, request=request)
                     extracted = viewset_instance.extract_data(data, auth_server_id, policy_id)
                     if extracted:
                         extracted_data[entity_name].extend(extracted)
@@ -53,7 +53,7 @@ class BaseAuthServerViewSet(BaseEntityViewSet):
                         logger.warning("Missing auth_server_id in auth_servers data, skipping.")
                         continue
 
-                    data = viewset_instance.fetch_from_okta(auth_server_id)
+                    data = viewset_instance.fetch_from_okta(auth_server_id, request=request)
                     extracted = viewset_instance.extract_data(data, auth_server_id)
 
                     if extracted:

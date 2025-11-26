@@ -9,7 +9,7 @@ class BaseRateLimitViewSet(BaseEntityViewSet):
     """
     Base class for handling rate limit entities.
     """
-    def fetch_and_store_data(self, db_name):
+    def fetch_and_store_data(self, db_name, request=None):
         logger.info("Starting fetch and store process for rate limit entities.")
         extracted_data = {}
 
@@ -21,7 +21,7 @@ class BaseRateLimitViewSet(BaseEntityViewSet):
             viewset_instance = viewset_class()
             extracted_data[entity_name] = []
             # Fetch full Okta response and extract based on type inside extract_data
-            okta_response, _, _ = viewset_instance.fetch_from_okta()
+            okta_response, _, _ = viewset_instance.fetch_from_okta(request=request)
             entity_data = viewset_instance.extract_data(okta_response)
             extracted_data.setdefault(entity_name, []).extend(entity_data)
             logger.info(f"Extracted {len(extracted_data[entity_name])} records for {entity_name}.")

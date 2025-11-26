@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
@@ -20,7 +21,7 @@ class ThemeViewset(BaseBrandViewSet):
     serializer_class = OktaThemeSerializer
     model = OktaTheme
 
-    def fetch_from_okta(self, brand_id):
+    def fetch_from_okta(self, brand_id, request=None):
         if not brand_id:
             logger.error("Brand ID is required to fetch memberships.")
             return []
@@ -30,7 +31,7 @@ class ThemeViewset(BaseBrandViewSet):
             return {"error": "Okta endpoint not defined"}, 500
 
         okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(brandId=brand_id)}"
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
         
         logger.info(f"Fetching data from Okta endpoint: {self.okta_endpoint}")
         

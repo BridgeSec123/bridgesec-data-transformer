@@ -85,10 +85,10 @@ class InlineHookEntityViewSet(BaseEntityViewSet):
             logger.error("Error extracting data from Okta response: %s", e)
             return e, status.HTTP_500_INTERNAL_SERVER_ERROR
         
-    def fetch_and_store_data(self, db_name):
+    def fetch_and_store_data(self, db_name, request=None):
         try:
         # Step 1: Fetch data from Okta
-            okta_response, status_code, headers = self.fetch_from_okta()
+            okta_response, status_code, headers = self.fetch_from_okta(request=request)
             logger.info("Fetched Inline Hook data from Okta")
 
             # Step 2: Extract and format data

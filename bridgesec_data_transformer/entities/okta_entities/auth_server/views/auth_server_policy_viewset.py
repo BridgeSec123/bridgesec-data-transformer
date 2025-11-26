@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from django.conf import settings
 
 from entities.okta_entities.auth_server.auth_server_models import (
@@ -22,7 +23,7 @@ class AuthorizationServerPolicyViewSet(BaseAuthServerViewSet):
     serializer_class = AuthorizationServerPolicySerializer
     model = AuthorizationServerPolicy
 
-    def fetch_from_okta(self, auth_server_id):
+    def fetch_from_okta(self, auth_server_id, request=None):
         """
         Fetch policies for a specific Authorization Server ID.
         """
@@ -31,7 +32,7 @@ class AuthorizationServerPolicyViewSet(BaseAuthServerViewSet):
             return []
 
         url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(auth_server_id=auth_server_id)}"
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
 
         logger.info(f"Fetching data from Okta API: {url}")
         

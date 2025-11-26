@@ -9,7 +9,7 @@ class BaseBrandViewSet(BaseEntityViewSet):
     Base ViewSet to handle fetching and storing both Brand and their sub entities data dynamically.
     """
 
-    def fetch_and_store_data(self, db_name):
+    def fetch_and_store_data(self, db_name, request=None):
         """
         Fetch brands from Okta, store them in a structured dictionary,
         and pass them to the respective viewsets for storing.
@@ -25,15 +25,15 @@ class BaseBrandViewSet(BaseEntityViewSet):
             viewset_instance = viewset_class()
 
             if entity_name == "brands":
-                data, status_code, rate_limit = viewset_instance.fetch_from_okta()
+                data, status_code, rate_limit = viewset_instance.fetch_from_okta(request=request)
                 extracted_data[entity_name] = viewset_instance.extract_data(data)
 
             elif entity_name == "okta_email_domain":
                 extracted_data[entity_name] = []
                 for brand in extracted_data.get("brands", []):
                     brand_name = brand["name"]
-                    data, _, _ = viewset_instance.fetch_from_okta()
-                    
+                    data, _, _ = viewset_instance.fetch_from_okta(request=request)
+
                     extracted = viewset_instance.extract_data(data, brand_name)
                     if extracted:
                         extracted_data.setdefault(entity_name, []).extend(extracted)
@@ -47,7 +47,7 @@ class BaseBrandViewSet(BaseEntityViewSet):
                         logger.warning("Missing brand_id in brands data, skipping.")
                         continue
 
-                    data = viewset_instance.fetch_from_okta(brand_id)
+                    data = viewset_instance.fetch_from_okta(brand_id, request=request)
                     extracted = viewset_instance.extract_data(data, brand_name)
                     if extracted:
                         extracted_data.setdefault(entity_name, []).extend(extracted)

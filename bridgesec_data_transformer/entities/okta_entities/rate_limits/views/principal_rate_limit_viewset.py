@@ -1,5 +1,6 @@
 import logging
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from rest_framework import status
 from rest_framework.response import Response
 from django.conf import settings
@@ -19,13 +20,13 @@ class PrincipalRateLimitViewSet(BaseEntityViewSet):
     serializer_class = PrincipalRateLimitSerializer
     model = PrincipalRateLimit
 
-    def fetch_from_okta(self):
+    def fetch_from_okta(self, resource_id=None, request=None):
         """
         Override to fetch principal rate limits for both SSWS_TOKEN and OAUTH_CLIENT types
         """
         all_data = []
         principal_types = ["SSWS_TOKEN", "OAUTH_CLIENT"]
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
 
         for principal_type in principal_types:
             # Build the query parameter for filtering

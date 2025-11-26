@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from django.conf import settings
 from entities.okta_entities.groups.group_models import GroupRule
 from entities.okta_entities.groups.group_serializers import GroupRuleSerializer
@@ -19,7 +20,7 @@ class GroupRuleViewSet(BaseGroupViewSet):
     serializer_class = GroupRuleSerializer
     model = GroupRule
 
-    def get_group_names_from_ids(self, group_ids):
+    def get_group_names_from_ids(self, group_ids, request=None):
         """
         Fetch group names by making API calls for each group ID.
         """
@@ -27,7 +28,7 @@ class GroupRuleViewSet(BaseGroupViewSet):
             return []
 
         group_names = []
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
 
         for group_id in group_ids:
             try:

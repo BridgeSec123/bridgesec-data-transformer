@@ -2,6 +2,7 @@ import logging
 
 from django.conf import settings
 import requests
+from core.utils.okta_helpers import get_okta_headers
 
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from entities.okta_entities.groups.group_models import GroupSchemaProperty
@@ -16,14 +17,14 @@ class GroupSchemaPropertyViewSet(BaseGroupViewSet):
     serializer_class = GroupSchemaPropertySerializer
     model = GroupSchemaProperty
     
-    def fetch_from_okta(self):
+    def fetch_from_okta(self, resource_id=None, request=None):
         """Fetch data from Okta API dynamically."""
         if not self.okta_endpoint:
             logger.error("Okta endpoint not defined")
             return {"error": "Okta endpoint not defined"}, 500
 
         okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint}"
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
         
         logger.info(f"Fetching data from Okta endpoint: {self.okta_endpoint}")
         

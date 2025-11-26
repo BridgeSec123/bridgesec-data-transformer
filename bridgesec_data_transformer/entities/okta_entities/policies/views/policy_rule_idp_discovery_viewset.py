@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
 
@@ -18,13 +19,13 @@ class PolicyRuleIDPDiscoveryViewSet(BasePolicyViewSet):
     entity_type = "okta_policy_rule_idp_discovery"
     serializer_class = PolicyRuleIDPDiscoverySerializer
     model = PolicyRuleIDPDiscovery
-    
-    def fetch_from_okta(self, _=None):
+
+    def fetch_from_okta(self, _=None, request=None):
         """
         Fetch IDP_DISCOVERY policies and their rules, attaching policy_id to each rule.
         """
         discovery_url = f"{settings.OKTA_API_URL}/api/v1/policies"
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
         params = {"type": "IDP_DISCOVERY"}
 
         logger.info("Fetching IDP_DISCOVERY policies from Okta.")

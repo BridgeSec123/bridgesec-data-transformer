@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from django.conf import settings
 from entities.okta_entities.groups.group_models import GroupMember
 from entities.okta_entities.groups.group_serializers import GroupMemberSerializer
@@ -19,7 +20,7 @@ class GroupMembershipViewSet(BaseGroupViewSet):
     serializer_class = GroupMemberSerializer
     model = GroupMember
 
-    def get_user_names_from_ids(self, user_ids):
+    def get_user_names_from_ids(self, user_ids, request=None):
         """
         Fetch user names by making API calls for each user ID.
         Optimized to handle large batches efficiently.
@@ -28,7 +29,7 @@ class GroupMembershipViewSet(BaseGroupViewSet):
             return []
 
         user_names = []
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
 
         # Log the number of users to process
         logger.info(f"Processing {len(user_ids)} users to fetch names")
@@ -67,7 +68,7 @@ class GroupMembershipViewSet(BaseGroupViewSet):
         logger.info(f"Successfully processed {len(user_names)} user names")
         return user_names
 
-    def fetch_from_okta(self, group_id):
+    def fetch_from_okta(self, group_id, request=None):
         """
         Fetch group membership details for a specific group from Okta.
         """
@@ -76,10 +77,7 @@ class GroupMembershipViewSet(BaseGroupViewSet):
             return []
 
         url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(group_id=group_id)}"
-        headers = {
-            "Authorization": f"SSWS {settings.OKTA_API_TOKEN}",
-            "Accept": "application/json"
-        }
+        headers = get_okta_headers(request)
 
         logger.info(f"Fetching data from Okta API: {url}")
         

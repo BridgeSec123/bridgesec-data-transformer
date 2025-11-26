@@ -9,7 +9,7 @@ class BaseDeviceAssurancePolicyViewSet(BaseEntityViewSet):
     Base ViewSet to handle fetching and storing Device Assurance Policies.
     """
     okta_endpoint = "/api/v1/device-assurances"
-    def fetch_and_store_data(self, db_name):
+    def fetch_and_store_data(self, db_name, request=None):
         """
         Fetch device assurance policies Okta, store them in a structured dictionary,
         and pass them to the respective viewsets for storing.
@@ -26,7 +26,7 @@ class BaseDeviceAssurancePolicyViewSet(BaseEntityViewSet):
             viewset_instance = viewset_class()
             extracted_data[entity_name] = []
             # Fetch full Okta response and extract based on type inside extract_data
-            okta_response, _, _ = viewset_instance.fetch_from_okta()
+            okta_response, _, _ = viewset_instance.fetch_from_okta(request=request)
             entity_data = viewset_instance.extract_data(okta_response)
             extracted_data.setdefault(entity_name, []).extend(entity_data)
             logger.info(f"Extracted {len(extracted_data[entity_name])} records for {entity_name}.")

@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
@@ -12,13 +13,13 @@ from entities.entity_filters import should_skip_policy_extraction
 
 logger = logging.getLogger(__name__)
 
-def get_group_name_by_id(group_id):
+def get_group_name_by_id(group_id, request=None):
     """
     Fetch group name by group ID from Okta API.
     """
     try:
         okta_url = f"{settings.OKTA_API_URL}/api/v1/groups/{group_id}"
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
 
         response = requests.get(okta_url, headers=headers)
         if response.status_code == 200:
@@ -37,14 +38,14 @@ class PolicyMFAViewSet(BasePolicyViewSet):
     serializer_class = PolicyMFASerializer
     model = PolicyMFA
     
-    def fetch_from_okta(self):
+    def fetch_from_okta(self, resource_id=None, request=None):
         """Fetch data from Okta API dynamically."""
         if not self.okta_endpoint:
             logger.error("Okta endpoint not defined")
             return {"error": "Okta endpoint not defined"}, 500
 
         okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint}"
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
         
         params = {
             "type": "MFA_ENROLL"
@@ -74,7 +75,7 @@ class PolicyMFAViewSet(BasePolicyViewSet):
 
             return response_data, 200, rate_limit_headers(response)
     
-    def extract_data(self, okta_data):
+    def extract_data(self, okta_data, request=None):
         """
         Override to format the user data by removing the "profile" key.
         """
@@ -104,7 +105,7 @@ class PolicyMFAViewSet(BasePolicyViewSet):
             group_ids = groups.get("include", [])
             group_names = []
             for group_id in group_ids:
-                group_name = get_group_name_by_id(group_id)
+                group_name = get_group_name_by_id(group_id, request=request)
                 group_names.append(group_name)
 
             formatted_record = {

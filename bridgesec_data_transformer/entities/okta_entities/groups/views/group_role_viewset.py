@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from django.conf import settings
 from entities.okta_entities.groups.group_models import GroupRole
 from entities.okta_entities.groups.group_serializers import GroupRoleSerializer
@@ -19,7 +20,7 @@ class GroupRoleViewSet(BaseGroupViewSet):
     serializer_class = GroupRoleSerializer
     model = GroupRole
     
-    def fetch_from_okta(self, group_id):
+    def fetch_from_okta(self, group_id, request=None):
         """
         Fetch group roles details for a specific group from Okta.
         """
@@ -28,7 +29,7 @@ class GroupRoleViewSet(BaseGroupViewSet):
             return []
 
         url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(group_id=group_id)}"
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
 
         logger.info(f"Fetching data from Okta API: {url}")
         

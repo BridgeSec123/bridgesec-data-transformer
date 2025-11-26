@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from django.conf import settings
 
 from entities.okta_entities.auth_server.auth_server_models import AuthTrustedServer
@@ -19,7 +20,7 @@ class AuthTrustedServerViewSet(BaseAuthServerViewSet):
     okta_endpoint = "api/v1/authorizationServers/{auth_server_id}/associatedServers"
     entity_type = "auth_trusted_servers"
 
-    def fetch_from_okta(self, auth_server_id):
+    def fetch_from_okta(self, auth_server_id, request=None):
         if not auth_server_id:
             logger.error("Auth Server ID is required to fetch trusted servers.")
             return []
@@ -28,10 +29,8 @@ class AuthTrustedServerViewSet(BaseAuthServerViewSet):
         params = {
             "trusted": "true"
         }
-        headers = {
-            "Authorization": f"SSWS {settings.OKTA_API_TOKEN}",
-            "Accept": "application/json"
-        }
+        headers = get_okta_headers(request)
+        headers["Accept"] = "application/json"
         logger.info(f"Fetching trusted servers from Okta API: {url}")
         response = requests.get(url, headers=headers, params=params)
 

@@ -74,10 +74,10 @@ class NetworkZoneViewSet(BaseEntityViewSet):
         logger.info("Extracted %d network zone records", len(formatted_data))
         return formatted_data
     
-    def fetch_and_store_data(self, db_name):
+    def fetch_and_store_data(self, db_name, request=None):
         try:
-            
-            okta_response, status_code, headers = self.fetch_from_okta()
+
+            okta_response, status_code, headers = self.fetch_from_okta(request=request)
             logger.info("Fetched network zone data from Okta")
             # Step 2: Extract and format data
             extracted_data = self.extract_data(okta_response)

@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
@@ -18,15 +19,15 @@ class PolicyPasswordViewSet(BasePolicyViewSet):
     entity_type = "okta_policy_password"
     serializer_class = PolicyPasswordSerializer
     model = PolicyPassword
-    
-    def fetch_from_okta(self):
+
+    def fetch_from_okta(self, resource_id=None, request=None):
         """Fetch data from Okta API dynamically."""
         if not self.okta_endpoint:
             logger.error("Okta endpoint not defined")
             return {"error": "Okta endpoint not defined"}, 500
 
         okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint}"
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
         
         params = {
             "type": "PASSWORD"

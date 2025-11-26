@@ -9,7 +9,7 @@ class BaseAdministratorViewSet(BaseEntityViewSet):
     Base ViewSet to handle fetching and storing both administrators and their sub entities data dynamically.
     """
 
-    def fetch_and_store_data(self, db_name):
+    def fetch_and_store_data(self, db_name, request=None):
         """
         Fetch administrators from Okta, store them in a structured dictionary,
         and pass them to the respective viewsets for storing.
@@ -26,7 +26,7 @@ class BaseAdministratorViewSet(BaseEntityViewSet):
             viewset_instance = viewset_class()
             extracted_data[entity_name] = []
             # Fetch full Okta response and extract based on type inside extract_data
-            okta_response, _, _ = viewset_instance.fetch_from_okta()
+            okta_response, _, _ = viewset_instance.fetch_from_okta(request=request)
             entity_data = viewset_instance.extract_data(okta_response)
             extracted_data.setdefault(entity_name, []).extend(entity_data) # Append to a flat list (not nested by type)
 

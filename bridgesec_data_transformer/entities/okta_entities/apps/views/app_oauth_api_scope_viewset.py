@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from core.utils.pagination import fetch_all_pages
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
@@ -11,13 +12,13 @@ from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 
 logger = logging.getLogger(__name__)
 
-class AppOauthApiScopeViewSet(BaseAppViewSet):  
+class AppOauthApiScopeViewSet(BaseAppViewSet):
     okta_endpoint = "/api/v1/apps/{app_id}/grants"
     entity_type = "okta_app_oauth_api_scope"
     serializer_class =  AppOauthApiScopeSerializer
     model =  AppOauthApiScope
 
-    def fetch_from_okta(self, app_id):
+    def fetch_from_okta(self, app_id, request=None):
         """
         Fetch OAuth API grants from Okta.
         Only makes the API call - no formatting logic.
@@ -27,7 +28,7 @@ class AppOauthApiScopeViewSet(BaseAppViewSet):
             return {"error": "Okta endpoint not defined"}, 500
 
         base_url = settings.OKTA_API_URL
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
 
         okta_url = f"{base_url}/{self.okta_endpoint.format(app_id=app_id)}"
 

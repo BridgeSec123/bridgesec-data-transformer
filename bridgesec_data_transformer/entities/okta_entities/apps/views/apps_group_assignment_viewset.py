@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from core.utils.rate_limit import handle_rate_limit, rate_limit_headers
 from django.conf import settings
 from entities.okta_entities.apps.apps_models import AppGroupAssignment
@@ -10,18 +11,18 @@ from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 
 logger = logging.getLogger(__name__)
 
-class AppsGroupAssignmentViewSet(BaseAppViewSet):  
+class AppsGroupAssignmentViewSet(BaseAppViewSet):
     okta_endpoint = "/api/v1/apps/{appId}/groups"
     entity_type = "okta_app_group_assignment"
     serializer_class = AppGroupAssignmentSerializer
     model = AppGroupAssignment
 
-    def fetch_from_okta(self, app_id):
+    def fetch_from_okta(self, app_id, request=None):
         """
         Fetch group assignments for a specific app from Okta.
         """
         base_url = settings.OKTA_API_URL
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
 
         # API call to get groups for this app
         groups_url = f"{base_url}/api/v1/apps/{app_id}/groups"
@@ -42,7 +43,7 @@ class AppsGroupAssignmentViewSet(BaseAppViewSet):
 
         return group_data, 200, rate_limit_headers(response)
 
-    def extract_data(self, okta_data, app=None):
+    def extract_data(self, okta_data, app=None, request=None):
         """
         Formats group assignment data. Fetches group names for each group ID.
         """
@@ -54,7 +55,7 @@ class AppsGroupAssignmentViewSet(BaseAppViewSet):
         app_label = app.get("label", app_id)  # Use label if available, otherwise app_id
 
         base_url = settings.OKTA_API_URL
-        headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+        headers = get_okta_headers(request)
 
         formatted_data = []
         for group in okta_data:

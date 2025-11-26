@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from core.utils.okta_helpers import get_okta_headers
 from django.conf import settings
 from entities.okta_entities.administrators.administrators_models import AdminResourceSet
 from entities.okta_entities.administrators.administrators_serializers import (
@@ -18,7 +19,7 @@ class AdminResourceSetViewSet(BaseAdministratorViewSet):
     serializer_class = AdminResourceSetSerializer
     model = AdminResourceSet
 
-    def get_resource_details(self, resources_url):
+    def get_resource_details(self, resources_url, request=None):
         """
         Fetch resource details from the resources URL and extract type and name.
         """
@@ -26,7 +27,7 @@ class AdminResourceSetViewSet(BaseAdministratorViewSet):
             return []
 
         try:
-            headers = {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
+            headers = get_okta_headers(request)
             response = requests.get(resources_url, headers=headers)
 
             if response.status_code == 200:
