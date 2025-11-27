@@ -1,6 +1,4 @@
 import logging
-from rest_framework import status
-from rest_framework.response import Response
 
 from entities.views.base_view import BaseEntityViewSet
 from entities.okta_entities.email.email_models import EmailSmtpServer
@@ -22,6 +20,9 @@ class EmailSmtpServerViewSet(BaseEntityViewSet):
         items = okta_data if isinstance(okta_data, list) else [okta_data]
 
         for item in items:
+            if not isinstance(item, dict):
+                logger.warning(f"Skipping invalid record (not a dict): {item}")
+                continue
             formatted_data.append({
                 "smtp_id" : item.get("id", ""),
                 "alias": item.get("alias", ""),
@@ -34,5 +35,3 @@ class EmailSmtpServerViewSet(BaseEntityViewSet):
 
         logger.info("Extracted %d Email SMTP Server records", len(formatted_data))
         return formatted_data
-
-    

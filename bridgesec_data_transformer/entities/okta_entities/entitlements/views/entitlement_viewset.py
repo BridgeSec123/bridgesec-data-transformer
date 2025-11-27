@@ -21,6 +21,9 @@ class EntitlementViewSet(BaseEntityViewSet):
         items = okta_data if isinstance(okta_data, list) else [okta_data]
 
         for item in items:
+            if not isinstance(item, dict):
+                logger.warning(f"Skipping invalid record (not a dict): {item}")
+                continue
             formatted_data.append({
                 "data_type": item.get("dataType", ""),
                 "external_value": item.get("externalValue", ""),

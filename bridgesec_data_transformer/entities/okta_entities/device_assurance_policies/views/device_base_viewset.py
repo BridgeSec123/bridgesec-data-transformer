@@ -4,11 +4,13 @@ from entities.views.base_view import BaseEntityViewSet
 
 logger = logging.getLogger(__name__)
 
+
 class BaseDeviceAssurancePolicyViewSet(BaseEntityViewSet):
     """
     Base ViewSet to handle fetching and storing Device Assurance Policies.
     """
     okta_endpoint = "/api/v1/device-assurances"
+
     def fetch_and_store_data(self, db_name, request=None):
         """
         Fetch device assurance policies Okta, store them in a structured dictionary,
@@ -16,11 +18,10 @@ class BaseDeviceAssurancePolicyViewSet(BaseEntityViewSet):
         """
         logger.info("Starting fetch and store process for device assurance policies")
 
-        # Dictionary to store all extracted data
         extracted_data = {}
 
-        # Lazy import to avoid circular import issues
         from entities.registry import DEVICE_ASSURANCE_POLICY_ENTITY_VIEWSETS
+
         for entity_name, viewset_class in DEVICE_ASSURANCE_POLICY_ENTITY_VIEWSETS.items():
             logger.info(f"Processing entity: {entity_name}")
             viewset_instance = viewset_class()

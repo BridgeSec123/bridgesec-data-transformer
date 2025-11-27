@@ -51,6 +51,9 @@ class AuthorizationServerScopeViewSet(BaseAuthServerViewSet):
     def extract_data(self, okta_data, auth_server_id=None):
         extracted_data = []
         for scope in okta_data:
+            if not isinstance(scope, dict):
+                logger.warning(f"Skipping invalid record (not a dict): {scope}")
+                continue
             record = {
                 "auth_server_id": auth_server_id,
                 "scope_id" : scope.get("id"),

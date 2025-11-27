@@ -1,6 +1,4 @@
 import logging
-from rest_framework import status
-from rest_framework.response import Response
 
 from entities.views.base_view import BaseEntityViewSet
 from entities.okta_entities.sms_templates.sms_template_models import SmsTemplate
@@ -19,6 +17,9 @@ class SmsTemplateViewSet(BaseEntityViewSet):
         formatted_data = []
 
         for item in extracted_data:
+            if not isinstance(item, dict):
+                logger.warning(f"Skipping invalid record (not a dict): {item}")
+                continue
             translations = item.get("translations") or [] # Fallback to empty list
             formatted_translations = []
             if translations:

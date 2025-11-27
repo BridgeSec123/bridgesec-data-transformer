@@ -4,6 +4,7 @@ from entities.views.base_view import BaseEntityViewSet
 
 logger = logging.getLogger(__name__)
 
+
 class BaseAdministratorViewSet(BaseEntityViewSet):
     """
     Base ViewSet to handle fetching and storing both administrators and their sub entities data dynamically.
@@ -16,11 +17,10 @@ class BaseAdministratorViewSet(BaseEntityViewSet):
         """
         logger.info("Starting fetch and store process for administrators.")
 
-        # Dictionary to store all extracted data
         extracted_data = {}
 
-        # Lazy import to avoid circular import issues
         from entities.registry import ADMINISTRATORS_ENTITY_VIEWSETS
+
         for entity_name, viewset_class in ADMINISTRATORS_ENTITY_VIEWSETS.items():
             logger.info(f"Processing entity: {entity_name}")
             viewset_instance = viewset_class()
@@ -28,12 +28,11 @@ class BaseAdministratorViewSet(BaseEntityViewSet):
             # Fetch full Okta response and extract based on type inside extract_data
             okta_response, _, _ = viewset_instance.fetch_from_okta(request=request)
             entity_data = viewset_instance.extract_data(okta_response)
-            extracted_data.setdefault(entity_name, []).extend(entity_data) # Append to a flat list (not nested by type)
+            extracted_data.setdefault(entity_name, []).extend(entity_data)
 
         for entity_name, data in extracted_data.items():
-                viewset_instance = ADMINISTRATORS_ENTITY_VIEWSETS[entity_name]()
-                viewset_instance.store_data(data, db_name)
-                
-                logger.info(f"Stored {len(entity_data)} records for {entity_name}")
+            viewset_instance = ADMINISTRATORS_ENTITY_VIEWSETS[entity_name]()
+            viewset_instance.store_data(data, db_name)
+            logger.info(f"Stored {len(data)} records for {entity_name}")
 
         return extracted_data

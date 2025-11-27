@@ -1,6 +1,4 @@
 import logging
-from rest_framework import status
-from rest_framework.response import Response
 
 from entities.views.base_view import BaseEntityViewSet
 from entities.okta_entities.threat_insights.threat_insight_models import ThreatInsight
@@ -15,16 +13,18 @@ class ThreatInsightViewSet(BaseEntityViewSet):
     model = ThreatInsight
 
     def extract_data(self, okta_data):
-        # extracted_data = super().extract_data(okta_data)
         formatted_data = []
 
-        # for item in okta_data:
+        if not isinstance(okta_data, dict):
+            logger.warning(f"Expected dict but got {type(okta_data)}")
+            return []
+
         formatted_data.append({
             "action": okta_data.get("action", ""),
             "network_excludes": okta_data.get("excludeZones", [])
         })
-            
-        logger.info("Extracted %d Threat InSights records", len(formatted_data))
+
+        logger.info("Extracted %d Threat Insights records", len(formatted_data))
         return formatted_data
     
     def fetch_and_store_data(self, db_name, request=None):

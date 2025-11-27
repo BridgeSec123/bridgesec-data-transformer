@@ -1,7 +1,6 @@
 import logging
 
 from rest_framework import status
-from rest_framework.response import Response
 
 from entities.okta_entities.inline_hooks.inline_hook_models import InlineHook
 from entities.okta_entities.inline_hooks.inline_hook_serializer import (
@@ -28,6 +27,9 @@ class InlineHookEntityViewSet(BaseEntityViewSet):
             
             formatted_data = []
             for record in extracted_data:
+                if not isinstance(record, dict):
+                    logger.warning(f"Skipping invalid record (not a dict): {record}")
+                    continue
                 channel = record.get("channel", {})
                 entity_type = channel.get("type", "").lower()
 

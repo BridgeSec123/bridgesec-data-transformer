@@ -1,8 +1,5 @@
 import logging
 
-from rest_framework import status
-from rest_framework.response import Response
-
 from entities.okta_entities.trusted_origins.trusted_origin_models import TrustedOrigin
 from entities.okta_entities.trusted_origins.trusted_origin_serializers import (
     TrustedOriginSerializer,
@@ -22,6 +19,9 @@ class TrustedOriginViewSet(BaseEntityViewSet):
         formatted_data = []
 
         for item in extracted_data:
+            if not isinstance(item, dict):
+                logger.warning(f"Skipping invalid record (not a dict): {item}")
+                continue
             # Get the first scope type if multiple exist, or default to empty string
             scopes = item.get("scopes", [])
             scope_value = []

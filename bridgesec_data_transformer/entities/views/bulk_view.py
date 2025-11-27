@@ -16,6 +16,7 @@ from core.utils.db_utils import (ENTITIES_WITH_BUILDERS, extract_time,
 from core.utils.jwt_utils import get_user_from_request
 from core.utils.model_registry import MODEL_REGISTRY
 from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
+from core.utils.okta_helpers import get_okta_headers
 from core.utils.restore_utils import (extract_terraform_target_params,
                                       fetch_and_merge_restored_data,
                                       remove_metadata_fields,
@@ -60,7 +61,6 @@ class BulkEntityViewSet(viewsets.ViewSet):
         if hasattr(request, 'session'):
             okta_access_token = request.session.get('okta_access_token')
             okta_granted_scopes = request.session.get('okta_granted_scopes', [])
-            logger.info(f"Passing {len(okta_granted_scopes)} scopes to bulk task: {okta_granted_scopes}")
 
         # Pass access token and scopes to Celery task for Bearer token authentication
         run_bulk_entity_task.delay(
@@ -286,32 +286,6 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     status=400,
                 )
 
-            # Validate data before storing in MongoDB
-            # serializer_class = SERIALIZER_REGISTRY.get(entity_name)
-            # if serializer_class:
-            #     validation_errors = []
-            #     for index, record in enumerate(modified_data):
-            #         serializer = serializer_class(data=record)
-            #         if not serializer.is_valid():
-            #             validation_errors.append({
-            #                 "record_index": index,
-            #                 "record_data": record,
-            #                 "errors": serializer.errors
-            #             })
-
-            #     if validation_errors:
-            #         return Response(
-            #             {
-            #                 "error": "Validation failed for one or more records",
-            #                 "validation_errors": validation_errors,
-            #                 "total_errors": len(validation_errors),
-            #                 "total_records": len(modified_data)
-            #             },
-            #             status=status.HTTP_400_BAD_REQUEST,
-            #         )
-            # else:
-            #     logger.warning(f"No serializer found for entity '{entity_name}'. Skipping validation.")
-
             # resolve collection name
             collection_name = get_collection_name(entity_name)
             if not collection_name:
@@ -356,12 +330,15 @@ class BulkEntityViewSet(viewsets.ViewSet):
             # Uses original data (with nested arrays intact) to extract all IDs
             params = extract_terraform_target_params(collection_name, modified_data)
 
+            # Get Okta authorization headers (Bearer token from session)
+            tf_headers = get_okta_headers(request)
+
             # Send data to Terraform API
             tf_response = requests.post(
                 f"{server_url}/api/",
                 params=params,
                 json={"data": modified_data},
-                headers={"Content-Type": "application/json"},
+                headers=tf_headers,
             )
 
             try:
@@ -536,26 +513,3 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-# db_name = get_dynamic_db()
-#         # Loop through all registered entity viewsets dynamically
-#         for entity_name, viewset_class in ENTITY_VIEWSETS.items():
-#             viewset_instance = viewset_class()
-
-#         # Fetch and extract data using the base class methods
-#         extracted_data = viewset_instance.fetch_and_store_data(db_name)
-#         if not extracted_data: # If no data returned
-#             return Response(
-#                 {"error": f"Failed to fetch {entity_name} data"},
-#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#             )
-#         # Setup output directory
-#         output_dir = os.path.join(settings.BASE_DIR, "output", db_name)
-#         os.makedirs(output_dir, exist_ok=True)
-
-#         for sub_entity_name, sub_entity_data in extracted_data.items():
-#             file_name = f"{sub_entity_name}.json"
-#             file_path = os.path.join(output_dir, file_name)
-
-#         with open(file_path, "w", encoding="utf-8") as f:
-#             json.dump(sub_entity_data, f, ensure_ascii=False, indent=4)

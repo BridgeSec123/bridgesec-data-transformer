@@ -20,6 +20,9 @@ class CaptchaViewSet(BaseCaptchaViewSet):
 
         formatted_data = []
         for record in extracted_data:
+            if not isinstance(record, dict):
+                logger.warning(f"Skipping invalid record (not a dict): {record}")
+                continue
             formatted_record = {
                 "name": record.get("name", ""),
                 "type": record.get("type", ""),

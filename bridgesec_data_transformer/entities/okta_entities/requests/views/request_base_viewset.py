@@ -9,11 +9,11 @@ class BaseRequestConditionViewSet(BaseEntityViewSet):
     """
     Base class for handling request condition entities.
     """
+
     def fetch_and_store_data(self, db_name, request=None):
         logger.info("Starting fetch and store process for request condition entities.")
         extracted_data = {}
 
-        # Import request registry here to avoid circular imports
         from entities.registry import REQUEST_ENTITY_VIEWSETS
 
         for entity_name, viewset_class in REQUEST_ENTITY_VIEWSETS.items():

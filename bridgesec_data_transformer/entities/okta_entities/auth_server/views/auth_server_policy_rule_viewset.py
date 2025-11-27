@@ -51,6 +51,9 @@ class AuthorizationServerPolicyRuleViewSet(BaseAuthServerViewSet):
     def extract_data(self, okta_data, auth_server_id=None, policy_id=None):
         extracted_data = []
         for rule in okta_data:
+            if not isinstance(rule, dict):
+                logger.warning(f"Skipping invalid record (not a dict): {rule}")
+                continue
             record = {
                 "auth_server_id": auth_server_id,
                 "policy_rule_id": rule.get("id"),

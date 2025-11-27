@@ -1,8 +1,5 @@
 import logging
 
-from rest_framework import status
-from rest_framework.response import Response
-
 from entities.entity_filters import should_skip_network_zone_extraction
 from entities.okta_entities.network_zone.network_zone_models import NetworkZone
 from entities.okta_entities.network_zone.network_zone_serializer import (
@@ -23,6 +20,9 @@ class NetworkZoneViewSet(BaseEntityViewSet):
         formatted_data = []
 
         for item in extracted_data:
+            if not isinstance(item, dict):
+                logger.warning(f"Skipping invalid record (not a dict): {item}")
+                continue
             zone_name = item.get("name")
 
             # Skip excluded network zones

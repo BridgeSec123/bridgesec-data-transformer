@@ -24,6 +24,9 @@ class OktaLinkDefinitionViewSet(BaseLinkViewSet):
 
         
         for record in extracted_data:
+            if not isinstance(record, dict):
+                logger.warning(f"Skipping invalid record (not a dict): {record}")
+                continue
             associated = record.get("associated", {})
             primary = record.get("primary", {})
             formatted_data.append(

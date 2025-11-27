@@ -19,11 +19,10 @@ class DeviceMacOSViewSet(BaseDeviceAssurancePolicyViewSet):
     model = DeviceMacOS
     
     def extract_data(self, okta_data):
-        logger.info("Extracting data from Okta response.")
-        # extracted_data = super().extract_data(okta_data)
-
         formatted_data = []
         for record in okta_data:
+            if not isinstance(record, dict):
+                continue
             if record.get("platform") == "MACOS":
                 third_party_signal_providers = record.get("thirdPartySignalProviders", {})
                 formatted_record = {
@@ -49,5 +48,5 @@ class DeviceMacOSViewSet(BaseDeviceAssurancePolicyViewSet):
                     "tpsp_site_isolation_enabled": third_party_signal_providers.get("siteIsolationEnabled", False),
                 }
                 formatted_data.append(formatted_record)
-        logger.info(f"Extracted and formatted {len(formatted_data)} Device Mac OS records from Okta.")
+        logger.info("Extracted %d Device macOS records", len(formatted_data))
         return formatted_data

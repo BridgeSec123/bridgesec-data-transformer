@@ -9,11 +9,11 @@ class BaseEntitlementViewSet(BaseEntityViewSet):
     """
     Base class for handling entitlement entities.
     """
+
     def fetch_and_store_data(self, db_name, request=None):
         logger.info("Starting fetch and store process for entitlement entities.")
         extracted_data = {}
 
-        # Import entitlement registry here to avoid circular imports
         from entities.registry import ENTITLEMENT_ENTITY_VIEWSETS
 
         for entity_name, viewset_class in ENTITLEMENT_ENTITY_VIEWSETS.items():

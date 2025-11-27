@@ -19,11 +19,10 @@ class DeviceAndroidViewSet(BaseDeviceAssurancePolicyViewSet):
     model = DeviceAndroid
     
     def extract_data(self, okta_data):
-        logger.info("Extracting data from Okta response.")
-        # extracted_data = super().extract_data(okta_data)
-
         formatted_data = []
         for record in okta_data:
+            if not isinstance(record, dict):
+                continue
             if record.get("platform") == "ANDROID":
                 formatted_record = {
                     "device_id": record.get("id", ""),
@@ -35,5 +34,5 @@ class DeviceAndroidViewSet(BaseDeviceAssurancePolicyViewSet):
                     "screenlock_type": record.get("screenLockType", {}).get("include", []),
                 }
                 formatted_data.append(formatted_record)
-        logger.info(f"Extracted and formatted {len(formatted_data)} Device Android records from Okta.")
+        logger.info("Extracted %d Device Android records", len(formatted_data))
         return formatted_data

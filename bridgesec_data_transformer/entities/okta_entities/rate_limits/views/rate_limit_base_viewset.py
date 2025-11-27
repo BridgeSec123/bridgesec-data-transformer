@@ -9,11 +9,11 @@ class BaseRateLimitViewSet(BaseEntityViewSet):
     """
     Base class for handling rate limit entities.
     """
+
     def fetch_and_store_data(self, db_name, request=None):
         logger.info("Starting fetch and store process for rate limit entities.")
         extracted_data = {}
 
-        # Import rate limit registry here to avoid circular imports
         from entities.registry import RATE_LIMIT_ENTITY_VIEWSETS
 
         for entity_name, viewset_class in RATE_LIMIT_ENTITY_VIEWSETS.items():

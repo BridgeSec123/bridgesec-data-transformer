@@ -21,6 +21,9 @@ class EventHookViewSet(BaseEntityViewSet):
 
         formatted_data = []
         for record in extracted_data:
+            if not isinstance(record, dict):
+                logger.warning(f"Skipping invalid record (not a dict): {record}")
+                continue
             channel = record.get("channel", {})
             formatted_record = {
                 "event_id" : record.get("id"),

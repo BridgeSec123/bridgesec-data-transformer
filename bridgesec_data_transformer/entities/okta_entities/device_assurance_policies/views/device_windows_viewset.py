@@ -19,11 +19,10 @@ class DeviceWindowsViewSet(BaseDeviceAssurancePolicyViewSet):
     model = DeviceWindows
     
     def extract_data(self, okta_data):
-        logger.info("Extracting data from Okta response.")
-        # extracted_data = super().extract_data(okta_data)
-
         formatted_data = []
         for record in okta_data:
+            if not isinstance(record, dict):
+                continue
             if record.get("platform") == "WINDOWS":
                 third_party_signal_providers = record.get("thirdPartySignalProviders", {})
                 formatted_record = {
@@ -55,5 +54,5 @@ class DeviceWindowsViewSet(BaseDeviceAssurancePolicyViewSet):
                     "tpsp_windows_user_domain": third_party_signal_providers.get("windowsUserDomain", ""),
                 }
                 formatted_data.append(formatted_record)
-        logger.info(f"Extracted and formatted {len(formatted_data)} Device Windows records from Okta.")
+        logger.info("Extracted %d Device Windows records", len(formatted_data))
         return formatted_data

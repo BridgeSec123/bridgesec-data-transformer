@@ -21,6 +21,9 @@ class AuthorizationServerViewSet(BaseAuthServerViewSet):
         extracted_data = super().extract_data(okta_data)
         formatted_data = []
         for data in extracted_data:
+            if not isinstance(data, dict):
+                logger.warning(f"Skipping invalid record (not a dict): {data}")
+                continue
             formatted_record = {
                 # "auth_server_name": data.get("name"),
                 "auth_server_id": data.get("id"),

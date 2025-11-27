@@ -32,15 +32,12 @@ class AdminResourceSetViewSet(BaseAdministratorViewSet):
 
             if response.status_code == 200:
                 resources_data = response.json()
-                logger.info(f"Resources API response: {resources_data}")
                 resource_objects = []
 
-                # Check different possible response structures
                 resources_list = (resources_data.get("resources", []) or
                                 resources_data if isinstance(resources_data, list) else [])
 
                 for resource in resources_list:
-                    logger.info(f"Processing resource: {resource}")
                     resource_type = resource.get("type", "")
                     resource_name = resource.get("name", "")
 
@@ -50,7 +47,6 @@ class AdminResourceSetViewSet(BaseAdministratorViewSet):
                             "name": resource_name
                         })
 
-                logger.info(f"Final resource objects: {resource_objects}")
                 return resource_objects
             else:
                 logger.warning(f"Failed to fetch resources from {resources_url}. Status: {response.status_code}")
@@ -61,14 +57,17 @@ class AdminResourceSetViewSet(BaseAdministratorViewSet):
             return []
 
     def extract_data(self, okta_data):
-        logger.info("Extracting data from Okta response")
+        if not isinstance(okta_data, dict):
+            logger.warning(f"Expected dict but got {type(okta_data)}")
+            return []
         formatted_data = []
         for record in okta_data.get("resource-sets", []):
+            if not isinstance(record, dict):
+                continue
             label = record.get("label", "")
             description = record.get("description", "")
             resources_url = record.get("_links", {}).get("resources", {}).get("href", "")
 
-            # Fetch and format the resource details
             resource_objects = self.get_resource_details(resources_url)
 
             formatted_data.append(
@@ -78,5 +77,5 @@ class AdminResourceSetViewSet(BaseAdministratorViewSet):
                     "resources": resource_objects
                 }
             )
-        logger.info("Extracted and formatted %d admin resource set records from Okta", len(formatted_data))
+        logger.info("Extracted %d admin resource set records", len(formatted_data))
         return formatted_data

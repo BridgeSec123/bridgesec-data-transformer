@@ -22,6 +22,9 @@ class CaptchaOrgWideSettingsViewSet(BaseCaptchaViewSet):
 
         formatted_data = []
         for record in extracted_data:
+            if not isinstance(record, dict):
+                logger.warning(f"Skipping invalid record (not a dict): {record}")
+                continue
             formatted_record = {
                 "captcha_id": record.get("captchaId"),
                 "enabled_for": record.get("enabledPages"),

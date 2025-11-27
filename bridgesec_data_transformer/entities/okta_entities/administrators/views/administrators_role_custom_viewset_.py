@@ -21,9 +21,13 @@ class AdminRoleCustomViewSet(BaseAdministratorViewSet):
         """
         Format the admin role data from Okta response.
         """
-        logger.info("Extracting data from Okta response")
+        if not isinstance(okta_data, dict):
+            logger.warning(f"Expected dict but got {type(okta_data)}")
+            return []
         formatted_data = []
         for record in okta_data.get("roles", []):
+            if not isinstance(record, dict):
+                continue
             label = record.get("label", "")
             description = record.get("description", "")
             permissions_url = record.get("_links", {}).get("permissions", {}).get("href", "")
@@ -38,5 +42,5 @@ class AdminRoleCustomViewSet(BaseAdministratorViewSet):
                     "permissions": permission
                 }
             )
-        logger.info("Extracted and formatted %d admin role custom records from Okta", len(formatted_data))
+        logger.info("Extracted %d admin role custom records", len(formatted_data))
         return formatted_data
