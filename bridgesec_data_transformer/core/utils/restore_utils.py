@@ -44,6 +44,23 @@ def _extract_ids_from_data(data_records, field_name, include_nested=False):
 
     return ids
 
+def _store_collection_simple(db, entity_name, collection_name, records):
+    """
+    Store records without restore metadata.
+    For creation flow only.
+    """
+
+    collection = db[collection_name]
+
+    for rec in records:
+        rec_copy = copy.deepcopy(rec)
+        # rec_copy.pop("_id", None)
+        rec_copy["created_at"] = datetime.utcnow()
+
+        collection.insert_one(rec_copy)
+
+    logger.info(f"Stored {len(records)} records in '{collection_name}' for entity {entity_name}")
+
 
 def _store_collection(db, entity_name, collection_name, data, restored_by, source_db_name):
     """
@@ -172,7 +189,51 @@ def store_restored_data_with_metadata(db, entity_name, collection_name, modified
                         modified_data, restored_by, source_db_name)
         return modified_data
 
+def store_created_data(db, entity_name, collection_name, created_data):
+    """
+    Store newly created data without restore metadata.
+    Handles simple and nested (builder-style) entities.
+    """
 
+    logger.info(f"Storing created data for {entity_name}: {len(created_data)} records")
+
+    nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name)
+
+    if nested_mapping:
+        # Has nested collections → split parent + nested
+        accumulated_nested_data = {
+            nested_collection_name: []
+            for nested_collection_name in nested_mapping.values()
+        }
+        flattened_parent_data = []
+
+        for parent_record in created_data:
+            parent_copy = copy.deepcopy(parent_record)
+
+            for nested_field, nested_collection_name in nested_mapping.items():
+                nested_array = parent_record.get(nested_field, [])
+                if nested_array:
+                    accumulated_nested_data[nested_collection_name].extend(nested_array)
+
+                parent_copy.pop(nested_field, None)
+
+            flattened_parent_data.append(parent_copy)
+
+        # Store nested collections (no metadata)
+        for nested_collection_name, records in accumulated_nested_data.items():
+            if records:
+                _store_collection_simple(db, entity_name, nested_collection_name, records)
+
+        # Store parent data
+        _store_collection_simple(db, entity_name, collection_name, flattened_parent_data)
+
+        return flattened_parent_data
+
+    else:
+        # No nested data → store collection directly
+        _store_collection_simple(db, entity_name, collection_name, created_data)
+        return created_data
+                                                     
 def extract_terraform_target_params(collection_name, data_to_send):
     """Extract target field IDs and build parameters for Terraform API."""
     params = {"collection_name": collection_name}
