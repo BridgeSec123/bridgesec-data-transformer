@@ -28,6 +28,7 @@ from django.conf import settings
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from entities.registry import ENTITY_VIEWSETS
+from core.utils.collection_mapping import ENTITY_ID_MAPPING
 from entities.serializers.restore_serializer import RestoreDataSerializer
 from entities.services.resouce_data_service import EntityDataService
 from pymongo import MongoClient
@@ -36,7 +37,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.utils.fieldfetch import get_collection, get_mapped_collection
+from core.utils import fieldfetch
 from core.utils import mapping_handlers
 logger = logging.getLogger(__name__)
 
@@ -277,130 +278,6 @@ class BulkEntityViewSet(viewsets.ViewSet):
         methods=["post"],
         url_path=r"restore/(?P<date_str>\d{4}-\d{2}-\d{2})/(?P<entity_name>[^/.]+)",
     )
-    # def restore_modified_data(self, request, date_str, entity_name):
-    #     """
-    #     Process each item individually:
-    #     - Determine restore/create
-    #     - Build its final data
-    #     - Store it
-    #     - Trigger Terraform for that item alone
-    #     """
-    #     try:
-    #         incoming_list = request.data.get("data", [])
-    #         if not isinstance(incoming_list, list):
-    #             return Response({"error": "'data' must be a list"}, status=400)
-
-    #         collection_name = get_collection_name(entity_name)
-    #         if not collection_name:
-    #             return Response(
-    #                 {"message": f"Unknown entity '{entity_name}'", "data": []},
-    #                 status=200,
-    #             )
-
-    #         # DB resolution
-    #         source_db_name = get_latest_db(mongo_client, date_str)
-    #         if not source_db_name:
-    #             return Response({"message": f"No DB found for date {date_str}"}, status=404)
-
-    #         today = datetime.now().strftime("%Y-%m-%d")
-    #         current_db_name = get_latest_db(mongo_client, today)
-    #         if not current_db_name:
-    #             current_db_name = get_dynamic_db()
-
-    #         source_db = mongo_client[source_db_name]
-    #         current_db = mongo_client[current_db_name]
-
-    #         restored_by = get_user_from_request(request)
-
-    #         # Response collector
-    #         results = []
-
-    #         # --------------------------------------
-    #         # PROCESS EACH ITEM INDIVIDUALLY
-    #         # --------------------------------------
-    #         for item in incoming_list:
-
-    #             # Detect restore by presence of known IDs
-    #             has_id = any(
-    #                 item.get(key)
-    #                 for key in ["app_id", "user_id", "policy_id", "group_id"]
-    #             )
-
-    #             if has_id:
-    #                 # RESTORE MODE
-    #                 if not mapping_handlers.is_mapped_entity(collection_name):
-    #                     final_data = get_collection(source_db, collection_name, item)
-    #                 else:
-    #                     final_data = get_mapped_collection(source_db, collection_name, item)
-
-    #                 # Store with metadata
-    #                 store_restored_data_with_metadata(
-    #                     current_db,
-    #                     entity_name,
-    #                     collection_name,
-    #                     [final_data],     # store single
-    #                     restored_by,
-    #                     source_db_name,
-    #                 )
-
-    #                 mode = "restore"
-
-    #             else:
-    #                 # CREATE MODE
-    #                 final_data = copy.deepcopy(item)
-
-    #                 # Store without metadata
-    #                 store_created_data(
-    #                     current_db,
-    #                     entity_name,
-    #                     collection_name,
-    #                     [final_data],     # store single
-    #                 )
-
-    #                 mode = "create"
-
-    #             # ----------------------------
-    #             # TERRAFORM CALL FOR ONE ITEM
-    #             # ----------------------------
-    #             params = extract_terraform_target_params(collection_name, [final_data])
-    #             headers = get_okta_headers(request)
-
-    #             tf_response = requests.post(
-    #                 f"{server_url}/api/",
-    #                 params=params,
-    #                 json={"data": final_data},  # single item
-    #                 headers=headers,
-    #             )
-
-    #             try:
-    #                 tf_json = tf_response.json()
-    #             except:
-    #                 tf_json = {"message": "Unknown TF response"}
-
-    #             results.append({
-    #                 "mode": mode,
-    #                 "tf_message": tf_json.get("message", None)
-    #             })
-
-    #         # ----------------------------
-    #         # FINAL API RESPONSE
-    #         # ----------------------------
-    #         return Response(
-    #             {
-    #                 "message": "Processed all items successfully",
-    #                 "restored_db": current_db_name,
-    #                 "collection": f"_{collection_name}",
-    #                 "results": results,
-    #                 "count": len(results),
-    #             },
-    #             status=201,
-    #         )
-
-    #     except Exception as e:
-    #         import traceback
-    #         traceback.print_exc()
-    #         return Response({"error": str(e)}, status=500)
-
 
     def restore_modified_data(self, request, date_str, entity_name):
         """
@@ -442,34 +319,33 @@ class BulkEntityViewSet(viewsets.ViewSet):
             current_db = mongo_client[current_db_name]
             source_db = mongo_client[source_db_name]
             
-            type = "restore"
+            op_type = "restore"
             for doc in modified_data:
                 # find all *_id fields
-                id_fields = [key for key in doc.keys() if key.endswith("_id")]
+                id_field = [key for key in doc.keys() if key == ENTITY_ID_MAPPING.get(entity_name)]
 
-                if id_fields:
-                    print("existing resource detected:", id_fields)
-                    type = "restore"
+                if id_field:
+                    op_type = "restore"
                 else:
                     print("new resource (no ID fields)")
-                    type = "create"
-    
-            if type == "restore":
+                    op_type = "create"
+
+            if op_type == "restore":
                 print("restore")
                 if not mapping_handlers.is_mapped_entity(collection_name):
                     
                     for i, doc in enumerate(modified_data):
-                        new_data = get_collection(source_db, collection_name, doc)
+                        new_data = fieldfetch.get_collection(source_db, collection_name, doc)
                         modified_data[i] = new_data
                 else:
                     for i, doc in enumerate(modified_data):
-                        data = get_mapped_collection(source_db, collection_name, doc)
+                        data = fieldfetch.get_mapped_collection(source_db, collection_name, doc)
                         # modified_data[i] = {**data["parent"], **data["rules"]}
 
                         modified_data[i] = data
             else:
-                modified_data = modified_data
-
+                for i, doc in enumerate(modified_data):
+                    modified_data[i] = fieldfetch.transform_data(collection_name, doc)
             #? Test Response
             # return Response({"message":"OKay"})
 
@@ -481,17 +357,46 @@ class BulkEntityViewSet(viewsets.ViewSet):
             data_for_storage = copy.deepcopy(modified_data)
             restored_by = get_user_from_request(request)
 
-            if type == "create":
+            if op_type == "create":
                 print("create")
                 stored_data = store_created_data(
                     current_db, entity_name, collection_name,
-                    data_for_storage
+                    data_for_storage, 
                 )
             else:
                 stored_data = store_restored_data_with_metadata(
                     current_db, entity_name, collection_name,
                     data_for_storage, restored_by, source_db_name
                 )
+
+            temp_data = []
+            if (mapping_handlers.is_mapped_entity(collection_name)):
+                rule_collection_name = mapping_handlers.MAPPED_ENTITIES_HELPERS["entity_mapped_collections"][collection_name]
+                all_rules = mapping_handlers.drop_mongo_id_list(fieldfetch.get_all_data(current_db, f"_{rule_collection_name}"))
+
+            all_records = mapping_handlers.drop_mongo_id_list(fieldfetch.get_all_data(current_db, f"_{collection_name}"))
+            pops = ["operation_type", "created_at", "updated_at", "restored_by", "restored_at", "restored_from", "unique_id"]
+            
+            for record in all_records:
+                if mapping_handlers.is_mapped_entity(collection_name):
+                    parent_id = mapping_handlers.ID_KEYS[collection_name]
+                    child_id = mapping_handlers.ID_KEYS[rule_collection_name]
+                    
+                    if record.get(parent_id, None):
+                        id_field = ENTITY_ID_MAPPING.get(entity_name)
+                    else:
+                        id_field = child_id = "unique_id"
+                        
+                    record_rules = [rule for rule in all_rules if rule.get(child_id) == record.get(id_field)]
+                    record_rules = fieldfetch.clean_data(record_rules)
+                    subset_key = mapping_handlers.MAPPED_ENTITIES_HELPERS["entity_subsets"][collection_name]
+                    record[subset_key] = record_rules
+                    
+                for pop in pops:
+                    record.pop(pop, None)  
+                temp_data.append(record)
+            
+            modified_data = temp_data
 
             # Extract target parameters for Terraform API
             # Uses original data (with nested arrays intact) to extract all IDs
@@ -680,84 +585,3 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-
-    # @swagger_auto_schema(
-    #     method="post",
-    #     request_body=openapi.Schema(
-    #         type=openapi.TYPE_OBJECT,
-    #         properties={
-    #             "data": openapi.Schema(type=openapi.TYPE_OBJECT)
-    #         },
-    #         required=["data"],
-    #     ),
-    #     responses={201: "Success", 400: "Bad Request"},
-    # )
-    # @action(
-    #     detail=False,
-    #     methods=["post"],
-    #     url_path=r"create/(?P<date_str>\d{4}-\d{2}-\d{2})/(?P<entity_name>[^/.]+)",
-    # )
-    # def create_new_app(self, request, date_str, entity_name):
-    #     """
-    #     Restore data into a new dynamic DB using pymongo only → no ensure_mongo_connection.
-    #     """
-    #     try:
-    #         new_data = request.data.get("data", {})
-    #         if not isinstance(new_data, dict):
-    #             return Response(
-    #                 {"error": "Invalid data format. 'data' must be a dictionary"},
-    #                 status=400,
-    #             )
-
-    #         # resolve collection name
-    #         collection_name = get_collection_name(entity_name)
-    #         if not collection_name:
-    #             return Response(
-    #                 {
-    #                     "message": f"Entity type '{entity_name}' not found in resource map",
-    #                     "data": [],
-    #                 },
-    #                 status=status.HTTP_200_OK,
-    #             )
-
-    #         source_db_name = get_latest_db(mongo_client, date_str)
-    #         if not source_db_name:
-    #             return Response(
-    #                 {"message": f"No source DB found for date {date_str}"},
-    #                 status=404,
-    #             )
-
-    #         params = extract_terraform_target_params(collection_name, new_data)
-
-    #         # Get Okta authorization headers (Bearer token from session)
-    #         tf_headers = get_okta_headers(request)
-
-    #         # Send data to Terraform API
-    #         tf_response = requests.post(
-    #             f"{server_url}/api/",
-    #             params=params,
-    #             json={"data": new_data},
-    #             headers=tf_headers,
-    #         )
-
-    #         try:
-    #             tf_data = tf_response.json()
-    #         except Exception:
-    #             tf_data = {"message": "Unknown response from TF repo"}
-
-    #         tf_message = tf_data.get("message", "No message returned")
-
-    #         return Response(
-    #             {
-    #                 "tf_message": tf_message,
-    #                 "message": "created data restored successfully.",
-    #                 "record_count": len(new_data),
-    #             },
-    #             status=status.HTTP_201_CREATED,
-    #         )
-
-    #     except Exception as e:
-    #         import traceback
-    #         traceback.print_exc()
-    #         return Response({"error": str(e)}, status=500)

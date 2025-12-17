@@ -1,11 +1,19 @@
 from . import mapping_handlers
 import logging
-
+import json
 
 logger = logging.getLogger(__name__)
 
+get_all_data = lambda db, collection: list(db[collection].find({}))
 
-def get_data(db, collection, modified_data, mapped=False, id_value=None) -> {}:
+def clean_data(datas):
+    pops = ["operation_type", "created_at", "updated_at", "restored_by", "restored_at", "restored_from", "unique_id"]
+    for data in datas:
+        for pop in pops:
+            data.pop(pop, None)
+    return datas
+
+def get_data(db, collection, modified_data = None, mapped=False, id_value=None) -> {}:
     """Fetch the data from the db to return the original data
 
     Args:
@@ -19,13 +27,14 @@ def get_data(db, collection, modified_data, mapped=False, id_value=None) -> {}:
     """    
     collect = db[collection]
     try:
-        id = mapping_handlers.ID_KEYS[collection]
-        if not id_value:
+        id = mapping_handlers.ID_KEYS[collection]  # To handle collections with leading underscore
+        if not id_value and modified_data:
             id_value = modified_data.get(id, None)
         print('collection: ', collection)
         print('id: ', id)
         if not mapped:
             data = collect.find_one({id: id_value})
+            data = transform_data(collection, data)
             print('data: ', data)
         if mapped and id:
             data = list(collect.find({id: id_value}))
@@ -49,6 +58,7 @@ def get_collection(db, collection, modified_data) -> {}:
     """
     try:
         data = mapping_handlers.delete_ids(get_data(db, collection, modified_data))
+        modified_data = transform_data(collection, modified_data)
         new_data = {**data, **modified_data}
         return new_data
 
@@ -92,30 +102,38 @@ def get_mapped_collection(db, collection, modified_data):
     # Clean all rules
     clean_rules = mapping_handlers.drop_mongo_id_list(all_rules)
 
+    parent_data = {**parent_data, **modified_data}
     parent_data[subset_key] = clean_rules
     print('parent_data with subset_key: ', parent_data)
     
     return parent_data
 
+def transform_data(collection_name, modified_data):
+    """
+    Transform data based on whether the collection is mapped or not.
+
+    Args:
+        collection_name (str): The name of the collection
+        modified_data (dict): The modified data to transform
+
+    Returns:
+        dict: The transformed data
+    """
+
+    none_fields = mapping_handlers.NONE_FIELD_LISTS.get(collection_name, [])
+    if not none_fields:
+        return modified_data
+
+    def is_empty(value):
+        return value in (None, "", [], "{}", {}, [{}])
     
+    if collection_name == "okta_policy_mfa" and is_empty(modified_data.get("external_idps")):
+        modified_data["external_idps"] = []
+        for field in mapping_handlers.NONE_FIELD_LISTS.get("okta_mfa_authenticator", []):
+            modified_data.pop(field, None)
+        
+    for field, default_value in none_fields.items():
+        if is_empty(modified_data.get(field)):
+            modified_data[field] = default_value
 
-
-# def get_mapped_collection(db, collection, modified_data) -> {}:
-#     """Fetch the mapped collection from the database.
-
-#     Args:
-#         db (any): Database
-#         collection (str): Collection name
-#     Returns:
-#         {}: Mapped collection data
-#     """
-#     new_collection = mapping_handlers.MAPPED_ENTITIES_HELPERS["entity_mapped_collections"][collection]
-
-#     id = mapping_handlers.ID_KEYS[collection]
-
-#     data = get_data(db, collection, modified_data, mapped=False)
-#     print('data: ', data)
-#     sub_data = get_data(db, new_collection, modified_data, True, data[id])
-#     print('sub_data: ', sub_data)
-
-
+    return modified_data

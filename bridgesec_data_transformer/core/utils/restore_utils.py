@@ -12,6 +12,9 @@ from core.utils.constants import (ENTITY_TARGET_FIELD_MAP,
 from core.utils.nested_mapping import (NESTED_FIELD_COLLECTIONS,
                                        NESTED_FIELD_ID_MAPPING)
 
+from core.utils.mapping_handlers import MAPPED_ENTITIES_HELPERS
+from django.utils.text import slugify
+
 logger = logging.getLogger(__name__)
 
 
@@ -44,18 +47,21 @@ def _extract_ids_from_data(data_records, field_name, include_nested=False):
 
     return ids
 
-def _store_collection_simple(db, entity_name, collection_name, records):
+def _store_collection_simple(db, entity_name, collection_name, records, unique_id=None):
     """
     Store records without restore metadata.
     For creation flow only.
     """
 
-    collection = db[collection_name]
+    collection = db[f"_{collection_name}"]
 
     for rec in records:
         rec_copy = copy.deepcopy(rec)
         # rec_copy.pop("_id", None)
-        rec_copy["created_at"] = datetime.utcnow()
+        rec_copy["operation_type"] = "created"
+        rec_copy["created_at"] = str(datetime.utcnow())
+        if unique_id:
+            rec_copy["unique_id"] = unique_id
 
         collection.insert_one(rec_copy)
 
@@ -106,6 +112,7 @@ def _store_collection(db, entity_name, collection_name, data, restored_by, sourc
         upsert_count = 0
         for doc in data:
             # Add metadata
+            doc["operation_type"] = "restored"
             doc["restored_by"] = restored_by
             doc["restored_from"] = source_db_name
             doc["restored_at"] = restored_at
@@ -206,8 +213,10 @@ def store_created_data(db, entity_name, collection_name, created_data):
             for nested_collection_name in nested_mapping.values()
         }
         flattened_parent_data = []
-
+        
         for parent_record in created_data:
+            unique_fields = MAPPED_ENTITIES_HELPERS["entity_unique_fields"].get(collection_name, "")
+            unique_id = slugify(parent_record.get(unique_fields, "")) if unique_fields else None
             parent_copy = copy.deepcopy(parent_record)
 
             for nested_field, nested_collection_name in nested_mapping.items():
@@ -222,10 +231,10 @@ def store_created_data(db, entity_name, collection_name, created_data):
         # Store nested collections (no metadata)
         for nested_collection_name, records in accumulated_nested_data.items():
             if records:
-                _store_collection_simple(db, entity_name, nested_collection_name, records)
+                _store_collection_simple(db, entity_name, nested_collection_name, records, unique_id)
 
         # Store parent data
-        _store_collection_simple(db, entity_name, collection_name, flattened_parent_data)
+        _store_collection_simple(db, entity_name, collection_name, flattened_parent_data, unique_id)
 
         return flattened_parent_data
 
@@ -237,34 +246,7 @@ def store_created_data(db, entity_name, collection_name, created_data):
 def extract_terraform_target_params(collection_name, data_to_send):
     """Extract target field IDs and build parameters for Terraform API."""
     params = {"collection_name": collection_name}
-
-    # Check if singleton resource
-    singleton_id = SINGLETON_RESOURCE_IDENTIFIERS.get(collection_name)
-    if singleton_id:
-        params["target_id"] = singleton_id
-        return params
-
-    # Extract IDs from data
-    target_field = ENTITY_TARGET_FIELD_MAP.get(collection_name)
-    if not target_field:
-        return params
-
-    target_fields = [target_field] if isinstance(target_field, str) else target_field
-
-    # Single field entities
-    if len(target_fields) == 1:
-        target_ids = _extract_ids_from_data(data_to_send, target_fields[0])
-        if target_ids:
-            params["target_field"] = target_fields[0]
-            params["target_id"] = ",".join(sorted(target_ids))
-
-    # Multiple field entities (builders)
-    else:
-        for field in target_fields:
-            field_ids = _extract_ids_from_data(data_to_send, field, include_nested=True)
-            if field_ids:
-                params[field] = ",".join(sorted(field_ids))
-
+    
     return params
 
 
