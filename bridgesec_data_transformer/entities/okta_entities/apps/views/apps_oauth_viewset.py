@@ -29,22 +29,28 @@ class AppOauthViewSet(BaseAppViewSet):
                 if should_skip_app_extraction(app_label):
                     logger.info(f"Skipping app extraction for label: {app_label}")
                     continue
+
+                # Extract client_id early to check if this is a system app
+                credentials = record.get("credentials", {})
+                oauthClient = credentials.get("oauthClient", {})
+                client_id = oauthClient.get("client_id", "")
+
+                # Skip system-level apps that don't have a client_id
+                # System apps (like "Okta End User Settings") have empty client_id
+                if not client_id or client_id.strip() == "":
+                    logger.info(f"Skipping system app without client_id: {app_label}")
+                    continue
+
                 accessibility = record.get("accessibility", {})
                 visibility = record.get("visibility", {})
                 hide = visibility.get("hide", {})
-                credentials = record.get("credentials", {})
                 userNameTemplate = credentials.get("userNameTemplate", {})
                 settings = record.get("settings", {})
                 notes = settings.get("notes", {})
-                oauthClient = settings.get("oauthClient", {})
+                oauthClient_settings = settings.get("oauthClient", {})
                 link = record.get("_links", {})
                 authentication_policy = link.get("accessPolicy", {}).get("href", "").rstrip("/").split("/")[-1]
-                credentials = record.get("credentials", {})
-                oauthClient = credentials.get("oauthClient", {})
-                hide = visibility.get("hide", {})
-                oauthClient_settings = settings.get("oauthClient", {})
                 idp_initiated_login = oauthClient_settings.get("idp_initiated_login", {})
-                userNameTemplate = credentials.get("userNameTemplate", {})
                 refresh_token = oauthClient_settings.get("refresh_token", {})
 
                 type = oauthClient_settings.get("application_type") or "service"
@@ -80,7 +86,7 @@ class AppOauthViewSet(BaseAppViewSet):
                     "auto_key_rotation": oauthClient.get("autoKeyRotation", False),
                     "auto_submit_toolbar": visibility.get("autoSubmitToolbar", False),
                     "client_basic_secret": record.get("client_basic_secret", ""),
-                    "client_id": oauthClient.get("client_id", ""),
+                    "client_id": client_id,  # Already extracted and validated above
                     "client_uri": oauthClient_settings.get("client_uri", ""),
                     "consent_method": oauthClient_settings.get("consent_method", ""),
                     "enduser_note": notes.get("enduser", ""),

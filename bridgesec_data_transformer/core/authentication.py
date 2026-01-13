@@ -43,8 +43,18 @@ class CustomJWTAuthentication(BaseAuthentication):
         Also stores the token in session for subsequent Okta API calls.
         """
         try:
+            # Normalize OKTA_ISSUER - remove trailing slash if present
+            issuer_base = settings.OKTA_ISSUER.rstrip('/')
+
+            # Build JWKS URL - handle both org and custom auth servers
+            if '/oauth2/' in issuer_base:
+                # Custom authorization server (e.g., /oauth2/default)
+                jwks_url = f"{issuer_base}/v1/keys"
+            else:
+                # Org authorization server
+                jwks_url = f"{issuer_base}/oauth2/v1/keys"
+
             # Get Okta JWKS for token verification
-            jwks_url = f"{settings.OKTA_ISSUER}/oauth2/v1/keys"
             jwks_response = requests.get(jwks_url)
             jwks = jwks_response.json()
 

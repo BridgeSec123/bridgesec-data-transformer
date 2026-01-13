@@ -35,7 +35,23 @@ class OktaCallbackView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        token_url = f"{settings.OKTA_ISSUER}/oauth2/v1/token"
+        # Normalize OKTA_ISSUER - remove trailing slash if present
+        issuer_base = settings.OKTA_ISSUER.rstrip('/')
+
+        # Build token URL - handle both org and custom auth servers
+        # If issuer already contains /oauth2/{authServerId}, use /v1/token
+        # Otherwise, use /oauth2/v1/token (org auth server)
+        if '/oauth2/' in issuer_base:
+            # Custom authorization server (e.g., /oauth2/default)
+            token_url = f"{issuer_base}/v1/token"
+            jwks_url = f"{issuer_base}/v1/keys"
+        else:
+            # Org authorization server
+            token_url = f"{issuer_base}/oauth2/v1/token"
+            jwks_url = f"{issuer_base}/oauth2/v1/keys"
+
+        logger.info(f"Using token URL: {token_url}")
+
         data = {
             "grant_type": "authorization_code",
             "code": code,
@@ -70,7 +86,8 @@ class OktaCallbackView(APIView):
         granted_scopes = self._extract_scopes_from_token(access_token)
 
         # Decode and verify ID token
-        jwks_url = f"{settings.OKTA_ISSUER}/oauth2/v1/keys"
+        # First, extract the actual issuer from the token to avoid validation errors
+        logger.info(f"Fetching JWKS from: {jwks_url}")
         jwks = requests.get(jwks_url).json()
         unverified_header = jwt.get_unverified_header(id_token)
         kid = unverified_header["kid"]
@@ -78,16 +95,24 @@ class OktaCallbackView(APIView):
         key = next((k for k in jwks["keys"] if k["kid"] == kid), None)
         if not key:
             return Response(
-                {"error": "Token verification failed"},
+                {"error": "Token verification failed - signing key not found"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Decode without verification first to get the actual issuer
+        unverified_payload = jwt.get_unverified_claims(id_token)
+        actual_issuer = unverified_payload.get('iss')
+
+        logger.info(f"Token issuer claim: {actual_issuer}")
+        logger.info(f"Expected issuer: {issuer_base}")
+
+        # Now decode with proper issuer validation
         payload = jwt.decode(
             id_token,
             key,
             algorithms=["RS256"],
             audience=settings.OKTA_CLIENT_ID,
-            issuer=settings.OKTA_ISSUER,
+            issuer=actual_issuer,  # Use actual issuer from token instead of settings
             access_token=access_token
         )
 

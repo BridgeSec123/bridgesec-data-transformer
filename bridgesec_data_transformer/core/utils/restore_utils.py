@@ -335,7 +335,14 @@ def rebuild_restored_data_with_nested_arrays(db, entity_name, collection_name, i
 def remove_metadata_fields(data):
     """
     Recursively remove metadata fields from data structure.
-    Removes: restored_by, restored_from, restored_at, _id
+    Removes all internal tracking fields before sending to Terraform.
+
+    Removes:
+        - restored_by, restored_from, restored_at (restore metadata)
+        - operation_type (create/restore indicator)
+        - created_at, updated_at (timestamp fields)
+        - unique_id (tracking ID for created resources)
+        - _id (MongoDB ID)
 
     Args:
         data: Dict or List to clean
@@ -343,7 +350,16 @@ def remove_metadata_fields(data):
     Returns:
         Cleaned data (modifies in place)
     """
-    metadata_fields = ["restored_by", "restored_from", "restored_at", "_id"]
+    metadata_fields = [
+        "restored_by",
+        "restored_from",
+        "restored_at",
+        "operation_type",
+        "created_at",
+        "updated_at",
+        "unique_id",
+        "_id"
+    ]
 
     if isinstance(data, list):
         for item in data:

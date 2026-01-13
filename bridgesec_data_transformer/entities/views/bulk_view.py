@@ -16,6 +16,7 @@ from core.utils.db_utils import (ENTITIES_WITH_BUILDERS, extract_time,
 from core.utils.jwt_utils import get_user_from_request
 from core.utils.model_registry import MODEL_REGISTRY
 from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
+from core.utils.nested_mapping import NESTED_FIELD_COLLECTIONS
 from core.utils.okta_helpers import get_okta_headers
 from core.utils.restore_utils import (extract_terraform_target_params,
                                       fetch_and_merge_restored_data,
@@ -369,34 +370,94 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     data_for_storage, restored_by, source_db_name
                 )
 
-            temp_data = []
-            if (mapping_handlers.is_mapped_entity(collection_name)):
-                rule_collection_name = mapping_handlers.MAPPED_ENTITIES_HELPERS["entity_mapped_collections"][collection_name]
-                all_rules = mapping_handlers.drop_mongo_id_list(fieldfetch.get_all_data(current_db, f"_{rule_collection_name}"))
+            # CRITICAL FIX: Fetch ALL records from source DB and merge with restored data
+            # This ensures Terraform receives complete state (not just modified records)
+            # to prevent unintended resource deletion
 
-            all_records = mapping_handlers.drop_mongo_id_list(fieldfetch.get_all_data(current_db, f"_{collection_name}"))
-            pops = ["operation_type", "created_at", "updated_at", "restored_by", "restored_at", "restored_from", "unique_id"]
-            
-            for record in all_records:
-                if mapping_handlers.is_mapped_entity(collection_name):
-                    parent_id = mapping_handlers.ID_KEYS[collection_name]
-                    child_id = mapping_handlers.ID_KEYS[rule_collection_name]
-                    
-                    if record.get(parent_id, None):
-                        id_field = ENTITY_ID_MAPPING.get(entity_name)
-                    else:
-                        id_field = child_id = "unique_id"
-                        
-                    record_rules = [rule for rule in all_rules if rule.get(child_id) == record.get(id_field)]
-                    record_rules = fieldfetch.clean_data(record_rules)
-                    subset_key = mapping_handlers.MAPPED_ENTITIES_HELPERS["entity_subsets"][collection_name]
-                    record[subset_key] = record_rules
-                    
-                for pop in pops:
-                    record.pop(pop, None)  
-                temp_data.append(record)
-            
-            modified_data = temp_data
+            logger.info("=" * 80)
+            logger.info("MERGING COLLECTIONS FOR TERRAFORM")
+            logger.info("=" * 80)
+
+            # Step 1: Fetch ALL original data from source DB snapshot
+            service = EntityDataService()
+            original_data = service.fetch(date_str, entity_name)
+            logger.info(f"Step 1: Fetched {len(original_data)} original records from source DB ({source_db_name})")
+
+            # Step 2: Get ID field for merging
+            id_field = ENTITY_ID_MAPPING.get(entity_name)
+
+            if not id_field:
+                logger.warning(f"No ID field configured for {entity_name}, cannot merge properly")
+                return Response(
+                    {"error": f"Entity '{entity_name}' missing ID field configuration"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            # Step 3: Merge original data with restored data from today's DB
+            # This handles both simple entities and nested entities (with builders)
+            merged_data = fetch_and_merge_restored_data(
+                current_db, entity_name, collection_name, id_field, original_data
+            )
+            logger.info(f"Step 2: Merged to {len(merged_data)} total records (original + restored)")
+
+            # Step 4: Add newly created records (those without IDs in original data)
+            # Created records only exist in restored collection with operation_type="created"
+            restored_collection = current_db[f"_{collection_name}"]
+            created_records = list(restored_collection.find(
+                {"operation_type": "created"},
+                {"_id": 0}
+            ))
+
+            if created_records:
+                logger.info(f"Step 3: Found {len(created_records)} newly created records")
+
+                # For created records with nested data, rebuild nested arrays
+                nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name)
+                if nested_mapping:
+                    # Rebuild nested arrays for created records
+                    from core.utils.restore_utils import rebuild_restored_data_with_nested_arrays
+
+                    # Get created records with nested arrays rebuilt
+                    for created_record in created_records:
+                        unique_id = created_record.get("unique_id")
+                        if unique_id:
+                            # Fetch nested data for this created record
+                            for nested_field, nested_coll_name in nested_mapping.items():
+                                nested_coll = f"_{nested_coll_name}"
+                                if nested_coll in current_db.list_collection_names():
+                                    nested_data = list(current_db[nested_coll].find(
+                                        {"unique_id": unique_id},
+                                        {"_id": 0}
+                                    ))
+                                    created_record[nested_field] = nested_data
+                                else:
+                                    created_record[nested_field] = []
+
+                # Add created records to merged data
+                merged_data.extend(created_records)
+                logger.info(f"Step 4: Added created records, total now {len(merged_data)} records")
+            else:
+                logger.info("Step 3: No newly created records found")
+
+            # Step 5: Remove metadata fields before sending to Terraform
+            metadata_fields = ["operation_type", "created_at", "updated_at",
+                             "restored_by", "restored_at", "restored_from", "unique_id", "_id"]
+            remove_metadata_fields(merged_data)
+
+            # Also remove metadata from nested arrays
+            for record in merged_data:
+                for key, value in record.items():
+                    if isinstance(value, list):
+                        for item in value:
+                            if isinstance(item, dict):
+                                for field in metadata_fields:
+                                    item.pop(field, None)
+
+            logger.info(f"Step 5: Removed metadata fields from {len(merged_data)} records")
+            logger.info(f"FINAL: Sending {len(merged_data)} complete records to Terraform")
+            logger.info("=" * 80)
+
+            modified_data = merged_data
 
             # Extract target parameters for Terraform API
             # Uses original data (with nested arrays intact) to extract all IDs
@@ -405,10 +466,27 @@ class BulkEntityViewSet(viewsets.ViewSet):
             # Get Okta authorization headers (Bearer token from session)
             tf_headers = get_okta_headers(request)
 
-            # Send data to Terraform API
+            # Get module-specific Terraform API endpoint
+            from core.utils.module_mapping import get_terraform_api_for_entity
+
+            terraform_api = get_terraform_api_for_entity(entity_name)
+
+            if not terraform_api:
+                logger.error(f"No Terraform API configured for entity: {entity_name}")
+                return Response(
+                    {"error": f"Entity '{entity_name}' not configured for Terraform deployment"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            # Build full Terraform URL with module-based endpoint
+            terraform_url = f"{server_url}{terraform_api}"
+            logger.info(f"Routing to Terraform module API: {terraform_url}")
+
+            # Send data to module-specific Terraform API
+            # Still pass collection_name as query parameter for entity identification
             tf_response = requests.post(
-                f"{server_url}/api/",
-                params=params,
+                terraform_url,
+                params={"collection_name": collection_name},
                 json={"data": modified_data},
                 headers=tf_headers,
             )

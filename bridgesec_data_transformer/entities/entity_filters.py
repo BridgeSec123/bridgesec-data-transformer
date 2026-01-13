@@ -1,6 +1,7 @@
 # Common filtering logic for all entities
 
 # App labels to exclude from data extraction
+# These are Okta system apps that should not be modified or backed up
 EXCLUDED_APP_LABELS = [
     "Okta Access Requests",
     "Okta Workflows",
@@ -9,7 +10,8 @@ EXCLUDED_APP_LABELS = [
     "Okta Browser Plugin",
     "Okta Admin Console",
     "Okta Identity Governance",
-    "Okta Access Certification Reviews"
+    "Okta Access Certification Reviews",
+    "Okta End User Settings"
 ]
 
 EXCLUDED_SAML_LABELS = [
@@ -72,12 +74,17 @@ EXCLUDED_NETWORK_ZONE_NAMES = [
     "DefaultExemptIpZone"
 ]
 
-def should_skip_app_extraction(app_label):
+def should_skip_app_extraction(app_label, client_id=None):
     """
-    Check if an app should be skipped based on its label.
+    Check if an app should be skipped based on its label or client_id.
+
+    System apps are identified by:
+    1. Label matching the exclusion list (e.g., "Okta Dashboard", "Okta Admin Console")
+    2. Empty client_id (system apps often have no client_id)
 
     Args:
         app_label (str): The label of the app to check
+        client_id (str, optional): The client_id of the app to check
 
     Returns:
         bool: True if the app should be skipped, False otherwise
@@ -85,7 +92,16 @@ def should_skip_app_extraction(app_label):
     if not app_label:
         return False
 
-    return app_label in EXCLUDED_APP_LABELS
+    # Check if label is in exclusion list
+    if app_label in EXCLUDED_APP_LABELS:
+        return True
+
+    # Additional check: Skip apps with empty client_id (typically system apps)
+    # OAuth apps should always have a client_id; empty means it's likely a system app
+    if client_id is not None and client_id == "":
+        return True
+
+    return False
 
 def should_skip_app_saml_extraction(app_label):
     """

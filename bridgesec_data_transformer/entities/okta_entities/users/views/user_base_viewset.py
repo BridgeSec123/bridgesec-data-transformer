@@ -62,7 +62,7 @@ class BaseUserViewSet(BaseEntityViewSet):
 
                         for role_type, role_id in zip(role_types, role_ids):
                             data = viewset_instance.fetch_from_okta(user_id=user_id, role_id=role_id, request=request)
-                            extracted = viewset_instance.extract_data(data, user_name)
+                            extracted = viewset_instance.extract_data(data, user_name, role_type)
                             if extracted:
                                 role_targets_data.extend(extracted)
 
