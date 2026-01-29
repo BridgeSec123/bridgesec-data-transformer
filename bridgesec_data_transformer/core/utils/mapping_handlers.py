@@ -100,6 +100,9 @@ ID_KEYS = {
     "okta_app_access_policy_assignment": "app_id",
     
     "okta_app_user": "app_id",
+    "okta_app_oauth_api_scope": "app_id",
+    "okta_app_oauth_redirect_uri": "app_id",
+    "okta_app_oauth_post_logout_redirect_uri": "app_id",
 
     "okta_group": "group_id",
     "okta_group_rule": "group_rule_id",
@@ -113,6 +116,10 @@ ID_KEYS = {
     "okta_policy_rule_sign_on": "policy_id",
     "okta_policy_profile_enrollment": "policy_id",
     "okta_policy_rule_profile_enrollment": "policy_id",
+
+    "okta_idp_oidc": "idp_id",
+    "okta_idp_saml": "idp_id",
+    "okta_idp_social": "idp_id",
 }
 
 NONE_FIELD_LISTS = {

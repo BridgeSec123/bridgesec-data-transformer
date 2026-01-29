@@ -59,11 +59,19 @@ def get_collection(db, collection, modified_data) -> {}:
     try:
         data = mapping_handlers.delete_ids(get_data(db, collection, modified_data))
         modified_data = transform_data(collection, modified_data)
+
+        # If data is None (record doesn't exist in source DB), treat as new record
+        if data is None:
+            logger.info(f"Record not found in source DB for {collection}, treating as new record")
+            return modified_data
+
         new_data = {**data, **modified_data}
         return new_data
 
     except Exception as err:
         logger.exception(f"Error occured {err}")
+        # Return modified_data as fallback if error occurs
+        return modified_data
 
 
 def get_mapped_collection(db, collection, modified_data):
@@ -98,14 +106,19 @@ def get_mapped_collection(db, collection, modified_data):
     
     # Get partial rules from incoming data
     partial_rules = modified_data.get(subset_key, [])  # e.g., "policy_rules", "mfa_rules"
-    
+
     # Clean all rules
     clean_rules = mapping_handlers.drop_mongo_id_list(all_rules)
 
     parent_data = {**parent_data, **modified_data}
-    parent_data[subset_key] = clean_rules
+
+    # Only use original rules if user didn't provide modified rules
+    if not partial_rules:
+        parent_data[subset_key] = clean_rules
+    # Otherwise, keep the modified rules from the user (already in parent_data from merge above)
+
     print('parent_data with subset_key: ', parent_data)
-    
+
     return parent_data
 
 def transform_data(collection_name, modified_data):

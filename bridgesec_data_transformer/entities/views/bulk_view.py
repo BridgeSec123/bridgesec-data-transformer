@@ -22,7 +22,12 @@ from core.utils.restore_utils import (extract_terraform_target_params,
                                       fetch_and_merge_restored_data,
                                       remove_metadata_fields,
                                       store_restored_data_with_metadata,
-                                      store_created_data)
+                                      store_created_data,
+                                      store_deleted_data_with_metadata,
+                                      update_deletion_status,
+                                      filter_deleted_records_from_state,
+                                      handle_nested_deletion,
+                                      validate_deletion_safety)
 from core.utils.schema_extractor import get_ui_backend_mapping
 from core.utils.serializer_registry import SERIALIZER_REGISTRY
 from django.conf import settings
@@ -265,14 +270,40 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
     @swagger_auto_schema(
         method="post",
+        manual_parameters=[
+            openapi.Parameter(
+                name="operation_type",
+                in_=openapi.IN_QUERY,
+                description="Operation type: 'delete' to delete resources, omit for restore/create operations",
+                type=openapi.TYPE_STRING,
+                required=False,
+                enum=["delete"],
+            )
+        ],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                "data": openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_OBJECT))
+                "data": openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    description="Array of resource objects. For delete operations, only ID field is required.",
+                    items=openapi.Items(type=openapi.TYPE_OBJECT)
+                )
             },
             required=["data"],
         ),
-        responses={201: "Success", 400: "Bad Request"},
+        responses={
+            201: openapi.Response(
+                description="Success",
+                examples={
+                    "application/json": {
+                        "message": "Operations completed: 1 deleted",
+                        "operations": {"deleted": 1, "restored": 0, "created": 0},
+                        "tf_message": "Successfully deleted 1 resource(s) from Okta"
+                    }
+                }
+            ),
+            400: "Bad Request"
+        },
     )
     @action(
         detail=False,
@@ -283,6 +314,10 @@ class BulkEntityViewSet(viewsets.ViewSet):
     def restore_modified_data(self, request, date_str, entity_name):
         """
         Restore data into a new dynamic DB using pymongo only → no ensure_mongo_connection.
+
+        Query Parameters:
+            - operation_type: "delete", "restore", or "create" (optional)
+                If "delete", all records in body are treated as deletion targets
         """
         try:
             modified_data = request.data.get("data", [])
@@ -291,6 +326,10 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     {"error": "Invalid data format. 'data' must be a list"},
                     status=400,
                 )
+
+            # Get operation_type from query parameters
+            operation_type = request.query_params.get("operation_type")
+            logger.info(f"Operation type from query param: {operation_type}")
 
             # resolve collection name
             collection_name = get_collection_name(entity_name)
@@ -319,58 +358,131 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
             current_db = mongo_client[current_db_name]
             source_db = mongo_client[source_db_name]
-            
-            op_type = "restore"
-            for doc in modified_data:
-                # find all *_id fields
-                id_field = [key for key in doc.keys() if key == ENTITY_ID_MAPPING.get(entity_name)]
 
-                if id_field:
-                    op_type = "restore"
-                else:
-                    print("new resource (no ID fields)")
-                    op_type = "create"
+            # Get ID field for this entity
+            id_field = ENTITY_ID_MAPPING.get(entity_name)
+            if not id_field:
+                return Response(
+                    {"error": f"Entity '{entity_name}' missing ID field configuration"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
-            if op_type == "restore":
-                print("restore")
-                if not mapping_handlers.is_mapped_entity(collection_name):
-                    
-                    for i, doc in enumerate(modified_data):
-                        new_data = fieldfetch.get_collection(source_db, collection_name, doc)
-                        modified_data[i] = new_data
-                else:
-                    for i, doc in enumerate(modified_data):
-                        data = fieldfetch.get_mapped_collection(source_db, collection_name, doc)
-                        # modified_data[i] = {**data["parent"], **data["rules"]}
+            # Separate records by operation type
+            # If operation_type query param is "delete", treat ALL records as deletions
+            deleted_records = []
+            restore_records = []
+            create_records = []
 
-                        modified_data[i] = data
+            if operation_type == "delete":
+                # All records in body are deletion targets
+                for doc in modified_data:
+                    has_id = doc.get(id_field) is not None
+                    if not has_id:
+                        return Response(
+                            {"error": f"Deletion requires valid ID field '{id_field}' in all records"},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                    deleted_records.append(doc)
+                logger.info(f"Delete operation: {len(deleted_records)} records marked for deletion")
+
             else:
-                for i, doc in enumerate(modified_data):
-                    modified_data[i] = fieldfetch.transform_data(collection_name, doc)
-            #? Test Response
-            # return Response({"message":"OKay"})
+                # Auto-detect operation based on presence of ID field
+                for doc in modified_data:
+                    has_id = doc.get(id_field) is not None
 
-            # Clean up _id fields
-            # for doc in modified_data:
-            #     doc.pop("_id", None)
+                    if has_id:
+                        restore_records.append(doc)
+                    else:
+                        create_records.append(doc)
+                logger.info(f"Auto-detected: {len(restore_records)} restored, {len(create_records)} created")
 
-            # Store restored data (handles both simple and nested entities)
-            data_for_storage = copy.deepcopy(modified_data)
+            logger.info(f"Operation counts: {len(deleted_records)} deleted, {len(restore_records)} restored, {len(create_records)} created")
+
+            # Initialize variables for deletion tracking
+            deleted_ids_list = []
+            cascade_info = {}
+
+            # Process deletion operations
+            if deleted_records:
+                logger.info(f"Processing {len(deleted_records)} deletion(s)")
+
+                # Validate deletion safety
+                errors = validate_deletion_safety(source_db, entity_name, collection_name, deleted_records)
+                if errors:
+                    return Response(
+                        {"error": "Deletion validation failed", "details": errors},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # Fetch complete records from source DB for each deleted record
+                complete_deleted_records = []
+                for doc in deleted_records:
+                    record_id = doc.get(id_field)
+                    if not mapping_handlers.is_mapped_entity(collection_name):
+                        complete_record = fieldfetch.get_collection(source_db, collection_name, doc)
+                    else:
+                        complete_record = fieldfetch.get_mapped_collection(source_db, collection_name, doc)
+
+                    if complete_record:
+                        complete_deleted_records.append(complete_record)
+
+                logger.info(f"Fetched {len(complete_deleted_records)} complete records for deletion")
+
+                # Store deleted records with metadata in "deletion_pending" status
+                # This allows us to track the deletion attempt before Terraform runs
+                restored_by = get_user_from_request(request)
+                store_deleted_data_with_metadata(
+                    current_db, entity_name, collection_name,
+                    complete_deleted_records, restored_by, source_db_name,
+                    operation_type="deletion_pending"  # PENDING status before Terraform
+                )
+
+                # Handle cascade deletion for nested entities (also with "deletion_pending" status)
+                deleted_ids_list, cascade_info = handle_nested_deletion(
+                    current_db, entity_name, complete_deleted_records,
+                    restored_by, source_db_name
+                )
+
+                logger.info(f"Cascade deletion complete: {len(deleted_ids_list)} total IDs marked as deletion_pending")
+
+            # Process restore operations
+            if restore_records:
+                logger.info(f"Processing {len(restore_records)} restore(s)")
+                if not mapping_handlers.is_mapped_entity(collection_name):
+                    for i, doc in enumerate(restore_records):
+                        new_data = fieldfetch.get_collection(source_db, collection_name, doc)
+                        restore_records[i] = new_data
+                else:
+                    for i, doc in enumerate(restore_records):
+                        data = fieldfetch.get_mapped_collection(source_db, collection_name, doc)
+                        restore_records[i] = data
+
+            # Process create operations
+            if create_records:
+                logger.info(f"Processing {len(create_records)} creation(s)")
+                for i, doc in enumerate(create_records):
+                    create_records[i] = fieldfetch.transform_data(collection_name, doc)
+
+            # Store restored and created data (deleted data was already stored above)
             restored_by = get_user_from_request(request)
 
-            if op_type == "create":
-                print("create")
-                stored_data = store_created_data(
-                    current_db, entity_name, collection_name,
-                    data_for_storage, 
-                )
-            else:
-                stored_data = store_restored_data_with_metadata(
+            if restore_records:
+                data_for_storage = copy.deepcopy(restore_records)
+                store_restored_data_with_metadata(
                     current_db, entity_name, collection_name,
                     data_for_storage, restored_by, source_db_name
                 )
+                logger.info(f"Stored {len(restore_records)} restored records")
 
-            # CRITICAL FIX: Fetch ALL records from source DB and merge with restored data
+            if create_records:
+                data_for_storage = copy.deepcopy(create_records)
+                store_created_data(
+                    current_db, entity_name, collection_name,
+                    data_for_storage,
+                )
+                logger.info(f"Stored {len(create_records)} created records")
+
+            # CRITICAL: Fetch ALL records from source DB and merge with restored/created data
             # This ensures Terraform receives complete state (not just modified records)
             # to prevent unintended resource deletion
 
@@ -383,33 +495,24 @@ class BulkEntityViewSet(viewsets.ViewSet):
             original_data = service.fetch(date_str, entity_name)
             logger.info(f"Step 1: Fetched {len(original_data)} original records from source DB ({source_db_name})")
 
-            # Step 2: Get ID field for merging
-            id_field = ENTITY_ID_MAPPING.get(entity_name)
-
-            if not id_field:
-                logger.warning(f"No ID field configured for {entity_name}, cannot merge properly")
-                return Response(
-                    {"error": f"Entity '{entity_name}' missing ID field configuration"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
-
-            # Step 3: Merge original data with restored data from today's DB
+            # Step 2: Merge original data with restored data from today's DB
             # This handles both simple entities and nested entities (with builders)
+            # Note: fetch_and_merge_restored_data now filters out deleted records automatically
             merged_data = fetch_and_merge_restored_data(
                 current_db, entity_name, collection_name, id_field, original_data
             )
-            logger.info(f"Step 2: Merged to {len(merged_data)} total records (original + restored)")
+            logger.info(f"Step 2: Merged to {len(merged_data)} total records (original + restored, deleted filtered)")
 
-            # Step 4: Add newly created records (those without IDs in original data)
+            # Step 3: Add newly created records (those without IDs in original data)
             # Created records only exist in restored collection with operation_type="created"
             restored_collection = current_db[f"_{collection_name}"]
-            created_records = list(restored_collection.find(
+            created_records_from_db = list(restored_collection.find(
                 {"operation_type": "created"},
                 {"_id": 0}
             ))
 
-            if created_records:
-                logger.info(f"Step 3: Found {len(created_records)} newly created records")
+            if created_records_from_db:
+                logger.info(f"Step 3: Found {len(created_records_from_db)} newly created records")
 
                 # For created records with nested data, rebuild nested arrays
                 nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name)
@@ -418,7 +521,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     from core.utils.restore_utils import rebuild_restored_data_with_nested_arrays
 
                     # Get created records with nested arrays rebuilt
-                    for created_record in created_records:
+                    for created_record in created_records_from_db:
                         unique_id = created_record.get("unique_id")
                         if unique_id:
                             # Fetch nested data for this created record
@@ -426,7 +529,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                                 nested_coll = f"_{nested_coll_name}"
                                 if nested_coll in current_db.list_collection_names():
                                     nested_data = list(current_db[nested_coll].find(
-                                        {"unique_id": unique_id},
+                                        {"unique_id": unique_id, "operation_type": {"$ne": "deleted"}},
                                         {"_id": 0}
                                     ))
                                     created_record[nested_field] = nested_data
@@ -434,14 +537,20 @@ class BulkEntityViewSet(viewsets.ViewSet):
                                     created_record[nested_field] = []
 
                 # Add created records to merged data
-                merged_data.extend(created_records)
+                merged_data.extend(created_records_from_db)
                 logger.info(f"Step 4: Added created records, total now {len(merged_data)} records")
             else:
                 logger.info("Step 3: No newly created records found")
 
+            # Step 4: Filter deleted records from merged state (if any deletions occurred)
+            if deleted_ids_list:
+                merged_data = filter_deleted_records_from_state(merged_data, deleted_ids_list, id_field)
+                logger.info(f"Step 5: Filtered deleted records, {len(merged_data)} records remaining")
+
             # Step 5: Remove metadata fields before sending to Terraform
             metadata_fields = ["operation_type", "created_at", "updated_at",
-                             "restored_by", "restored_at", "restored_from", "unique_id", "_id"]
+                             "restored_by", "restored_at", "restored_from", "unique_id", "_id",
+                             "deleted_by", "deleted_at", "deleted_from", "cascade_parent_id"]
             remove_metadata_fields(merged_data)
 
             # Also remove metadata from nested arrays
@@ -453,15 +562,22 @@ class BulkEntityViewSet(viewsets.ViewSet):
                                 for field in metadata_fields:
                                     item.pop(field, None)
 
-            logger.info(f"Step 5: Removed metadata fields from {len(merged_data)} records")
+            logger.info(f"Step 6: Removed metadata fields from {len(merged_data)} records")
             logger.info(f"FINAL: Sending {len(merged_data)} complete records to Terraform")
+            if deleted_ids_list:
+                logger.info(f"DELETION: Requesting deletion of {len(deleted_ids_list)} IDs: {deleted_ids_list}")
             logger.info("=" * 80)
 
             modified_data = merged_data
 
             # Extract target parameters for Terraform API
-            # Uses original data (with nested arrays intact) to extract all IDs
-            params = extract_terraform_target_params(collection_name, modified_data)
+            # If deletion occurred, add target_id and operation parameters
+            params = extract_terraform_target_params(
+                collection_name,
+                modified_data,
+                operation_type="delete" if deleted_records else None,
+                target_ids=deleted_ids_list if deleted_records else None
+            )
 
             # Get Okta authorization headers (Bearer token from session)
             tf_headers = get_okta_headers(request)
@@ -481,12 +597,13 @@ class BulkEntityViewSet(viewsets.ViewSet):
             # Build full Terraform URL with module-based endpoint
             terraform_url = f"{server_url}{terraform_api}"
             logger.info(f"Routing to Terraform module API: {terraform_url}")
+            logger.info(f"Terraform params: {params}")
 
             # Send data to module-specific Terraform API
-            # Still pass collection_name as query parameter for entity identification
+            # Pass all params including deletion parameters if applicable
             tf_response = requests.post(
                 terraform_url,
-                params={"collection_name": collection_name},
+                params=params,
                 json={"data": modified_data},
                 headers=tf_headers,
             )
@@ -498,16 +615,97 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
             tf_message = tf_data.get("message", "No message returned")
 
-            return Response(
-                {
-                    "tf_message": tf_message,
-                    "message": "Modified data restored successfully.",
-                    "restored_db": current_db_name,
-                    "collection": f"_{collection_name}",
-                    "record_count": len(modified_data),
-                },
-                status=status.HTTP_201_CREATED,
-            )
+            # Handle deletion status update based on Terraform response
+            if deleted_records:
+                # Check if Terraform operation was successful (HTTP 2xx)
+                if 200 <= tf_response.status_code < 300:
+                    # SUCCESS: Update deletion status from "deletion_pending" to "deleted"
+                    logger.info(f"Terraform deletion successful (status {tf_response.status_code}), updating deletion status")
+
+                    # Update parent records
+                    parent_ids = [doc.get(id_field) for doc in complete_deleted_records if doc.get(id_field)]
+                    update_deletion_status(
+                        current_db, entity_name, collection_name,
+                        parent_ids, new_status="deleted"
+                    )
+
+                    # Update cascade deleted records (nested entities)
+                    if cascade_info and "nested_deletions" in cascade_info:
+                        for nested_field, nested_info in cascade_info["nested_deletions"].items():
+                            nested_collection = nested_info["collection"]
+                            nested_ids = nested_info["ids"]
+
+                            # Update nested records to "deleted" status
+                            update_deletion_status(
+                                current_db, entity_name, nested_collection,
+                                nested_ids, new_status="deleted"
+                            )
+
+                    logger.info(f"Successfully updated {len(deleted_ids_list)} records to 'deleted' status")
+
+                else:
+                    # FAILURE: Keep status as "deletion_pending" and return error
+                    logger.error(f"Terraform deletion failed (status {tf_response.status_code}), keeping 'deletion_pending' status")
+
+                    # Update all records to "deletion_failed" with error message
+                    parent_ids = [doc.get(id_field) for doc in complete_deleted_records if doc.get(id_field)]
+                    update_deletion_status(
+                        current_db, entity_name, collection_name,
+                        parent_ids, new_status="deletion_failed",
+                        terraform_error=tf_message
+                    )
+
+                    # Update cascade deleted records as well
+                    if cascade_info and "nested_deletions" in cascade_info:
+                        for nested_field, nested_info in cascade_info["nested_deletions"].items():
+                            nested_collection = nested_info["collection"]
+                            nested_ids = nested_info["ids"]
+
+                            update_deletion_status(
+                                current_db, entity_name, nested_collection,
+                                nested_ids, new_status="deletion_failed",
+                                terraform_error=tf_message
+                            )
+
+                    # Return error response
+                    return Response({
+                        "error": "Terraform deletion failed",
+                        "tf_message": tf_message,
+                        "tf_status_code": tf_response.status_code,
+                        "message": f"Deletion marked as failed. Records remain in 'deletion_failed' state in MongoDB for manual review.",
+                        "failed_ids": deleted_ids_list,
+                        "cascade_info": cascade_info
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            # Build response message based on operations performed
+            operation_summary = []
+            if deleted_records:
+                operation_summary.append(f"{len(deleted_records)} deleted")
+            if restore_records:
+                operation_summary.append(f"{len(restore_records)} restored")
+            if create_records:
+                operation_summary.append(f"{len(create_records)} created")
+
+            response_message = f"Operations completed: {', '.join(operation_summary)}" if operation_summary else "No operations performed"
+
+            response_data = {
+                "tf_message": tf_message,
+                "message": response_message,
+                "restored_db": current_db_name,
+                "collection": f"_{collection_name}",
+                "record_count": len(modified_data),
+                "operations": {
+                    "deleted": len(deleted_records),
+                    "restored": len(restore_records),
+                    "created": len(create_records),
+                }
+            }
+
+            # Add cascade info if deletion occurred
+            if deleted_records and cascade_info:
+                response_data["cascade_info"] = cascade_info
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
             import traceback

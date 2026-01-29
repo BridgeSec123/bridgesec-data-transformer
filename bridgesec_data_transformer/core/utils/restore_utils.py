@@ -243,10 +243,310 @@ def store_created_data(db, entity_name, collection_name, created_data):
         _store_collection_simple(db, entity_name, collection_name, created_data)
         return created_data
                                                      
-def extract_terraform_target_params(collection_name, data_to_send):
-    """Extract target field IDs and build parameters for Terraform API."""
+def store_deleted_data_with_metadata(db, entity_name, collection_name, deleted_data, deleted_by, source_db_name, cascade_parent_id=None, operation_type="deletion_pending"):
+    """
+    Store deleted data with deletion metadata.
+
+    Args:
+        db: MongoDB database instance (today's DB)
+        entity_name: Entity name (e.g., "Policy MFA")
+        collection_name: Collection name (e.g., "okta_policy_mfa")
+        deleted_data: Complete records to mark as deleted
+        deleted_by: Username who performed deletion
+        source_db_name: Source database name
+        cascade_parent_id: Parent ID if this is a cascaded deletion
+        operation_type: Operation status - "deletion_pending" (before Terraform) or "deleted" (after Terraform success)
+
+    Returns:
+        Stored data
+    """
+    logger.info(f"Storing {len(deleted_data)} deleted records for {entity_name} with operation_type={operation_type}")
+
+    # Prepare metadata
+    deleted_at = datetime.now().strftime("%H:%M:%S")
+    deleted_collection_name = f"_{collection_name}"
+    deleted_collection = db[deleted_collection_name]
+
+    # Get ID field for upsert
+    nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name, {})
+    id_field = None
+
+    # Find if this collection is a nested collection
+    for nested_field, nested_collection_name in nested_mapping.items():
+        if nested_collection_name == collection_name:
+            id_field = NESTED_FIELD_ID_MAPPING.get(nested_field, {}).get("child_id_field")
+            logger.info(f"Detected nested collection {collection_name}, using child_id_field: {id_field}")
+            break
+
+    # If not a nested collection, use the entity's ID field
+    if not id_field:
+        id_field = ENTITY_ID_MAPPING.get(entity_name)
+
+    if not id_field:
+        logger.error(f"No ID field defined for {entity_name}, cannot store deleted records")
+        return deleted_data
+
+    # Store each deleted record with metadata
+    upsert_count = 0
+    for doc in deleted_data:
+        doc_copy = copy.deepcopy(doc)
+
+        # Add deletion metadata
+        doc_copy["operation_type"] = operation_type  # "deletion_pending" before Terraform, "deleted" after success
+        doc_copy["deleted_by"] = deleted_by
+        doc_copy["deleted_from"] = source_db_name
+        doc_copy["deleted_at"] = deleted_at
+        if cascade_parent_id:
+            doc_copy["cascade_parent_id"] = cascade_parent_id
+        doc_copy.pop("_id", None)
+
+        id_value = doc_copy.get(id_field)
+        if id_value:
+            # Upsert: update if exists, insert if not
+            deleted_collection.replace_one(
+                {id_field: id_value},
+                doc_copy,
+                upsert=True
+            )
+            upsert_count += 1
+        else:
+            logger.warning(f"Document missing {id_field} field, skipping")
+
+    logger.info(f"Upserted {upsert_count} deleted records to {deleted_collection_name}")
+    return deleted_data
+
+
+def update_deletion_status(db, entity_name, collection_name, deleted_ids, new_status, terraform_error=None):
+    """
+    Update deletion status after Terraform operation completes.
+
+    Args:
+        db: MongoDB database instance (today's DB)
+        entity_name: Entity name (e.g., "Policy MFA")
+        collection_name: Collection name (e.g., "okta_policy_mfa")
+        deleted_ids: List of IDs that were attempted to be deleted
+        new_status: "deleted" (success) or "deletion_failed" (failure)
+        terraform_error: Error message from Terraform (if failed)
+
+    Returns:
+        Number of records updated
+    """
+    logger.info(f"Updating deletion status to '{new_status}' for {len(deleted_ids)} records in {collection_name}")
+
+    deleted_collection_name = f"_{collection_name}"
+    deleted_collection = db[deleted_collection_name]
+
+    # Get ID field
+    id_field = ENTITY_ID_MAPPING.get(entity_name)
+    if not id_field:
+        logger.error(f"No ID field defined for {entity_name}, cannot update deletion status")
+        return 0
+
+    # Update each deleted record
+    update_count = 0
+    for deleted_id in deleted_ids:
+        update_data = {
+            "$set": {
+                "operation_type": new_status,
+                "status_updated_at": datetime.now().strftime("%H:%M:%S")
+            }
+        }
+
+        # Add error details if deletion failed
+        if terraform_error:
+            update_data["$set"]["terraform_error"] = terraform_error
+
+        result = deleted_collection.update_one(
+            {id_field: deleted_id, "operation_type": "deletion_pending"},
+            update_data
+        )
+
+        if result.modified_count > 0:
+            update_count += 1
+
+    logger.info(f"Updated {update_count} records to status '{new_status}' in {deleted_collection_name}")
+    return update_count
+
+
+def filter_deleted_records_from_state(merged_data, deleted_ids, id_field):
+    """
+    Remove deleted records from complete state before sending to Terraform.
+
+    Args:
+        merged_data: Complete merged data (original + restored)
+        deleted_ids: List of IDs to remove
+        id_field: ID field name for matching
+
+    Returns:
+        Filtered data without deleted records
+    """
+    if not deleted_ids:
+        return merged_data
+
+    deleted_ids_set = set(str(id_val) for id_val in deleted_ids if id_val)
+
+    filtered_data = [
+        record for record in merged_data
+        if str(record.get(id_field)) not in deleted_ids_set
+    ]
+
+    logger.info(f"Filtered {len(merged_data) - len(filtered_data)} deleted records from state")
+    return filtered_data
+
+
+def handle_nested_deletion(db, entity_name, deleted_parent_records, deleted_by, source_db_name):
+    """
+    Handle cascade deletion for entities with nested data.
+
+    Args:
+        db: MongoDB database instance (today's DB)
+        entity_name: Entity name
+        deleted_parent_records: Parent records being deleted
+        deleted_by: Username who performed deletion
+        source_db_name: Source database name
+
+    Returns:
+        Tuple of (all_deleted_ids, cascade_info)
+        - all_deleted_ids: List of all deleted IDs (parent + children)
+        - cascade_info: Dict with cascade details
+    """
+    # Check if entity has nested data
+    nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name)
+
+    if not nested_mapping:
+        # No nested data, return parent IDs only
+        parent_id_field = ENTITY_ID_MAPPING.get(entity_name)
+        parent_ids = [str(record.get(parent_id_field)) for record in deleted_parent_records if record.get(parent_id_field)]
+        return parent_ids, {}
+
+    # Entity has nested data - cascade deletion
+    parent_id_field = ENTITY_ID_MAPPING.get(entity_name)
+    parent_ids = [str(record.get(parent_id_field)) for record in deleted_parent_records if record.get(parent_id_field)]
+
+    cascade_info = {
+        "parent_count": len(parent_ids),
+        "parent_ids": parent_ids,
+        "nested_deletions": {}
+    }
+
+    all_deleted_ids = list(parent_ids)
+
+    # Process each nested collection
+    for nested_field, nested_collection_name in nested_mapping.items():
+        nested_coll = f"_{nested_collection_name}"
+
+        # Get nested ID mapping
+        nested_id_config = NESTED_FIELD_ID_MAPPING.get(nested_field, {})
+        child_id_field = nested_id_config.get("child_id_field", "id")
+        parent_id_field_in_nested = nested_id_config.get("parent_id_field", parent_id_field)
+
+        # Find all child records for deleted parents
+        if nested_coll not in db.list_collection_names():
+            logger.info(f"No nested collection found: {nested_coll}")
+            continue
+
+        # Query for children of deleted parents
+        # Note: We check both the nested collection and original nested arrays
+        child_records_to_delete = []
+
+        # Extract nested arrays from parent records
+        for parent_record in deleted_parent_records:
+            nested_array = parent_record.get(nested_field, [])
+            if nested_array:
+                child_records_to_delete.extend(nested_array)
+
+        if child_records_to_delete:
+            # Store child records as deleted with cascade metadata
+            child_ids = [str(child.get(child_id_field)) for child in child_records_to_delete if child.get(child_id_field)]
+
+            # Store with cascade parent ID
+            for parent_id in parent_ids:
+                # Filter children belonging to this parent
+                parent_children = [
+                    child for child in child_records_to_delete
+                    if str(child.get(parent_id_field_in_nested)) == parent_id
+                ]
+
+                if parent_children:
+                    store_deleted_data_with_metadata(
+                        db, entity_name, nested_collection_name,
+                        parent_children, deleted_by, source_db_name,
+                        cascade_parent_id=parent_id
+                    )
+
+            cascade_info["nested_deletions"][nested_field] = {
+                "collection": nested_collection_name,
+                "count": len(child_ids),
+                "ids": child_ids
+            }
+
+            all_deleted_ids.extend(child_ids)
+
+            logger.info(f"Cascade deleted {len(child_ids)} records from {nested_collection_name}")
+
+    return all_deleted_ids, cascade_info
+
+
+def validate_deletion_safety(source_db, entity_name, collection_name, deleted_records):
+    """
+    Validate deletion safety before processing.
+
+    Args:
+        source_db: Source MongoDB database instance
+        entity_name: Entity name
+        collection_name: Collection name
+        deleted_records: Records to delete
+
+    Returns:
+        List of error messages (empty if valid)
+    """
+    errors = []
+    id_field = ENTITY_ID_MAPPING.get(entity_name)
+
+    if not id_field:
+        errors.append(f"No ID field configured for entity '{entity_name}'")
+        return errors
+
+    # Validate each record
+    for i, record in enumerate(deleted_records):
+        record_id = record.get(id_field)
+
+        # Check ID field is present
+        if not record_id:
+            errors.append(f"Record at index {i} missing required ID field '{id_field}'")
+            continue
+
+        # Check resource exists in source DB
+        source_collection = source_db[collection_name]
+        existing_record = source_collection.find_one({id_field: record_id}, {"_id": 0})
+
+        if not existing_record:
+            errors.append(f"Record with {id_field}='{record_id}' not found in source database")
+
+    return errors
+
+
+def extract_terraform_target_params(collection_name, data_to_send, operation_type=None, target_ids=None):
+    """
+    Extract target field IDs and build parameters for Terraform API.
+
+    Args:
+        collection_name: Collection name
+        data_to_send: Data being sent to Terraform
+        operation_type: Operation type ("delete", None for restore/create)
+        target_ids: List of target IDs for deletion
+
+    Returns:
+        Dict of parameters for Terraform API
+    """
     params = {"collection_name": collection_name}
-    
+
+    # Add deletion parameters if applicable
+    if operation_type == "delete" and target_ids:
+        params["target_id"] = ",".join(str(id_val) for id_val in target_ids if id_val)
+        params["operation"] = "delete"
+        logger.info(f"Added deletion params: target_id={params['target_id']}, operation=delete")
+
     return params
 
 
@@ -278,6 +578,7 @@ def rebuild_restored_data_with_nested_arrays(db, entity_name, collection_name, i
     """
     Rebuild restored data with nested arrays.
     Returns only the LATEST version of each record.
+    Filters out records with operation_type="deleted".
     """
     nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name)
 
@@ -286,7 +587,13 @@ def rebuild_restored_data_with_nested_arrays(db, entity_name, collection_name, i
         coll_name = f"_{collection_name}"
         if coll_name in db.list_collection_names():
             all_data = list(db[coll_name].find({}, {"_id": 0}))
-            return _get_latest_records_by_id(all_data, id_field)
+            latest_data = _get_latest_records_by_id(all_data, id_field)
+            # Filter out deleted, deletion_pending, and deletion_failed records
+            latest_data = [
+                record for record in latest_data
+                if record.get("operation_type") not in ["deleted", "deletion_pending", "deletion_failed"]
+            ]
+            return latest_data
         return []
 
     # Entity with nested data - rebuild
@@ -300,6 +607,12 @@ def rebuild_restored_data_with_nested_arrays(db, entity_name, collection_name, i
     )
     if not parent_data:
         return []
+
+    # Filter out deleted, deletion_pending, and deletion_failed parents
+    parent_data = [
+        record for record in parent_data
+        if record.get("operation_type") not in ["deleted", "deletion_pending", "deletion_failed"]
+    ]
 
     # Map parents by ID
     parent_map = {str(r.get(id_field)): copy.deepcopy(r) for r in parent_data if r.get(id_field)}
@@ -317,17 +630,30 @@ def rebuild_restored_data_with_nested_arrays(db, entity_name, collection_name, i
         if nested_coll not in db.list_collection_names():
             continue
 
-        # Get nested ID field and latest records
+        # Get nested ID field and parent ID field from mapping
         nested_id_field = NESTED_FIELD_ID_MAPPING.get(nested_field, {}).get("child_id_field", "id")
+        parent_id_field = NESTED_FIELD_ID_MAPPING.get(nested_field, {}).get("parent_id_field", id_field)
+
         nested_data = _get_latest_records_by_id(
             list(db[nested_coll].find({}, {"_id": 0})), nested_id_field
         )
 
-        # Attach to parents
+        # Filter out deleted, deletion_pending, and deletion_failed nested records
+        nested_data = [
+            record for record in nested_data
+            if record.get("operation_type") not in ["deleted", "deletion_pending", "deletion_failed"]
+        ]
+
+        # Attach to parents using the correct parent_id_field from nested record
         for nested in nested_data:
-            parent_id = str(nested.get(id_field))
-            if parent_id in parent_map:
-                parent_map[parent_id][nested_field].append(nested)
+            # Use parent_id_field to get the parent ID from nested record
+            parent_id_value = str(nested.get(parent_id_field))
+
+            # Match against parent's actual ID field value
+            for parent_key, parent_record in parent_map.items():
+                if parent_key == parent_id_value:
+                    parent_record[nested_field].append(nested)
+                    break
 
     return list(parent_map.values())
 
@@ -339,7 +665,11 @@ def remove_metadata_fields(data):
 
     Removes:
         - restored_by, restored_from, restored_at (restore metadata)
-        - operation_type (create/restore indicator)
+        - deleted_by, deleted_from, deleted_at (deletion metadata)
+        - cascade_parent_id (cascade deletion tracking)
+        - terraform_error (error details from failed operations)
+        - status_updated_at (status update timestamp)
+        - operation_type (create/restore/delete indicator)
         - created_at, updated_at (timestamp fields)
         - unique_id (tracking ID for created resources)
         - _id (MongoDB ID)
@@ -354,6 +684,12 @@ def remove_metadata_fields(data):
         "restored_by",
         "restored_from",
         "restored_at",
+        "deleted_by",
+        "deleted_from",
+        "deleted_at",
+        "cascade_parent_id",
+        "terraform_error",
+        "status_updated_at",
         "operation_type",
         "created_at",
         "updated_at",
@@ -431,6 +767,9 @@ def _merge_records(original, restored, id_field, metadata_fields):
     }
 
     merged = []
+    merged_ids = set()
+
+    # First pass: merge existing original items with restored changes
     for orig_item in original:
         item_id = str(orig_item.get(id_field)) if orig_item.get(id_field) else None
 
@@ -441,8 +780,21 @@ def _merge_records(original, restored, id_field, metadata_fields):
                 if key not in metadata_fields:
                     merged_item[key] = value
             merged.append(merged_item)
+            merged_ids.add(item_id)
         else:
             merged.append(orig_item)
+            if item_id:
+                merged_ids.add(item_id)
+
+    # Second pass: add NEW items from restored that don't exist in original
+    for item_id, restored_item in restored_map.items():
+        if item_id not in merged_ids:
+            # This is a new item, add it
+            clean_item = copy.deepcopy(restored_item)
+            # Remove metadata fields
+            for field in metadata_fields:
+                clean_item.pop(field, None)
+            merged.append(clean_item)
 
     return merged
 

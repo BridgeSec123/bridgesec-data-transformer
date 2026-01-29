@@ -15,7 +15,7 @@ MODULE_APIS = {
 }
 
 ENTITY_TO_MODULE = {
-    # Apps module (9 entities)
+    # Apps module (11+ entities)
     "App Oauth": "apps",
     "App SAML": "apps",
     "App SWA": "apps",
@@ -25,28 +25,62 @@ ENTITY_TO_MODULE = {
     "App Browser Plugin": "apps",
     "App OIDC": "apps",
     "App WS Federation": "apps",
+    "App Signon Policy": "apps",
+    "App Signon Policy Rule": "apps",
+    "App Group Assignments": "apps",
+    "App Group Assignment": "apps",
+    "App Access Policy Assignment": "apps",
+    "App Three Field": "apps",
+    "App Secure Password Store": "apps",
+    "App User Schema Property": "apps",
+    "App User Base Schema Property": "apps",
+    "App Saml": "apps",
+    "App User": "apps",
+    "App Oauth Api Scope": "apps",
+    "App Oauth Redirect Uri": "apps",
+    "APP Oauth Post Logout Redirect Uri": "apps",
 
-    # Users module (5 entities)
+    # Users module (10+ entities)
     "Users": "users",
+    "User": "users",
     "User Types": "users",
+    "User Type": "users",
     "User Factors": "users",
     "User Admin Roles": "users",
     "User Schemas": "users",
+    "User Schema Properties": "users",
+    "User Group Memberships": "users",
+    "User Base Schema Properties": "users",
 
-    # Groups module (4 entities)
+    # Groups module (6+ entities)
     "Groups": "groups",
     "Group Rules": "groups",
     "Group Roles": "groups",
     "Group Schemas": "groups",
+    "Group Schema Property": "groups",
+    "Group Memberships": "groups",
+    "Group Role": "groups",
 
-    # Policies module (4 entities)
+    # Policies module (10+ entities)
     "Policy MFA": "policies",
     "Policy Password": "policies",
     "Policy SignOn": "policies",
+    "Policy Sign On": "policies",
     "Policy Profile Enrollment": "policies",
+    "Policy Profile Enrollment apps": "policies",
+    "Policy Rule Mfa": "policies",
+    "Policy Rule Password": "policies",
+    "Policy Rule Sign On": "policies",
+    "Policy Rule Profile Enrollment": "policies",
+    "Policy Rule Idp Discovery": "policies",
+    "Policy Device Assurance Android": "policies",
+    "Policy Device Assurance IOS": "policies",
+    "Policy Device Assurance Macos": "policies",
+    "Policy Device Assurance Windows": "policies",
 
-    # Auth Servers module (5 entities)
+    # Auth Servers module (5+ entities)
     "Auth Servers": "auth_servers",
+    "Auth Server": "auth_servers",
     "Auth Server Scopes": "auth_servers",
     "Auth Server Claims": "auth_servers",
     "Auth Server Policies": "auth_servers",
@@ -55,24 +89,53 @@ ENTITY_TO_MODULE = {
     # IDPs module (3 entities)
     "IDP OIDC": "idps",
     "IDP SAML": "idps",
-    "IDP Social": "idps",
+    "IDP SOCIAL": "idps",
 
-    # Security module (6 entities)
+    # Security module (15+ entities)
     "Authenticators": "security",
+    "Authenticator": "security",
     "Brands": "security",
+    "Brand": "security",
     "Themes": "security",
+    "Theme": "security",
+    "Email Domain": "security",
     "Network Zones": "security",
+    "Network Zone": "security",
     "Trusted Origins": "security",
+    "Trusted Origin": "security",
     "Behaviors": "security",
+    "Behavior": "security",
+    "Threat Insights": "security",
+    "Organization Security": "security",
 
-    # Admin module (7+ entities)
+    # Admin module (25+ entities)
     "Admin Roles": "admin",
+    "Admin Role Custom": "admin",
     "Rate Limits": "admin",
+    "Principal Rate Limit": "admin",
+    "Rate Limit Admin Notification": "admin",
+    "Rate Limit Admin Notification Settings": "admin",
+    "Rate Limit Warning Threshold Percentage": "admin",
     "Email Configuration": "admin",
+    "Email": "admin",
+    "Email SMTP Server": "admin",
     "Captchas": "admin",
     "Links": "admin",
+    "Link": "admin",
+    "Link Definition": "admin",
     "Entitlements": "admin",
+    "Entitlement Bundle": "admin",
+    "Principal Entitlement": "admin",
     "Catalogs": "admin",
+    "Sms Template": "admin",
+    "Requests": "admin",
+    "Request Condition": "admin",
+    "Request Sequence": "admin",
+    "Request Settings": "admin",
+    "Inline Hooks": "admin",
+    "Inline Hook": "admin",
+    "Event_Hook": "admin",
+    "Event Hook": "admin",
 }
 
 

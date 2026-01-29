@@ -238,7 +238,7 @@ ENTITY_ID_MAPPING = {
     "App Group Assignments": "app_id",
     "App Access Policy Assignment": "app_id",
     "App Signon Policy": "app_policy_id",
-    "App Group Assignment": "app_id",
+    "App Group Assignment": "app_id",  # NOTE: Actual unique key is app_id+group_id composite
     "App Bookmark": "app_id",
     "App Auto Login": "app_id",
     "App Three Field": "app_id",
@@ -248,6 +248,9 @@ ENTITY_ID_MAPPING = {
     "App Basic Auth": "app_id",
     "App Swa": "app_id",
     "App User": "app_id",
+    "App Oauth Api Scope": "app_id",
+    "APP Oauth Post Logout Redirect Uri": "app_id",
+    "App Oauth Redirect Uri": "app_id",
 }
 
 NON_EDITABLE_FIELDS = {

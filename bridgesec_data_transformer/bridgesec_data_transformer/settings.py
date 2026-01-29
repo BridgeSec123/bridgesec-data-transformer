@@ -23,7 +23,7 @@ from pymongo import MongoClient
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+environ.Env.read_env(os.path.join(BASE_DIR.parent, '.env'))
 
 
 OKTA_API_URL = env("OKTA_API_URL")
@@ -71,6 +71,10 @@ OKTA_SCOPES = " ".join([
     "okta.apps.manage",
     "okta.schemas.manage",
     "okta.groups.manage",
+    "okta.idps.manage",
+    "okta.idps.read",
+    "okta.profileMappings.read",
+    "okta.profileMappings.manage",
     "okta.policies.manage",
     # "okta.networkZones.read",
     "okta.trustedOrigins.read",
@@ -114,7 +118,7 @@ OKTA_API_SCOPE_MAP = {
     "/groups": "okta.groups.read",
     "/policies": "okta.policies.read",
     "/authorizationServers": "okta.authorizationServers.read",
-    # "/idps": "okta.idps.read",
+    "/idps": ["okta.idps.read", "okta.idps.manage", "okta.profileMappings.read", "okta.profileMappings.manage"],
     # Brands endpoint requires multiple scopes for sub-entities
     "/brands": [
         "okta.brands.read",
@@ -156,7 +160,7 @@ OKTA_API_SCOPE_MAP = {
 SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = env.bool("DEBUG", default=False)
 
 ALLOWED_HOSTS = [
     '.onrender.com',
