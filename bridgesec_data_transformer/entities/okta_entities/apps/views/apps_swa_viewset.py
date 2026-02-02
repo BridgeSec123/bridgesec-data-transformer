@@ -21,9 +21,21 @@ class AppSwaViewSet(BaseAppViewSet):
         extracted_data = super().extract_data(okta_data)
 
         formatted_data = []
-        
+
         for record in extracted_data:
             if record.get("signOnMode") == "BROWSER_PLUGIN":
+                # Check if this is a three-field app (has extra field properties)
+                settings_app = record.get("settings", {}).get("app", {})
+                has_extra_field = (
+                    settings_app.get("extraFieldSelector") or
+                    settings_app.get("extraFieldValue")
+                )
+
+                # Skip three-field apps (they belong to AppThreeFieldViewSet)
+                if has_extra_field:
+                    logger.info(f"Skipping three-field app for SWA collection: {record.get('label', '')}")
+                    continue
+
                 app_label = record.get("label", "")
                 if should_skip_app_three_field_extraction(app_label):
                     logger.info(f"Skipping SWA app extraction for label: {app_label}")
