@@ -1,12 +1,25 @@
 from urllib.parse import quote
+import logging
 
 from django.conf import settings
 from django.shortcuts import redirect
 from rest_framework.views import APIView
 
+logger = logging.getLogger(__name__)
+
 
 class OktaLoginView(APIView):
     def get(self, request):
+        request_id = getattr(request, 'request_id', 'N/A')
+
+        logger.info(
+            "Okta login initiated",
+            extra={
+                'component': 'auth',
+                'request_id': request_id,
+                'action': 'login',
+            }
+        )
         # URL encode the scopes to handle special characters
         encoded_scopes = quote(settings.OKTA_SCOPES, safe='')
 
@@ -38,6 +51,15 @@ class OktaLoginView(APIView):
                 f"state=xyz&nonce=abc&"
                 f"prompt=login"
             )
+
+        logger.info(
+            "Redirecting to Okta authorization",
+            extra={
+                'component': 'auth',
+                'request_id': request_id,
+                'redirect_url': issuer_base,
+            }
+        )
 
         return redirect(authorize_url)
 

@@ -1,9 +1,11 @@
 import logging
+import time
 from datetime import datetime
 
 import requests
 from core.utils.entity_mapping import extract_entity_data
 from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
+from bridgesec_logging import log_mongodb_operation
 from core.utils.okta_helpers import (
     build_okta_url,
     get_okta_headers,
@@ -59,6 +61,9 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
     
     def fetch_from_okta(self, resource_id=None, request=None):
         """Fetch data from Okta API dynamically."""
+        # Get request_id from request if available
+        request_id = getattr(request, 'request_id', None) if request else None
+
         if not self.okta_endpoint:
             logger.error("Okta endpoint not defined")
             return {"error": "Okta endpoint not defined"}, 500, {}
@@ -72,7 +77,17 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
         # Validate scope before making request
         is_valid, required_scopes, granted_scopes, missing_scopes = validate_scope_for_endpoint(request, okta_url)
 
-        logger.info(f"Fetching data from Okta endpoint: {self.okta_endpoint}")
+        logger.info(
+            f"Fetching data from Okta: {self.okta_endpoint}",
+            extra={
+                'component': 'okta_api',
+                'request_id': request_id,
+                'entity_type': self.entity_type,
+                'endpoint': self.okta_endpoint,
+            }
+        )
+
+        start_time = time.time()
 
         while True:  # Keep retrying if rate limited
             response = requests.get(okta_url, headers=headers)
@@ -119,7 +134,7 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
 
             return response_data, 200, rate_limit_headers(response)
 
-    def extract_data(self, okta_data):
+    def extract_data(self, okta_data, request_id=None):
         """
         Extract relevant data from Okta response using the mapping.
         """
@@ -127,14 +142,28 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
             logger.error("Entity type not defined")
             return JsonResponse({"error": "Entity type not defined"}, status=500)
 
+        start_time = time.time()
         extracted_data = extract_entity_data(self.entity_type, okta_data)
-        # logger.info(f"Extracted {len(extracted_data)} records for entity: {self.entity_type}")
+        duration_ms = int((time.time() - start_time) * 1000)
+
+        logger.info(
+            f"Extracted data: {self.entity_type}",
+            extra={
+                'component': 'data_extraction',
+                'request_id': request_id,
+                'entity_type': self.entity_type,
+                'record_count': len(extracted_data),
+                'duration_ms': duration_ms,
+            }
+        )
+
         return extracted_data
 
-    def store_data(self, extracted_data, db_name, batch_size=2000):
+    def store_data(self, extracted_data, db_name, batch_size=2000, request_id=None):
         """
         Store the extracted data in a dynamically named MongoDB database.
         """
+        start_time = time.time()
         # Test this code for inserting all data at one go.
         # logger.info(f"Storing {self.entity_type} data in MongoDB database: {db_name}")
 
@@ -272,7 +301,39 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
             batch = data_list[i : i + batch_size]  # Get a batch of `batch_size` records
             collection.insert_many(batch)  # Bulk insert
 
-            logger.info(f"Inserted {len(batch)} records into {db_name}")
+            logger.info(
+                f"Inserted batch: {len(batch)} records into {db_name}",
+                extra={
+                    'component': 'mongodb',
+                    'request_id': request_id,
+                    'entity_type': self.entity_type,
+                    'batch_size': len(batch),
+                    'batch_number': (i // batch_size) + 1,
+                }
+            )
+
+        duration_ms = int((time.time() - start_time) * 1000)
+
+        # Log final MongoDB operation
+        log_mongodb_operation(
+            operation='insert',
+            collection=self.entity_type,
+            count=len(extracted_data),
+            duration_ms=duration_ms,
+            request_id=request_id
+        )
+
+        logger.info(
+            f"Stored data in MongoDB: {self.entity_type}",
+            extra={
+                'component': 'mongodb',
+                'request_id': request_id,
+                'entity_type': self.entity_type,
+                'record_count': len(extracted_data),
+                'database': db_name,
+                'duration_ms': duration_ms,
+            }
+        )
 
         return db_name
     

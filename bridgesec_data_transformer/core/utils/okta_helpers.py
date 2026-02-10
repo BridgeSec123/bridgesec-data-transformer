@@ -1,7 +1,9 @@
 import logging
+import time
 
 import requests
 from django.conf import settings
+from bridgesec_logging import log_okta_api_call
 
 logger = logging.getLogger(__name__)
 
@@ -132,10 +134,30 @@ def make_okta_request(url, request=None, method="GET", data=None, params=None):
         tuple: (response_data, error_info)
                error_info is None on success, or dict with error details on failure
     """
+    # Get request_id from request if available
+    request_id = getattr(request, 'request_id', None) if request else None
+
     headers = get_okta_headers(request)
 
     # Validate scope before making request
     is_valid, required_scopes, granted_scopes, missing_scopes = validate_scope_for_endpoint(request, url)
+
+    # Log scope validation if missing scopes
+    if missing_scopes:
+        logger.warning(
+            f"Okta API scope validation failed: {url}",
+            extra={
+                'component': 'okta_api',
+                'request_id': request_id,
+                'endpoint': url,
+                'required_scopes': required_scopes,
+                'granted_scopes': granted_scopes,
+                'missing_scopes': missing_scopes,
+            }
+        )
+
+    # Start timing the request
+    start_time = time.time()
 
     try:
         if method.upper() == "GET":
@@ -148,6 +170,38 @@ def make_okta_request(url, request=None, method="GET", data=None, params=None):
             response = requests.delete(url, headers=headers, params=params)
         else:
             return None, {"error": f"Unsupported HTTP method: {method}"}
+
+        # Calculate duration
+        duration_ms = int((time.time() - start_time) * 1000)
+
+        # Extract rate limit info from headers
+        rate_limit_remaining = response.headers.get('X-Rate-Limit-Remaining')
+        rate_limit_limit = response.headers.get('X-Rate-Limit-Limit')
+        rate_limit_reset = response.headers.get('X-Rate-Limit-Reset')
+
+        # Log the Okta API call
+        log_okta_api_call(
+            endpoint=url,
+            method=method,
+            status_code=response.status_code,
+            duration_ms=duration_ms,
+            rate_limit_remaining=int(rate_limit_remaining) if rate_limit_remaining else None,
+            request_id=request_id
+        )
+
+        # Warn if rate limit is low
+        if rate_limit_remaining and int(rate_limit_remaining) < 100:
+            logger.warning(
+                f"Okta rate limit low: {rate_limit_remaining} remaining",
+                extra={
+                    'component': 'okta_api',
+                    'request_id': request_id,
+                    'endpoint': url,
+                    'rate_limit_remaining': int(rate_limit_remaining),
+                    'rate_limit_limit': int(rate_limit_limit) if rate_limit_limit else None,
+                    'rate_limit_reset': rate_limit_reset,
+                }
+            )
 
         # Handle 401/403 errors with helpful scope message
         if response.status_code in [401, 403]:
@@ -173,7 +227,23 @@ def make_okta_request(url, request=None, method="GET", data=None, params=None):
                 "message": f"Access denied to Okta API: {error_summary}.{scope_hint}",
                 "url": url
             }
-            logger.error(f"Okta API access denied: {error_info}")
+
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            logger.error(
+                f"Okta API access denied: {url}",
+                extra={
+                    'component': 'okta_api',
+                    'request_id': request_id,
+                    'endpoint': url,
+                    'method': method,
+                    'status_code': response.status_code,
+                    'duration_ms': duration_ms,
+                    'error_code': error_code,
+                    'error_summary': error_summary,
+                    'missing_scopes': missing_scopes,
+                }
+            )
             return None, error_info
 
         response.raise_for_status()

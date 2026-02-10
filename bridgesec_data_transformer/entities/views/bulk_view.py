@@ -45,6 +45,8 @@ from rest_framework.response import Response
 
 from core.utils import fieldfetch
 from core.utils import mapping_handlers
+from bridgesec_logging import log_restore_operation, log_terraform_api_call, LogExecutionTime
+
 logger = logging.getLogger(__name__)
 
 mongo_client = settings.MONGO_CLIENT
@@ -65,6 +67,19 @@ class BulkEntityViewSet(viewsets.ViewSet):
         """
         Triggers a background task to fetch fresh data for all registered entities and store them in a dynamic MongoDB.
         """
+        # Get request_id from middleware
+        request_id = getattr(request, 'request_id', 'N/A')
+        user = getattr(request.user, 'username', 'anonymous') if hasattr(request, 'user') else 'anonymous'
+
+        logger.info(
+            "Bulk fetch triggered",
+            extra={
+                'component': 'api',
+                'request_id': request_id,
+                'user': user,
+            }
+        )
+
         # Get Okta access token and granted scopes from session to pass to background task
         okta_access_token = None
         okta_granted_scopes = []
@@ -72,10 +87,20 @@ class BulkEntityViewSet(viewsets.ViewSet):
             okta_access_token = request.session.get('okta_access_token')
             okta_granted_scopes = request.session.get('okta_granted_scopes', [])
 
-        # Pass access token and scopes to Celery task for Bearer token authentication
+        # Pass access token, scopes, and request_id to Celery task for Bearer token authentication
         run_bulk_entity_task.delay(
             okta_access_token=okta_access_token,
-            okta_granted_scopes=okta_granted_scopes
+            okta_granted_scopes=okta_granted_scopes,
+            request_id=request_id
+        )
+
+        logger.info(
+            "Bulk fetch task queued successfully",
+            extra={
+                'component': 'celery',
+                'request_id': request_id,
+                'user': user,
+            }
         )
 
         return Response(
@@ -319,6 +344,10 @@ class BulkEntityViewSet(viewsets.ViewSet):
             - operation_type: "delete", "restore", or "create" (optional)
                 If "delete", all records in body are treated as deletion targets
         """
+        # Get request_id and user for tracing
+        request_id = getattr(request, 'request_id', 'N/A')
+        user = get_user_from_request(request)
+
         try:
             modified_data = request.data.get("data", [])
             if not isinstance(modified_data, list):
@@ -329,7 +358,19 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
             # Get operation_type from query parameters
             operation_type = request.query_params.get("operation_type")
-            logger.info(f"Operation type from query param: {operation_type}")
+
+            logger.info(
+                f"Restore operation started: {entity_name}",
+                extra={
+                    'component': 'restore',
+                    'request_id': request_id,
+                    'user': user,
+                    'entity_type': entity_name,
+                    'operation_type': operation_type,
+                    'record_count': len(modified_data),
+                    'source_date': date_str,
+                }
+            )
 
             # resolve collection name
             collection_name = get_collection_name(entity_name)
@@ -596,11 +637,21 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
             # Build full Terraform URL with module-based endpoint
             terraform_url = f"{server_url}{terraform_api}"
-            logger.info(f"Routing to Terraform module API: {terraform_url}")
-            logger.info(f"Terraform params: {params}")
+            logger.info(
+                f"Sending to Terraform API: {terraform_url}",
+                extra={
+                    'component': 'terraform_api',
+                    'request_id': request_id,
+                    'entity_type': entity_name,
+                    'terraform_url': terraform_url,
+                    'params': params,
+                }
+            )
 
-            # Send data to module-specific Terraform API
-            # Pass all params including deletion parameters if applicable
+            # Send data to module-specific Terraform API with timing
+            import time
+            start_time = time.time()
+
             tf_response = requests.post(
                 terraform_url,
                 params=params,
@@ -608,12 +659,35 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 headers=tf_headers,
             )
 
+            duration_ms = int((time.time() - start_time) * 1000)
+
             try:
                 tf_data = tf_response.json()
             except Exception:
                 tf_data = {"message": "Unknown response from TF repo"}
 
             tf_message = tf_data.get("message", "No message returned")
+
+            # Log Terraform API response
+            log_terraform_api_call(
+                entity_type=entity_name,
+                operation=operation_type or 'restore',
+                status_code=tf_response.status_code,
+                duration_ms=duration_ms,
+                request_id=request_id
+            )
+
+            logger.info(
+                f"Terraform API response: {tf_response.status_code}",
+                extra={
+                    'component': 'terraform_api',
+                    'request_id': request_id,
+                    'entity_type': entity_name,
+                    'status_code': tf_response.status_code,
+                    'duration_ms': duration_ms,
+                    'response_message': tf_message,  # Renamed from 'message' (reserved field)
+                }
+            )
 
             # Handle deletion status update based on Terraform response
             if deleted_records:
@@ -642,6 +716,46 @@ class BulkEntityViewSet(viewsets.ViewSet):
                             )
 
                     logger.info(f"Successfully updated {len(deleted_ids_list)} records to 'deleted' status")
+
+                    # ============================================
+                    # NEW: RUN DELETION VERIFICATION
+                    # ============================================
+                    logger.info("=" * 80)
+                    logger.info("RUNNING DELETION VERIFICATION")
+                    logger.info("=" * 80)
+
+                    from core.utils.verification import verify_deletion_complete
+
+                    # Get Okta access token from request session
+                    okta_access_token = None
+                    if hasattr(request, 'session'):
+                        okta_access_token = request.session.get('okta_access_token')
+
+                    # Run verification for each deleted record
+                    verification_results = []
+                    for doc in complete_deleted_records:
+                        try:
+                            verification = verify_deletion_complete(
+                                entity_type=entity_name,
+                                entity_record=doc,
+                                deletion_results=tf_data,
+                                access_token=okta_access_token
+                            )
+                            verification_results.append(verification)
+                        except Exception as e:
+                            logger.error(f"Verification failed for record: {e}")
+                            verification_results.append({
+                                "verified": False,
+                                "error": str(e),
+                                "entity_record": doc
+                            })
+
+                    # Log verification summary
+                    verified_count = sum(1 for v in verification_results if v.get("verified"))
+                    failed_count = len(verification_results) - verified_count
+
+                    logger.info(f"VERIFICATION SUMMARY: {verified_count} verified, {failed_count} failed")
+                    logger.info("=" * 80)
 
                 else:
                     # FAILURE: Keep status as "deletion_pending" and return error
@@ -705,11 +819,60 @@ class BulkEntityViewSet(viewsets.ViewSet):
             if deleted_records and cascade_info:
                 response_data["cascade_info"] = cascade_info
 
+            # Add verification results if deletion occurred
+            if deleted_records and 'verification_results' in locals():
+                response_data["verification"] = {
+                    "performed": True,
+                    "total_verified": sum(1 for v in verification_results if v.get("verified")),
+                    "total_failed": sum(1 for v in verification_results if not v.get("verified")),
+                    "results": verification_results
+                }
+
+                # Update status based on verification
+                if any(not v.get("verified") for v in verification_results):
+                    response_data["warning"] = "Deletion completed but verification found issues. Check 'verification' field for details."
+
+            # Log operation completion
+            log_restore_operation(
+                entity_type=entity_name,
+                operation_type=operation_type or 'restore',
+                count=len(modified_data),
+                request_id=request_id,
+                user=user
+            )
+
+            logger.info(
+                f"Restore operation completed: {entity_name}",
+                extra={
+                    'component': 'restore',
+                    'request_id': request_id,
+                    'user': user,
+                    'entity_type': entity_name,
+                    'deleted_count': len(deleted_records),
+                    'restored_count': len(restore_records),
+                    'created_count': len(create_records),  # Renamed from 'created' (reserved field)
+                    'terraform_status': tf_response.status_code,
+                }
+            )
+
             return Response(response_data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
             import traceback
             traceback.print_exc()
+
+            logger.error(
+                f"Restore operation failed: {entity_name} - {str(e)}",
+                extra={
+                    'component': 'restore',
+                    'request_id': request_id,
+                    'user': user,
+                    'entity_type': entity_name,
+                    'error': str(e),
+                },
+                exc_info=True
+            )
+
             return Response({"error": str(e)}, status=500)
 
     @swagger_auto_schema(

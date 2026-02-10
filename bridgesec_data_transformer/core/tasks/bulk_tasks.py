@@ -2,15 +2,16 @@ import json
 import logging
 import os
 import time
+import uuid
 
 import pika
 from celery import shared_task, group
 from django.conf import settings
 
 from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
+from bridgesec_logging import log_task_start, log_task_complete, log_task_error, log_worker_assignment
 from entities.registry import ENTITY_VIEWSETS
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -75,7 +76,7 @@ def notify_backend_via_rabbitmq(db_name, status='completed', error_details=None)
 
 
 @shared_task(bind=True)
-def process_single_entity_group(self, entity_name, viewset_class_path, db_name, okta_access_token=None, okta_granted_scopes=None):
+def process_single_entity_group(self, entity_name, viewset_class_path, db_name, okta_access_token=None, okta_granted_scopes=None, request_id=None):
     """
     Process a single entity group in a Celery worker.
     This task runs in parallel with other entity group tasks.
@@ -86,6 +87,7 @@ def process_single_entity_group(self, entity_name, viewset_class_path, db_name, 
         db_name: Target MongoDB database name
         okta_access_token: OAuth access token (optional)
         okta_granted_scopes: List of granted OAuth scopes
+        request_id: Request tracing ID
 
     Returns:
         Dict with status, entity_name, processing_time, record_counts, error
@@ -93,7 +95,19 @@ def process_single_entity_group(self, entity_name, viewset_class_path, db_name, 
     start_time = time.time()
 
     try:
-        logger.info(f"[ENTITY: {entity_name}] Starting processing...")
+        # Log worker assignment
+        worker_id = self.request.id  # Celery task ID
+        log_worker_assignment(worker_id, entity_name, request_id)
+
+        logger.info(
+            f"[ENTITY: {entity_name}] Starting processing...",
+            extra={
+                'component': 'celery',
+                'entity_type': entity_name,
+                'request_id': request_id,
+                'worker_id': worker_id,
+            }
+        )
 
         # Import dependencies
         from core.utils.mongo_utils import ensure_mongo_connection
@@ -143,7 +157,19 @@ def process_single_entity_group(self, entity_name, viewset_class_path, db_name, 
             logger.info(f"[ENTITY: {entity_name}] Saved {sub_entity_name} ({record_count} records)")
 
         processing_time = time.time() - start_time
-        logger.info(f"[ENTITY: {entity_name}] ✓ Completed in {processing_time:.2f}s")
+        duration_ms = int(processing_time * 1000)
+
+        logger.info(
+            f"[ENTITY: {entity_name}] ✓ Completed in {processing_time:.2f}s",
+            extra={
+                'component': 'celery',
+                'entity_type': entity_name,
+                'request_id': request_id,
+                'worker_id': self.request.id,
+                'duration_ms': duration_ms,
+                'record_counts': record_counts,
+            }
+        )
 
         return {
             'status': 'success',
@@ -155,7 +181,20 @@ def process_single_entity_group(self, entity_name, viewset_class_path, db_name, 
 
     except Exception as e:
         processing_time = time.time() - start_time
-        logger.exception(f"[ENTITY: {entity_name}] ✗ Failed: {e}")
+        duration_ms = int(processing_time * 1000)
+
+        logger.exception(
+            f"[ENTITY: {entity_name}] ✗ Failed: {e}",
+            extra={
+                'component': 'celery',
+                'entity_type': entity_name,
+                'request_id': request_id,
+                'worker_id': self.request.id,
+                'duration_ms': duration_ms,
+                'error': str(e),
+            }
+        )
+
         return {
             'status': 'error',
             'entity_name': entity_name,
@@ -168,7 +207,8 @@ def process_single_entity_group(self, entity_name, viewset_class_path, db_name, 
 def run_bulk_entity_task(
     okta_access_token=None,
     okta_granted_scopes=None,
-    max_workers=4
+    max_workers=4,
+    request_id=None
 ):
     """
     Background task to fetch data from all Okta entities and store in MongoDB.
@@ -180,15 +220,33 @@ def run_bulk_entity_task(
                           If None, falls back to SSWS API token.
         okta_granted_scopes: List of OAuth scopes granted to the access token.
         max_workers: Not used in Celery version (kept for API compatibility).
+        request_id: Request tracing ID (generated if not provided).
     """
     start_time = time.time()
     db_name = get_dynamic_db()
     total_groups = len(ENTITY_VIEWSETS)
 
-    logger.info("=" * 80)
-    logger.info(f"PARALLEL BULK FETCH STARTING (Celery Group)")
-    logger.info(f"Entity Groups: {total_groups} | DB: {db_name}")
-    logger.info("=" * 80)
+    # Generate request_id if not provided
+    if not request_id:
+        request_id = str(uuid.uuid4())
+
+    # Log task start
+    log_task_start(
+        'bulk_fetch',
+        params={'total_groups': total_groups, 'db_name': db_name},
+        request_id=request_id
+    )
+
+    logger.info(
+        "PARALLEL BULK FETCH STARTING (Celery Group)",
+        extra={
+            'component': 'celery',
+            'task_name': 'bulk_fetch',
+            'request_id': request_id,
+            'db_name': db_name,
+            'total_groups': total_groups,
+        }
+    )
 
     # Log authentication method being used
     if okta_access_token:
@@ -215,7 +273,8 @@ def run_bulk_entity_task(
                 viewset_class_path=viewset_class_path,
                 db_name=db_name,
                 okta_access_token=okta_access_token,
-                okta_granted_scopes=okta_granted_scopes
+                okta_granted_scopes=okta_granted_scopes,
+                request_id=request_id  # Pass request_id to all child tasks
             )
             tasks.append(task)
 
@@ -260,11 +319,34 @@ def run_bulk_entity_task(
             notify_status = 'failed'
 
         total_time = time.time() - start_time
+        duration_ms = int(total_time * 1000)
 
-        logger.info("=" * 80)
-        logger.info(f"PARALLEL BULK FETCH COMPLETED")
-        logger.info(f"Status: {overall_status} | Successful: {successful}/{total_groups} | Time: {total_time:.2f}s")
-        logger.info("=" * 80)
+        # Log task completion
+        log_task_complete(
+            'bulk_fetch',
+            result={
+                'status': overall_status,
+                'successful': successful,
+                'failed': failed,
+                'total_groups': total_groups,
+            },
+            duration_ms=duration_ms,
+            request_id=request_id
+        )
+
+        logger.info(
+            "PARALLEL BULK FETCH COMPLETED",
+            extra={
+                'component': 'celery',
+                'task_name': 'bulk_fetch',
+                'request_id': request_id,
+                'status': overall_status,
+                'successful_groups': successful,
+                'failed_groups': failed,
+                'total_groups': total_groups,
+                'duration_ms': duration_ms,
+            }
+        )
 
         # Notify via RabbitMQ
         notify_backend_via_rabbitmq(db_name, notify_status, error_details if error_details else None)

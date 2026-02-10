@@ -1,0 +1,111 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # BridgeSec application logs
+  - job_name: bridgesec_app
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: bridgesec
+          app: bridgesec
+          __path__: /var/log/bridgesec/bridgesec.log
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: asctime
+            level: levelname
+            message: message
+            logger: name
+            request_id: request_id
+            user: user
+            component: component
+            entity_type: entity_type
+            duration_ms: duration_ms
+            hostname: hostname
+            environment: environment
+      - labels:
+          level:
+          logger:
+          request_id:
+          user:
+          component:
+          entity_type:
+          hostname:
+          environment:
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      - output:
+          source: message
+
+  # Celery worker logs
+  - job_name: celery_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: celery
+          app: bridgesec
+          component: celery
+          __path__: /var/log/bridgesec/bridgesec_celery.log
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: asctime
+            level: levelname
+            message: message
+            logger: name
+            request_id: request_id
+            user: user
+            component: component
+            entity_type: entity_type
+            duration_ms: duration_ms
+            hostname: hostname
+            environment: environment
+      - labels:
+          level:
+          logger:
+          request_id:
+          user:
+          component:
+          entity_type:
+          hostname:
+          environment:
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      - output:
+          source: message
+
+  # Django logs (if separate)
+  - job_name: django_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: django
+          app: bridgesec
+          component: api
+          __path__: /var/log/bridgesec/django.log
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      - output:
+          source: message

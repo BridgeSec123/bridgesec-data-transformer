@@ -18,12 +18,32 @@ logger = logging.getLogger(__name__)
 
 class OktaCallbackView(APIView):
     def get(self, request):
+        request_id = getattr(request, 'request_id', 'N/A')
+
+        logger.info(
+            "OAuth callback received",
+            extra={
+                'component': 'auth',
+                'request_id': request_id,
+                'action': 'callback',
+            }
+        )
+
         code = request.GET.get("code")
         error = request.GET.get("error")
         error_description = request.GET.get("error_description")
 
         # Handle OAuth errors from Okta
         if error:
+            logger.error(
+                f"OAuth error from Okta: {error}",
+                extra={
+                    'component': 'auth',
+                    'request_id': request_id,
+                    'error': error,
+                    'error_description': error_description,
+                }
+            )
             return Response(
                 {"error": error, "error_description": error_description},
                 status=status.HTTP_400_BAD_REQUEST
@@ -77,13 +97,28 @@ class OktaCallbackView(APIView):
         id_token = token_data.get("id_token")
         access_token = token_data.get("access_token")
 
-        logger.info(f"OKTA ACCESS TOKEN: {access_token}")
+        # SECURITY: Do not log full access tokens
+        # logger.info(f"OKTA ACCESS TOKEN: {access_token}")
+        logger.info(f"OKTA ACCESS TOKEN received (length: {len(access_token) if access_token else 0})")
+
+        # TEMPORARY DEBUG: Remove this after debugging!
+        logger.debug(f"DEBUG - Full Access Token: {access_token}")
 
         if not id_token or not access_token:
             return Response({"error": "Token not received"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Extract granted scopes from access token
         granted_scopes = self._extract_scopes_from_token(access_token)
+
+        logger.info(
+            "Token exchange successful",
+            extra={
+                'component': 'auth',
+                'request_id': request_id,
+                'granted_scopes_count': len(granted_scopes),
+                'scopes': granted_scopes,
+            }
+        )
 
         # Decode and verify ID token
         # First, extract the actual issuer from the token to avoid validation errors
@@ -129,6 +164,25 @@ class OktaCallbackView(APIView):
         if not user:
             user = User(email=email, username=username, role="admin")
             user.save()
+            logger.info(
+                f"New user created: {email}",
+                extra={
+                    'component': 'auth',
+                    'request_id': request_id,
+                    'user': email,
+                    'action': 'user_created',
+                }
+            )
+        else:
+            logger.info(
+                f"Existing user logged in: {email}",
+                extra={
+                    'component': 'auth',
+                    'request_id': request_id,
+                    'user': email,
+                    'action': 'user_login',
+                }
+            )
 
         # Generate custom access token for application
         jwt_token = generate_jwt_token(user)
@@ -144,6 +198,17 @@ class OktaCallbackView(APIView):
         session["okta_granted_scopes"] = granted_scopes
         session.set_expiry(3600)
         session.save()
+
+        logger.info(
+            f"User authenticated successfully: {email}",
+            extra={
+                'component': 'auth',
+                'request_id': request_id,
+                'user': email,
+                'granted_scopes': granted_scopes,
+                'action': 'auth_complete',
+            }
+        )
 
         response = HttpResponseRedirect(settings.FRONTEND_REDIRECT_URL)
         response.set_cookie("access_token", jwt_token, httponly=False, secure=False, samesite="Lax")

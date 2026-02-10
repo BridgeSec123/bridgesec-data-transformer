@@ -36,6 +36,15 @@ FRONTEND_REDIRECT_URL = env("FRONTEND_REDIRECT_URL")
 FRONTEND_URL = env("FRONTEND_URL")
 SERVER_URL = env("SERVER_URL")
 
+# Supabase Configuration (for Terraform state file verification)
+# Add these to your .env file:
+#   SUPABASE_URL=https://your-project.supabase.co
+#   SUPABASE_KEY=your-anon-key-here
+#   SUPABASE_BUCKET=terraform-states
+SUPABASE_URL = env("SUPABASE_URL", default=None)
+SUPABASE_KEY = env("SUPABASE_KEY", default=None)
+SUPABASE_BUCKET = env("SUPABASE_BUCKET", default="terraform-states")
+
 # Okta OAuth Scopes for API access
 # These scopes are requested during login to access Okta Admin APIs
 OKTA_SCOPES = " ".join([
@@ -189,6 +198,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
+    'bridgesec_logging.middleware.LoggingMiddleware',  # Centralized logging middleware
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -288,6 +298,22 @@ MONGO_CLIENT = MongoClient(MONGO_URI)
 connect(db=MONGO_DB_NAME, host=MONGO_URI)
 connect_to_mongo()
 MONGO_CONNECTIONS = set()
+
+# ========================================
+# LOGGING CONFIGURATION
+# ========================================
+# Setup structured logging with Loki integration
+try:
+    from bridgesec_logging import setup_logging
+    setup_logging(
+        app_name="bridgesec",
+        log_dir=BASE_DIR / 'logs',
+        environment=os.getenv('ENVIRONMENT', 'development'),
+        log_level='DEBUG',  # TEMPORARY: Set to DEBUG to see access token logs
+    )
+except Exception as e:
+    import logging
+    logging.warning(f"Failed to setup Loki logging: {e}. Using default logging.")
 
 # Logging configuration
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

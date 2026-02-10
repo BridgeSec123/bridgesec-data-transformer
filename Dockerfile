@@ -18,5 +18,8 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # Copy the project files
 COPY . .
 
+# Install bridgesec_logging package
+RUN pip install -e .
+
 # Expose port for Django (Gunicorn)
 EXPOSE 8000
