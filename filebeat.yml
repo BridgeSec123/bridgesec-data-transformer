@@ -1,0 +1,33 @@
+filebeat.inputs:
+  # BridgeSec application logs
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/bridgesec/bridgesec.log
+      - /var/log/bridgesec/bridgesec_celery.log
+    json.keys_under_root: true
+    json.add_error_key: true
+    json.overwrite_keys: true
+    fields:
+      app: bridgesec
+      service: api
+    fields_under_root: true
+
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  indices:
+    - index: "bridgesec-logs-%{+yyyy.MM.dd}"
+      when.equals:
+        app: "bridgesec"
+
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_docker_metadata: ~
+  - drop_fields:
+      fields: ["agent.ephemeral_id", "agent.id", "ecs.version", "input.type", "log.offset"]
+      ignore_missing: true
+
+logging.level: info
+logging.to_files: false
+logging.to_stderr: true
