@@ -310,6 +310,7 @@ try:
         log_dir=BASE_DIR / 'logs',
         environment=os.getenv('ENVIRONMENT', 'development'),
         log_level='DEBUG',  # TEMPORARY: Set to DEBUG to see access token logs
+        enable_loki=False,  # Disable Loki to prevent logging issues
     )
 except Exception as e:
     import logging
@@ -344,6 +345,11 @@ LOGGING = {
             'format': '{asctime} | {levelname} | {module}.{funcName}:{lineno} | {message}',
             'style': '{',
         },
+        'json': {
+            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+            'format': '%(asctime)s %(levelname)s %(name)s %(module)s %(funcName)s %(lineno)d %(message)s',
+            'datefmt': '%Y-%m-%dT%H:%M:%S',
+        },
         'colored': {
             '()': 'colorlog.ColoredFormatter',
             'format': '%(log_color)s%(asctime)s | %(levelname)s | %(module)s.%(funcName)s:%(lineno)d | %(message)s',
@@ -369,14 +375,20 @@ LOGGING = {
             'filename': os.path.join(LOG_DIR, 'app.log'),
             'formatter': 'verbose',
             'level': 'DEBUG',
-            
+
+        },
+        'celery_file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOG_DIR, 'bridgesec_celery.log'),
+            'formatter': 'json',
+            'level': 'DEBUG',
         },
         'error_file': {
             'class': 'logging.FileHandler',
             'filename': os.path.join(LOG_DIR, 'error.log'),
             'formatter': 'verbose',
             'level': 'ERROR',
-        },   
+        },
     },
 
     'loggers': {
@@ -387,7 +399,7 @@ LOGGING = {
             'propagate': True,
         },
          "celery": {
-            "handlers": ["console", "file"],
+            "handlers": ["console", "celery_file"],
             "level": "INFO",
             "propagate": False,
         },

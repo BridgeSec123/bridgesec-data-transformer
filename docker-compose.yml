@@ -25,14 +25,13 @@ services:
     env_file:
       - .env
     environment:
-      - CELERY_LOG_FILE=/app/logs/app.log
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
     volumes:
      - .:/app
      - ./bridgesec_data_transformer/logs:/app/logs
      - ./bridgesec_data_transformer/output:/app/bridgesec_data_transformer/output
-    command: /bin/sh -c 'celery -A bridgesec_data_transformer worker --loglevel=INFO 2>&1 | tee -a /app/logs/app.log'
+    command: celery -A bridgesec_data_transformer worker --loglevel=INFO
     restart: always
 
   consumer:
@@ -158,6 +157,56 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ============================================================================
+  # Splunk Stack 
+  # ============================================================================
+
+  # Splunk Enterprise - Main Splunk Server with Web UI
+  splunk-server:
+    image: splunk/splunk:9.1
+    container_name: bridgesec_splunk_server
+    hostname: splunk-server
+    environment:
+      - SPLUNK_START_ARGS=--accept-license
+      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD:-changeme123}
+      - SPLUNK_HEC_TOKEN=abcd1234-abcd-1234-abcd-1234abcd1234
+    ports:
+      - "8000:8000"      # Splunk Web UI
+      - "8088:8088"      # HEC (HTTP Event Collector)
+      - "9997:9997"      # Splunk Forwarder Receiver
+    volumes:
+      - splunk_server_data:/opt/splunk/var
+      - splunk_server_etc:/opt/splunk/etc
+    restart: unless-stopped
+    profiles:
+      - splunk
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Splunk Universal Forwarder - Ships logs to Splunk Server
+  splunk-forwarder:
+    image: splunk/universalforwarder:9.1
+    container_name: bridgesec_splunk_forwarder
+    hostname: bridgesec-splunk-forwarder
+    environment:
+      - SPLUNK_START_ARGS=--accept-license --answer-yes
+      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD:-changeme123}
+      - SPLUNK_FORWARD_SERVER=splunk-server:9997
+      - SPLUNK_ADD=monitor /logs
+    volumes:
+      - ./bridgesec_data_transformer/logs:/logs:ro
+      - ./splunk-inputs.conf:/opt/splunkforwarder/etc/apps/search/local/inputs.conf
+      - splunk_data:/opt/splunkforwarder/var
+    depends_on:
+      splunk-server:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - splunk
+
 volumes:
   static_volume:
   mongo_data:
@@ -165,3 +214,6 @@ volumes:
   grafana_data:
   elasticsearch_data:
   filebeat_data:
+  splunk_data:
+  splunk_server_data:
+  splunk_server_etc:
