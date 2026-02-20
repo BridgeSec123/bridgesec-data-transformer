@@ -17,7 +17,7 @@ MODULE_APIS = {
 ENTITY_TO_MODULE = {
     # Apps module (11+ entities)
     "App Oauth": "apps",
-    "App SAML": "apps",
+    "App Saml": "apps",
     "App SWA": "apps",
     "App Bookmark": "apps",
     "App Auto Login": "apps",
@@ -25,6 +25,21 @@ ENTITY_TO_MODULE = {
     "App Browser Plugin": "apps",
     "App OIDC": "apps",
     "App WS Federation": "apps",
+    "App Group Assignments":"apps",
+    "App Group Assignment":"apps",
+    "App Access Policy Assignment":"apps",
+    "App Signon Policy Rule":"apps",
+    "App Shared Credentials":"apps",
+    "App Saml Settings":"apps",
+    "App User":"apps",
+    "App Oauth Role Assignment":"apps",
+    "App Oauth Post Logout Redirect Uri":"apps",
+    "App Three Field":"apps",
+    "App Oauth Redirect Uri":"apps",
+    "App User Schema Property":"apps",
+    "App Signon Policy":"apps",
+    "App User Base Schema Property":"apps",
+    # "App Signon Policy ":"apps",
     "App Signon Policy": "apps",
     "App Signon Policy Rule": "apps",
     "App Group Assignments": "apps",
@@ -44,7 +59,7 @@ ENTITY_TO_MODULE = {
     "Users": "users",
     "User": "users",
     "User Types": "users",
-    "User Type": "users",
+    # "User Type": "users",
     "User Factors": "users",
     "User Admin Roles": "users",
     "User Schemas": "users",
@@ -56,6 +71,7 @@ ENTITY_TO_MODULE = {
     "Groups": "groups",
     "Group Rules": "groups",
     "Group Roles": "groups",
+    "Group Schema Property": "groups",
     "Group Schemas": "groups",
     "Group Schema Property": "groups",
     "Group Memberships": "groups",
@@ -64,6 +80,7 @@ ENTITY_TO_MODULE = {
     # Policies module (10+ entities)
     "Policy MFA": "policies",
     "Policy Password": "policies",
+    "Policy Sign On": "policies",
     "Policy SignOn": "policies",
     "Policy Sign On": "policies",
     "Policy Profile Enrollment": "policies",
@@ -78,6 +95,8 @@ ENTITY_TO_MODULE = {
     "Policy Device Assurance Macos": "policies",
     "Policy Device Assurance Windows": "policies",
 
+    # Auth Servers module (5 entities)
+    "Auth Server": "auth_servers",
     # Auth Servers module (5+ entities)
     "Auth Servers": "auth_servers",
     "Auth Server": "auth_servers",
@@ -94,6 +113,7 @@ ENTITY_TO_MODULE = {
     # Security module (15+ entities)
     "Authenticators": "security",
     "Authenticator": "security",
+    "Factor":"security",
     "Brands": "security",
     "Brand": "security",
     "Themes": "security",

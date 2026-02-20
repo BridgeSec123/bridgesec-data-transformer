@@ -3,9 +3,12 @@ Serializer Registry
 Maps entity names (from RESOURCE_COLLECTION_MAP) to their corresponding serializer classes.
 Used for validating data before storing in MongoDB.
 """
-
+from entities.okta_entities.brands.brand_serializers import EmailDomainSerializer
+from entities.okta_entities.users.user_serializers import UserTypeSerializer,UserSerializer,UserSchemaPropertySerializer,UserAdminRolesSerializer,UserGroupMembershipsSerializer,UserBaseSchemaPropertySerializer
 from entities.okta_entities.administrators.administrators_serializers import \
     AdminRoleCustomSerializer
+from entities.okta_entities.brands.brand_serializers import OktaThemeSerializer 
+from entities.okta_entities.authenticator.authenticator_serializers import OktaFactorSerializer
 # Import all serializer classes
 from entities.okta_entities.apps.apps_serializers import (
     AppAccessPolicyAssignmentSerializer, AppAutoLoginSerializer,
@@ -30,7 +33,7 @@ from entities.okta_entities.device_assurance_policies.device_assurance_policy_se
 from entities.okta_entities.email.email_serializers import \
     EmailSmtpServerSerializer
 from entities.okta_entities.entitlements.entitlement_serializers import (
-    EntitlementBundleSerializer, PrincipalEntitlementSerializer)
+    EntitlementBundleSerializer, PrincipalEntitlementSerializer, EntitlementSerializer)
 from entities.okta_entities.event_hook.event_hook_serializer import \
     EventHookSerializer
 from entities.okta_entities.groups.group_serializers import (
@@ -45,8 +48,8 @@ from entities.okta_entities.network_zone.network_zone_serializer import \
     NetworkZoneSerializer
 from entities.okta_entities.org.org_serializers import OrgSerializer
 from entities.okta_entities.policies.policy_serializers import (
-    PolicyMFASerializer, PolicyPasswordSerializer,
-    PolicyProfileEnrollmentSerializer, PolicySignOnSerializer)
+    PolicyMFASerializer, PolicyPasswordSerializer,PolicyRuleMFASerializer,
+    PolicyProfileEnrollmentSerializer, PolicySignOnSerializer,PolicyRulePasswordSerializer,PolicyRuleSignOnSerializer,PolicyRuleProfileEnrollmentSerializer)
 from entities.okta_entities.rate_limits.rate_limit_serializer import (
     PrincipalRateLimitSerializer, RateLimitAdminNotificationSerializer,
     RateLimitWarningThresholdSerializer)
@@ -76,8 +79,24 @@ SERIALIZER_REGISTRY = {
     "App User Schema Property": AppUserSchemaPropertySerializer,
     "App User Base Schema Property": AppUserBaseSchemaPropertySerializer,
     "App Basic Auth": AppBasicAuthSerializer,
-    "App Swa": AppSwaSerializer,
+    "App SWA": AppSwaSerializer,
     "App User": AppUserSerializer,
+    "App Signon Policy Rule":AppPolicySignOnRuleSerializer,
+    "App Shared Credentials":AppSharedCredentialsSerializer,
+    "App Saml Settings":AppSAMLSettingsSerializer,
+    "App Oauth Role Assignment":AppOAuthRoleAssignmentSerializer,
+    "App Oauth Post Logout Redirect Uri":AppOauthPostRedirectUriSerializer,
+    "App Oauth Redirect Uri":AppOauthRedirectUriSerializer,
+    "App User Schema Property":AppUserSchemaPropertySerializer,
+
+    
+    "Users":UserSerializer,
+    "User Schema Properties":UserSchemaPropertySerializer,
+    "User Group Memberships":UserGroupMembershipsSerializer,
+    "User Base Schema Properties":UserBaseSchemaPropertySerializer,
+    "User Admin Roles":UserAdminRolesSerializer,
+
+    "User Types":UserTypeSerializer,
 
     # Groups
     "Groups": GroupSerializer,
@@ -87,7 +106,8 @@ SERIALIZER_REGISTRY = {
     "Group Memberships": GroupMemberSerializer,
 
     # Brands
-    "Brand": BrandSerializer,
+    "Brands": BrandSerializer,
+    "Email Domain":EmailDomainSerializer,
 
     # Device Assurance Policies
     "Policy Device Assurance Android": DeviceAndroidSerializer,
@@ -98,6 +118,8 @@ SERIALIZER_REGISTRY = {
     # Email
     "Email SMTP Server": EmailSmtpServerSerializer,
 
+    "Themes": OktaThemeSerializer,
+
     # Rate Limits
     "Principal Rate Limit": PrincipalRateLimitSerializer,
     "Rate Limit Admin Notification": RateLimitAdminNotificationSerializer,
@@ -106,6 +128,7 @@ SERIALIZER_REGISTRY = {
     # Entitlements
     "Entitlement Bundle": EntitlementBundleSerializer,
     "Principal Entitlement": PrincipalEntitlementSerializer,
+    "Entitlements":EntitlementSerializer,
 
     # Requests
     "Request Condition": RequestConditionSerializer,
@@ -149,7 +172,12 @@ SERIALIZER_REGISTRY = {
 
     # Policies
     "Policy MFA": PolicyMFASerializer,
+    "Policy Rule Mfa":PolicyRuleMFASerializer,
     "Policy Password": PolicyPasswordSerializer,
     "Policy Profile Enrollment": PolicyProfileEnrollmentSerializer,
     "Policy Sign On": PolicySignOnSerializer,
+    "Policy Rule Password":PolicyRulePasswordSerializer,
+    "Policy Rule Profile Enrollment":PolicyRuleProfileEnrollmentSerializer,
+
+    "Factor":OktaFactorSerializer,
 }

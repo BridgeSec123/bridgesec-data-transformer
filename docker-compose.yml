@@ -178,8 +178,8 @@ services:
       - splunk_server_data:/opt/splunk/var
       - splunk_server_etc:/opt/splunk/etc
     restart: unless-stopped
-    profiles:
-      - splunk
+    # profiles:
+    #   - splunk
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000"]
       interval: 30s
@@ -204,8 +204,8 @@ services:
       splunk-server:
         condition: service_healthy
     restart: unless-stopped
-    profiles:
-      - splunk
+    # profiles:
+    #   - splunk
 
 volumes:
   static_volume:

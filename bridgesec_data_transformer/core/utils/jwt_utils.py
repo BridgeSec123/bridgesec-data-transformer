@@ -70,9 +70,9 @@ def get_user_from_request(request):
                     )
                     # Okta token: extract email from 'sub' or 'email' claim
                     email = decoded.get("sub") or decoded.get("email")
-                    logger.info(f"Decoded Okta token for user: {email}")
+                    logger.info(f"Decoded Okta token for user: {email}",extra={"operation":"Get User From Request"})
         except Exception as okta_error:
-            logger.debug(f"Not an Okta token, trying custom JWT: {str(okta_error)}")
+            logger.debug(f"Not an Okta token, trying custom JWT: {str(okta_error)}",extra={"operation":"Get User From Request"})
 
         # If Okta decode failed, try custom JWT (HS256)
         if not decoded:
@@ -80,9 +80,9 @@ def get_user_from_request(request):
                 decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
                 user_id = decoded.get('user_id')
                 email = decoded.get('email')
-                logger.info(f"Decoded custom JWT for user_id: {user_id}")
+                logger.info(f"Decoded custom JWT for user_id: {user_id}",extra={"operation":"Get User From Request"})
             except Exception as jwt_error:
-                logger.warning(f"Failed to decode both Okta and custom JWT: {str(jwt_error)}")
+                logger.warning(f"Failed to decode both Okta and custom JWT: {str(jwt_error)}",extra={"operation":"Get User From Request"})
                 return "Unknown"
 
         # Fetch user from database
@@ -94,26 +94,26 @@ def get_user_from_request(request):
                 user = User.objects(email=email).first()
                 if user:
                     user_identifier = user.username or user.email
-                    logger.info(f"Found user by email: {user_identifier}")
+                    logger.info(f"Found user by email: {user_identifier}",extra={"operation":"Get User From Request"})
                     return str(user_identifier)
 
             # Fallback to user_id for custom JWT tokens
             if user_id:
                 user = User.objects.get(id=ObjectId(user_id))
                 user_identifier = user.username or user.email
-                logger.info(f"Found user by ID: {user_identifier}")
+                logger.info(f"Found user by ID: {user_identifier}",extra={"operation":"Get User From Request"})
                 return str(user_identifier)
 
-            logger.warning("No email or user_id found in token")
+            logger.warning("No email or user_id found in token",extra={"operation":"Get User From Request"})
             return "Unknown"
 
         except User.DoesNotExist:
-            logger.warning(f"User not found in database")
+            logger.warning(f"User not found in database",extra={"operation":"Get User From Request"})
             return email or user_id or "Unknown"
         except Exception as db_error:
-            logger.warning(f"Database error fetching user: {str(db_error)}")
+            logger.warning(f"Database error fetching user: {str(db_error)}",extra={"operation":"Get User From Request"})
             return email or user_id or "Unknown"
 
     except Exception as e:
-        logger.warning(f"Failed to extract user from token: {str(e)}")
+        logger.warning(f"Failed to extract user from token: {str(e)}",extra={"operation":"Get User From Request"})
         return "Unknown"

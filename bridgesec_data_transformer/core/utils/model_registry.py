@@ -5,16 +5,21 @@ Used for dynamic schema extraction and entity operations.
 """
 
 # Import all model classes
+from entities.okta_entities.brands.brand_models import EmailDomain
+from entities.okta_entities.users.user_models import User,UserSchemaProperty,UserAdminRoles,UserBaseSchemaProperty,UserGroupMemberships,UserType
 from entities.okta_entities.auth_server.auth_server_models import AuthorizationServer
 from entities.okta_entities.policies.policy_models import (
-    PolicyMFA, PolicyPassword, PolicyProfileEnrollment, PolicySignOn
+    PolicyMFA, PolicyPassword, PolicyProfileEnrollment, PolicySignOn,PolicyRuleMFA,PolicyRulePassword,PolicyRuleProfileEnrollment,PolicyRuleSignOn
 )
+from entities.okta_entities.authenticator.authenticator_models import OktaFactor
+from entities.okta_entities.brands.brand_models import OktaTheme
 from entities.okta_entities.administrators.administrators_models import AdminRoleCustom
 from entities.okta_entities.apps.apps_models import (
     AppOauth, AppSAML, AppGroupAssignments, AppAccessPolicyAssignment,
+    AppSharedCredentials,AppSAMLSettings,AppOauthPostRedirectUri,AppOauthRedirectUri,
     AppPolicySignOn, AppGroupAssignment, AppBookMark, AppAutoLogin,
     AppThreeField, AppSecurePasswordStore, AppUserSchemaProperty,
-    AppUserBaseSchemaProperty, AppBasicAuth, AppSwa, AppUser
+    AppUserBaseSchemaProperty, AppBasicAuth, AppSwa, AppUser,AppPolicySignOnRule,AppOAuthRoleAssignment
 )
 from entities.okta_entities.groups.group_models import (
     Group, GroupSchemaProperty, GroupRule, GroupRole, GroupMember
@@ -35,7 +40,7 @@ from entities.okta_entities.trusted_origins.trusted_origin_models import Trusted
 from entities.okta_entities.inline_hooks.inline_hook_models import InlineHook
 from entities.okta_entities.event_hook.event_hook_models import EventHook
 from entities.okta_entities.email.email_models import EmailSmtpServer
-from entities.okta_entities.entitlements.entitlement_models import EntitlementBundle, PrincipalEntitlement
+from entities.okta_entities.entitlements.entitlement_models import EntitlementBundle, PrincipalEntitlement,Entitlement
 from entities.okta_entities.requests.request_condition_models import RequestCondition, RequestSequence, RequestSettings
 from entities.okta_entities.rate_limits.rate_limit_models import PrincipalRateLimit, RateLimitAdminNotification, RateLimitWarningThreshold
 # from entities.okta_entities.link.link_models import LinkDefinition
@@ -48,6 +53,7 @@ MODEL_REGISTRY = {
 
     # Policies
     "Policy MFA": PolicyMFA,
+    "Policy Rule Mfa":PolicyRuleMFA,
     "Policy Password": PolicyPassword,
     "Policy Profile Enrollment": PolicyProfileEnrollment,
     "Policy Sign On": PolicySignOn,
@@ -58,6 +64,7 @@ MODEL_REGISTRY = {
     # Applications
     "App Oauth": AppOauth,
     "App Saml": AppSAML,
+    "App Saml Settings":AppSAMLSettings,
     "App Group Assignments": AppGroupAssignments,
     "App Access Policy Assignment": AppAccessPolicyAssignment,
     "App Signon Policy": AppPolicySignOn,
@@ -69,8 +76,14 @@ MODEL_REGISTRY = {
     "App User Schema Property": AppUserSchemaProperty,
     "App User Base Schema Property": AppUserBaseSchemaProperty,
     "App Basic Auth": AppBasicAuth,
-    "App Swa": AppSwa,
+    "App SWA": AppSwa,
     "App User": AppUser,
+    "App Signon Policy Rule":AppPolicySignOnRule,
+    "App Shared Credentials":AppSharedCredentials,
+    "App Oauth Role Assignment":AppOAuthRoleAssignment,
+    "App Oauth Post Logout Redirect Uri":AppOauthPostRedirectUri,
+    "App Oauth Redirect Uri":AppOauthRedirectUri,
+    "App User Schema Property":AppUserSchemaProperty,
 
     # Groups
     "Groups": Group,
@@ -80,16 +93,20 @@ MODEL_REGISTRY = {
     "Group Memberships": GroupMember,
 
     # Brands
-    "Brand": Brand,
+    "Brands": Brand,
+    "Email Domain":EmailDomain,
 
     # Device Assurance Policies
     "Policy Device Assurance Android": DeviceAndroid,
     "Policy Device Assurance IOS": DeviceIos,
     "Policy Device Assurance Macos": DeviceMacOS,
     "Policy Device Assurance Windows": DeviceWindows,
-
+    "Policy Rule Password":PolicyRulePassword,
+    "Policy Rule Profile Enrollment":PolicyProfileEnrollment,
     # Email
     "Email SMTP Server": EmailSmtpServer,
+
+    "Themes":OktaTheme,
 
     # Rate Limits
     "Principal Rate Limit": PrincipalRateLimit,
@@ -99,6 +116,7 @@ MODEL_REGISTRY = {
     # Entitlements
     "Entitlement Bundle": EntitlementBundle,
     "Principal Entitlement": PrincipalEntitlement,
+    "Entitlements":Entitlement,
 
     # Requests
     "Request Condition": RequestCondition,
@@ -133,6 +151,16 @@ MODEL_REGISTRY = {
 
     # Event Hooks
     "Event_Hook": EventHook,
+
+    "Users":User,
+    "User Schema Properties":UserSchemaProperty,
+    "User Group Memberships":UserGroupMemberships,
+    "User Base Schema Properties":UserBaseSchemaProperty,
+    "User Admin Roles":UserAdminRoles,
+    "User Types":UserType,
+
+    "Factor":OktaFactor,
+
 
     # Link
     # "Link Definition": LinkDefinition,

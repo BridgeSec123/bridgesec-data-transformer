@@ -16,7 +16,7 @@ ENTITY_TARGET_FIELD_MAP = {
     "okta_app_group_assignement": "app_id",
     "okta_app_user_base_schema_property": "app_id",
     "okta_app_user_schema_property": "app_id",
-    "okta_app_user": "app_id",
+    "okta_app_user": "user_id",
     "okta_app_group_assignment": "app_id",
     "okta_app_access_policy_assignment": "app_id",
     "okta_app_secure_password_store": "app_id",

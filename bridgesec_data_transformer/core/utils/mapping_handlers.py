@@ -18,20 +18,46 @@ MAPPED_ENTITIES_HELPERS = {
 
         "okta_app_group_assignment": "group_id",
         "okta_app_access_policy_assignment" : "policy_id",
+        "okta_app_shared_credentials":"label",
+        "okta_app_signon_policy_rule":"policy_rule_id",
+        "okta_app_oauth_post_logout_redirect_uri":"app_id",
+        "okta_app_oauth_redirect_uri":"app_id",
+        "okta_app_user_schema_property":"app_id",
+        "okta_app_user_base_schema_property":"app_id",
 
+        # "okta_app_user": ["user_id","app_id"],
+        "okta_app_user": "user_id",
+        "okta_theme": "brand_id",
         "okta_user": "login",
-
+        "okta_user_schema_property":"index",
+        "okta_user_admin_roles":"user_id",
+        "okta_user_base_schema_property":"index",
         "okta_user_type": "name",
 
         "okta_group": "name",
         "okta_group_rule": "name",
-        "okta_group_role": "group_id",
+        "okta_group_role": "group_role_id",
+
+        "okta_brand":"name",
 
         "okta_policy_password": "name",
         "okta_policy_mfa": "name",
         "okta_policy_rule_mfa": "name",
         "okta_policy_sign_on": "name",
-        "okta_policy_profile_enrollment":"name"
+        "okta_policy_profile_enrollment":"name",
+        "okta_policy_rule_password":"policy_id",
+        "okta_policy_rule_mfa":"policy_id",
+
+        "okta_principal_rate_limits":"principal_type",
+        "okta_rate_limit_admin_notification":"",
+        "okta_entitlement_bundle":"name",
+        "okta_entitlements":"data_type",
+
+        "okta_policy_device_assurance_android":"device_id",
+
+        "okta_factor":"provider_id",
+
+        "okta_behavior":"behavior_id",
     },
     "entities": {
         "okta_app_signon_policy", 
@@ -69,6 +95,7 @@ RULES_FIELDS = {
     "okta_policy_rule_password": "okta_policy_rule_password",
     "okta_policy_rule_sign_on": "okta_policy_rule_sign_on",
     "okta_policy_rule_profile_enrollment": "okta_policy_rule_profile_enrollment",
+    "okta_policy_rule_password":"policy_rule_password",
 }
 
 ID_KEYS = {
@@ -79,26 +106,35 @@ ID_KEYS = {
     "okta_user_base_schema_property": "index",
     "okta_user_admin_roles": "user_id",
     "okta_user_type": "user_type_id",
+    "okta_theme": "brand_id",
 
     "okta_user":"user_id",
 
     "okta_auth_server": "auth_server_id",
 
+    "okta_brand":"brand_id",
+
     "okta_app_oauth": "app_id",
     "okta_app_saml": "app_id",
     "okta_app_signon_policy": "app_policy_id",
-    "okta_app_signon_policy_rule": "policy_id",
 
     "okta_app_bookmark": "app_id",
     "okta_app_basic_auth": "app_id",
     "okta_app_swa": "app_id",
     "okta_app_three_field": "app_id",
-
+    "okta_app_saml_app_settings":"app_id",
+    "okta_app_user_base_schema_property":"app_id",
+    "okta_app_signon_policy_rule": "policy_rule_id",
+    "okta_app_shared_credentials":"label",
+    "okta_app_oauth_post_logout_redirect_uri":"app_id",
+    "okta_app_oauth_redirect_uri":"app_id",
+    "okta_app_user_schema_property":"app_id",
     "okta_app_auto_login": "app_id",
     "okta_app_group_assignment": "app_id",
     "okta_app_group_assignments": "app_id",
     "okta_app_access_policy_assignment": "app_id",
     
+    "okta_app_user": "user_id",
     "okta_app_user": "app_id",
     "okta_app_oauth_api_scope": "app_id",
     "okta_app_oauth_redirect_uri": "app_id",
@@ -106,10 +142,10 @@ ID_KEYS = {
 
     "okta_group": "group_id",
     "okta_group_rule": "group_rule_id",
-    "okta_group_roles": "group_role_id",
+    "okta_group_role": "group_role_id",
 
     "okta_policy_mfa": "policy_id",
-    "okta_policy_rule_mfa": "policy_id",
+    "okta_policy_rule_mfa": "policy_rule_id",
     "okta_policy_password": "policy_id",
     "okta_policy_rule_password": "policy_id",
     "okta_policy_sign_on": "policy_signon_id",
@@ -120,6 +156,15 @@ ID_KEYS = {
     "okta_idp_oidc": "idp_id",
     "okta_idp_saml": "idp_id",
     "okta_idp_social": "idp_id",
+
+    "okta_principal_rate_limits":"principal_type",
+    "okta_entitlement_bundle":"name",
+    "okta_entitlements":"data_type",
+
+    "okta_policy_device_assurance_android":"device_id",
+    "okta_factor":"provider_id",
+
+    "okta_behavior":"behavior_id",
 }
 
 NONE_FIELD_LISTS = {

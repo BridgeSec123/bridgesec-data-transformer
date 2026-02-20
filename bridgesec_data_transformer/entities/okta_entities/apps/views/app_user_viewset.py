@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class AppUserViewSet(BaseAppViewSet):
     okta_endpoint = "/api/v1/apps/{appId}/users"
-    entity_type = "okta_app_users"
+    entity_type = "okta_app_user"
     serializer_class = AppUserSerializer
     model = AppUser
 

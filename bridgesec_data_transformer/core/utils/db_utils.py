@@ -27,6 +27,7 @@ def extract_time(db_name):
 
 def get_collection_name(entity_name):
     """Get collection name for a given entity type."""
+    logger.info("Extracting collection name for the given entity from mappings",extra={"operation":'Get Collection Name'})
     for entity_type, sub_entities in RESOURCE_COLLECTION_MAP.items():
         for entry in sub_entities:
             for display_name, collection_name in entry.items():
@@ -38,6 +39,7 @@ def get_collection_name(entity_name):
 def get_latest_db(mongo_client, date_str):
     """Get the latest database for a given date."""
     try:
+        logger.info("Finding Latest DB for given date",extra={"operation":'Get Latest Db'})
         datetime.strptime(date_str, "%Y-%m-%d")
         date_prefix = f"{settings.MONGO_DB_NAME}_{date_str}"
 
@@ -55,6 +57,7 @@ def get_latest_db(mongo_client, date_str):
 
         return None
     except ValueError:
+        logger.info("Couldn't Find Latest DB for given date",extra={"operation":'Get Latest Db'})
         return None
 
 

@@ -65,7 +65,7 @@ def _store_collection_simple(db, entity_name, collection_name, records, unique_i
 
         collection.insert_one(rec_copy)
 
-    logger.info(f"Stored {len(records)} records in '{collection_name}' for entity {entity_name}")
+    logger.info(f"Stored {len(records)} records in '{collection_name}' for entity {entity_name}",extra={"operation":"Stores Data Without Restore Metadata"})
 
 
 def _store_collection(db, entity_name, collection_name, data, restored_by, source_db_name):
@@ -100,7 +100,7 @@ def _store_collection(db, entity_name, collection_name, data, restored_by, sourc
         if nested_collection_name == collection_name:
             # This is a nested collection - use child_id_field
             id_field = NESTED_FIELD_ID_MAPPING.get(nested_field, {}).get("child_id_field")
-            logger.info(f"Detected nested collection {collection_name}, using child_id_field: {id_field}")
+            logger.info(f"Detected nested collection {collection_name}, using child_id_field: {id_field}",extra={"operation":"Stores Data With Restore Metadata"})
             break
 
     # If not a nested collection, use the entity's ID field
@@ -130,10 +130,10 @@ def _store_collection(db, entity_name, collection_name, data, restored_by, sourc
             else:
                 logger.warning(f"Document missing {id_field} field, skipping")
 
-        logger.info(f"Upserted {upsert_count} records to {restored_collection_name}")
+        logger.info(f"Upserted {upsert_count} records to {restored_collection_name}",extra={"operation":"Stores Data With Restore Metadata"})
     else:
         # Fallback: replace all data (dangerous - deletes existing)
-        logger.warning(f"No ID field defined for {entity_name}, using replace_all strategy")
+        logger.warning(f"No ID field defined for {entity_name}, using replace_all strategy",extra={"operation":"Stores Data With Restore Metadata"})
 
         # Add metadata to all records
         for doc in data:
@@ -144,11 +144,11 @@ def _store_collection(db, entity_name, collection_name, data, restored_by, sourc
 
         # Delete existing and insert new
         delete_result = restored_collection.delete_many({})
-        logger.info(f"Deleted {delete_result.deleted_count} existing records from {restored_collection_name}")
+        logger.info(f"Deleted {delete_result.deleted_count} existing records from {restored_collection_name}",extra={"operation":"Stores Data With Restore Metadata"})
 
         if data:
             restored_collection.insert_many(data)
-            logger.info(f"Inserted {len(data)} new records into {restored_collection_name}")
+            logger.info(f"Inserted {len(data)} new records into {restored_collection_name}",extra={"operation":"Stores Data With Restore Metadata"})
 
 
 def store_restored_data_with_metadata(db, entity_name, collection_name, modified_data, restored_by, source_db_name):
@@ -156,7 +156,7 @@ def store_restored_data_with_metadata(db, entity_name, collection_name, modified
     Universal function to store restored data.
     Handles BOTH simple entities AND entities with nested data (builders).
     """
-    logger.info(f"Storing {len(modified_data)} records for {entity_name}")
+    logger.info(f"Storing {len(modified_data)} records for {entity_name}",extra={"operation":"Universal Restore Data Storage"})
 
     # Check if this entity has nested fields
     nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name)
@@ -202,7 +202,7 @@ def store_created_data(db, entity_name, collection_name, created_data):
     Handles simple and nested (builder-style) entities.
     """
 
-    logger.info(f"Storing created data for {entity_name}: {len(created_data)} records")
+    logger.info(f"Storing created data for {entity_name}: {len(created_data)} records",extra={"operation":"Store New Data Without Metadata"})
 
     nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name)
 
@@ -260,7 +260,7 @@ def store_deleted_data_with_metadata(db, entity_name, collection_name, deleted_d
     Returns:
         Stored data
     """
-    logger.info(f"Storing {len(deleted_data)} deleted records for {entity_name} with operation_type={operation_type}")
+    logger.info(f"Storing {len(deleted_data)} deleted records for {entity_name} with operation_type={operation_type}",extra={"operation":"Store Del Data With Metadata"})
 
     # Prepare metadata
     deleted_at = datetime.now().strftime("%H:%M:%S")
@@ -275,7 +275,7 @@ def store_deleted_data_with_metadata(db, entity_name, collection_name, deleted_d
     for nested_field, nested_collection_name in nested_mapping.items():
         if nested_collection_name == collection_name:
             id_field = NESTED_FIELD_ID_MAPPING.get(nested_field, {}).get("child_id_field")
-            logger.info(f"Detected nested collection {collection_name}, using child_id_field: {id_field}")
+            logger.info(f"Detected nested collection {collection_name}, using child_id_field: {id_field}",extra={"operation":"Store Deletion Data With Metadata"})
             break
 
     # If not a nested collection, use the entity's ID field
@@ -283,7 +283,7 @@ def store_deleted_data_with_metadata(db, entity_name, collection_name, deleted_d
         id_field = ENTITY_ID_MAPPING.get(entity_name)
 
     if not id_field:
-        logger.error(f"No ID field defined for {entity_name}, cannot store deleted records")
+        logger.error(f"No ID field defined for {entity_name}, cannot store deleted records",extra={"operation":"Store Deletion Data With Metadata"})
         return deleted_data
 
     # Store each deleted record with metadata
@@ -310,9 +310,9 @@ def store_deleted_data_with_metadata(db, entity_name, collection_name, deleted_d
             )
             upsert_count += 1
         else:
-            logger.warning(f"Document missing {id_field} field, skipping")
+            logger.warning(f"Document missing {id_field} field, skipping",extra={"operation":"Store Deletion Data With Metadata"})
 
-    logger.info(f"Upserted {upsert_count} deleted records to {deleted_collection_name}")
+    logger.info(f"Upserted {upsert_count} deleted records to {deleted_collection_name}",extra={"operation":"Store Deletion Data With Metadata"})
     return deleted_data
 
 
@@ -331,7 +331,7 @@ def update_deletion_status(db, entity_name, collection_name, deleted_ids, new_st
     Returns:
         Number of records updated
     """
-    logger.info(f"Updating deletion status to '{new_status}' for {len(deleted_ids)} records in {collection_name}")
+    logger.info(f"Updating deletion status to '{new_status}' for {len(deleted_ids)} records in {collection_name}",extra={"operation":"Update Deletion Status"})
 
     deleted_collection_name = f"_{collection_name}"
     deleted_collection = db[deleted_collection_name]
@@ -339,7 +339,7 @@ def update_deletion_status(db, entity_name, collection_name, deleted_ids, new_st
     # Get ID field
     id_field = ENTITY_ID_MAPPING.get(entity_name)
     if not id_field:
-        logger.error(f"No ID field defined for {entity_name}, cannot update deletion status")
+        logger.error(f"No ID field defined for {entity_name}, cannot update deletion status",extra={"operation":"Update Deletion Status"})
         return 0
 
     # Update each deleted record
@@ -364,7 +364,7 @@ def update_deletion_status(db, entity_name, collection_name, deleted_ids, new_st
         if result.modified_count > 0:
             update_count += 1
 
-    logger.info(f"Updated {update_count} records to status '{new_status}' in {deleted_collection_name}")
+    logger.info(f"Updated {update_count} records to status '{new_status}' in {deleted_collection_name}",extra={"operation":"Update Deletion Status"})
     return update_count
 
 
@@ -390,7 +390,7 @@ def filter_deleted_records_from_state(merged_data, deleted_ids, id_field):
         if str(record.get(id_field)) not in deleted_ids_set
     ]
 
-    logger.info(f"Filtered {len(merged_data) - len(filtered_data)} deleted records from state")
+    logger.info(f"Filtered {len(merged_data) - len(filtered_data)} deleted records from state",extra={"operation":"Filter Deletion Data From State"})
     return filtered_data
 
 
@@ -442,7 +442,7 @@ def handle_nested_deletion(db, entity_name, deleted_parent_records, deleted_by, 
 
         # Find all child records for deleted parents
         if nested_coll not in db.list_collection_names():
-            logger.info(f"No nested collection found: {nested_coll}")
+            logger.info(f"No nested collection found: {nested_coll}",extra={"operation":"Handle Nested Deletion"})
             continue
 
         # Query for children of deleted parents
@@ -482,7 +482,7 @@ def handle_nested_deletion(db, entity_name, deleted_parent_records, deleted_by, 
 
             all_deleted_ids.extend(child_ids)
 
-            logger.info(f"Cascade deleted {len(child_ids)} records from {nested_collection_name}")
+            logger.info(f"Cascade deleted {len(child_ids)} records from {nested_collection_name}",extra={"operation":"Handle Nested Deletion"})
 
     return all_deleted_ids, cascade_info
 
@@ -545,7 +545,7 @@ def extract_terraform_target_params(collection_name, data_to_send, operation_typ
     if operation_type == "delete" and target_ids:
         params["target_id"] = ",".join(str(id_val) for id_val in target_ids if id_val)
         params["operation"] = "delete"
-        logger.info(f"Added deletion params: target_id={params['target_id']}, operation=delete")
+        logger.info(f"Added deletion params: target_id={params['target_id']}",extra={"operation":"Extract TF Target Params"})
 
     return params
 
@@ -730,16 +730,16 @@ def fetch_and_merge_restored_data(db, entity_name, collection_name, id_field, or
 
     # Check if restored collection exists
     if restored_collection_name not in db.list_collection_names():
-        logger.info(f"No restored collection found: {restored_collection_name}")
+        logger.info(f"No restored collection found: {restored_collection_name}",extra={"operation":'Fetch Merge Restored Data'})
         return original_data
 
-    logger.info(f"Found restored collection: {restored_collection_name}")
+    logger.info(f"Found restored collection: {restored_collection_name}",extra={"operation":'Fetch Merge Restored Data'})
 
     # Rebuild restored data with nested arrays (handles both simple and nested entities)
     restored_data = rebuild_restored_data_with_nested_arrays(
         db, entity_name, collection_name, id_field
     )
-    logger.info(f"Rebuilt {len(restored_data)} restored records")
+    logger.info(f"Rebuilt {len(restored_data)} restored records",extra={"operation":'Fetch Merge Restored Data'})
 
     if not restored_data:
         logger.info("No restored data after rebuild")
@@ -747,7 +747,7 @@ def fetch_and_merge_restored_data(db, entity_name, collection_name, id_field, or
 
     # Merge restored changes with original data
     merged_data = merge_restored_with_original(original_data, restored_data, id_field)
-    logger.info(f"Merged {len(merged_data)} records with restored changes")
+    logger.info(f"Merged {len(merged_data)} records with restored changes",extra={"operation":'Fetch Merge Restored Data'})
 
     return merged_data
 

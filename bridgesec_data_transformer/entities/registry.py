@@ -208,7 +208,7 @@ APP_ENTITY_VIEWSETS = {
     "okta_app_policy_sign_on": AppPolicySignOnViewSet,
     "okta_app_group_assignment": AppsGroupAssignmentViewSet,
     "okta_app_shared_credentials": AppSharedCredentialsViewSet,
-    "okta_app_saml_settings": AppSAMLSettingsViewSet,
+    "okta_app_saml_app_settings": AppSAMLSettingsViewSet,
     "okta_app_signon_policy_rule": AppPolicyRuleSignOnViewSet,
     "okta_app_oauth_role_assignment": AppOauthRoleAssignmentViewSet,
     "okta_app_bookmark": AppBookmarkViewSet,

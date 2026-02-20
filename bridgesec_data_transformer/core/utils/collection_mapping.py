@@ -1,13 +1,13 @@
 RESOURCE_COLLECTION_MAP = {
     "Users": [
-        {"User": "okta_user"},
-        {"User Schema Properties": "okta_user_schema_properties"},
+        {"Users": "okta_user"},
+        {"User Schema Properties": "okta_user_schema_property"},
         {"User Group Memberships": "okta_user_group_memberships"},
-        {"User Base Schema Properties": "user_base_schema_properties"},
-        {"User Admin Roles": "user_admin_roles"},
+        {"User Base Schema Properties": "okta_user_base_schema_property"},
+        {"User Admin Roles": "okta_user_admin_roles"},
     ],
     "User Types": [
-        {"User Type": "okta_user_type"}
+        {"User Types": "okta_user_type"}
     ],
     "Groups": [
         {"Groups": "okta_group"},
@@ -17,7 +17,7 @@ RESOURCE_COLLECTION_MAP = {
         {"Group Memberships": "okta_group_memberships"},
     ],
     "Brands": [
-        {"Brand": "okta_brand"},
+        {"Brands": "okta_brand"},
         {"Email Domain": "okta_email_domain"}
     ],
     "Device": [
@@ -26,9 +26,9 @@ RESOURCE_COLLECTION_MAP = {
         {"Policy Device Assurance Macos": "okta_policy_device_assurance_macos"},
         {"Policy Device Assurance Windows": "okta_policy_device_assurance_windows"},
     ],
-    # "Theme": [
-    #     {"Theme": "okta_theme"}
-    # ],
+    "Themes": [
+        {"Themes": "okta_theme"}
+    ],
     "Email": [
         {"Email SMTP Server": "okta_email_smtp_server"}
     ],
@@ -40,7 +40,8 @@ RESOURCE_COLLECTION_MAP = {
     ],
     "Entitlements": [
         {"Entitlement Bundle": "okta_entitlement_bundle"},
-        {"Principal Entitlement": "okta_principal_entitlements"}
+        {"Principal Entitlement": "okta_principal_entitlements"},
+        {"Entitlements":"okta_entitlements"}
     ],
     "Requests": [
         {"Request Condition": "okta_request_conditions"},
@@ -62,16 +63,16 @@ RESOURCE_COLLECTION_MAP = {
     ],
     "Authenticator": [
         {"Authenticator": "okta_authenticator"},
-    # +    {"Factor": "okta_factors"},
+        {"Factor": "okta_factor"},
     ],
     "Authorization Servers": [
         {"Auth Server": "okta_auth_server"},
-        # {"Auth Server Claim": "okta_auth_server_claim"},
-        # {"Auth Server Policy": "okta_auth_server_policy"},
-        # {"Auth Server Policy Rule": "okta_auth_server_policy_rule"},
-        # {"Auth Server Scope": "okta_auth_server_scope"},
-        # {"Auth Server Policy": "okta_auth_server_policy"},
-        # {"Auth Server Policy Rule": "okta_auth_server_policy_rule"},
+        {"Auth Server Claim": "okta_auth_server_claim"},
+        {"Auth Server Policy": "okta_auth_server_policy"},
+        {"Auth Server Policy Rule": "okta_auth_server_policy_rule"},
+        {"Auth Server Scope": "okta_auth_server_scope"},
+        {"Auth Server Policy": "okta_auth_server_policy"},
+        {"Auth Server Policy Rule": "okta_auth_server_policy_rule"},
     ],
     "Identity Providers": [
         {"IDP OIDC": "okta_idp_oidc"},
@@ -80,15 +81,15 @@ RESOURCE_COLLECTION_MAP = {
     ],
     "Policy": [
         {"Policy MFA": "okta_policy_mfa"},
-        # {"Policy Rule Mfa": "okta_policy_rule_mfa"},
+        {"Policy Rule Mfa": "okta_policy_rule_mfa"},
         {"Policy Password": "okta_policy_password"},
-        # {"Policy Rule Password": "okta_policy_rule_password"},
+        {"Policy Rule Password": "okta_policy_rule_password"},
         {"Policy Profile Enrollment": "okta_policy_profile_enrollment"},
-        # {"Policy Rule Profile Enrollment": "okta_policy_rule_profile_enrollment"},
+        {"Policy Rule Profile Enrollment": "okta_policy_rule_profile_enrollment"},
         {"Policy Sign On": "okta_policy_sign_on"},
-        # {"Policy Rule Sign On": "okta_policy_rule_sign_on"},
-         {"Policy Profile Enrollment apps": "okta_policy_profile_enrollment_apps"},
-        # {"Policy Rule Idp Discovery": "okta_policy_rule_idp_discovery"},
+        {"Policy Rule Sign On": "okta_policy_rule_sign_on"},
+        {"Policy Profile Enrollment apps": "okta_policy_profile_enrollment_apps"},
+        {"Policy Rule Idp Discovery": "okta_policy_rule_idp_discovery"},
     ],
     "Network Zone": [
         {"Network Zone": "okta_network_zone"}
@@ -100,7 +101,7 @@ RESOURCE_COLLECTION_MAP = {
         {"Admin Role Custom": "okta_admin_role_custom"},
         # {"Admin Role Targets": "okta_admin_role_targets"},
         # {"Role Subscription": "okta_role_subscription"},
-        # {"Resoure set": "okta_resource_set"},
+        {"Resoure set": "okta_resource_set"},
     ],
       "Trusted Origins": [
         {"Trusted Origin": "okta_trusted_origin"},
@@ -122,24 +123,25 @@ RESOURCE_COLLECTION_MAP = {
         {"App Oauth": "okta_app_oauth", "non_editable_field": ["app_id"]},
         {"App Saml": "okta_app_saml"},
         {"App Group Assignments": "okta_app_group_assignments"},
-        # {"App Oauth Role Assignment": "okta_app_oauth_role_assignment"},
+        {"App Oauth Role Assignment": "okta_app_oauth_role_assignment"},
         {"App Access Policy Assignment": "okta_app_access_policy_assignment"},
         {"App Signon Policy": "okta_app_signon_policy"},
         {"App Signon Policy Rule": "okta_app_signon_policy_rule"},
-        # {"App Saml Settings": "okta_app_saml_app_settings"},
+        {"App Saml Settings": "okta_app_saml_app_settings"},
         {"App Group Assignment": "okta_app_group_assignment"},
-        # {"App Shared Credentials": "okta_app_shared_credentials"},
-         {"App Bookmark": "okta_app_bookmark"},
-         {"App Auto Login": "okta_app_auto_login"},
-         {"App Three Field": "okta_app_three_field"},
-         {"App Secure Password Store" : "okta_app_secure_password_store"},
-         {"App User Schema Property" : "okta_app_user_schema_property"},
-         {"App User Base Schema Property" : "okta_app_user_base_schema_property"},
-         {"App Basic Auth": "okta_app_basic_auth"},
-         {"App Swa": "okta_app_swa"},
-         {"App User": "okta_app_user"},
+        {"App Shared Credentials": "okta_app_shared_credentials"},
+        # {"App Saml Settings": "okta_app_saml_settings"},
+        {"App Bookmark": "okta_app_bookmark"},
+        {"App Auto Login": "okta_app_auto_login"},
+        {"App Three Field": "okta_app_three_field"},
+        {"App Secure Password Store" : "okta_app_secure_password_store"},
+        {"App User Schema Property" : "okta_app_user_schema_property"},
+        {"App User Base Schema Property" : "okta_app_user_base_schema_property"},
+        {"App Basic Auth": "okta_app_basic_auth"},
+        {"App SWA": "okta_app_swa"},
+        {"App User": "okta_app_user"},
         {"App Oauth Api Scope": "okta_app_oauth_api_scope"},
-        {"APP Oauth Post Logout Redirect Uri": "okta_app_oauth_post_logout_redirect_uri"},
+        {"App Oauth Post Logout Redirect Uri": "okta_app_oauth_post_logout_redirect_uri"},
         {"App Oauth Redirect Uri": "okta_app_oauth_redirect_uri"},
     ]
 }
@@ -147,13 +149,17 @@ RESOURCE_COLLECTION_MAP = {
 # Entity ID mapping for comparison - maps entity name to its unique ID field
 ENTITY_ID_MAPPING = {
     # Users
-    "User": "user_id",
+    "Users": "user_id",
     "User Schema Properties": "user_id",
     "User Group Memberships": "user_id",
     "User Base Schema Properties": "user_id",
     "User Admin Roles": "user_id",
-    "User Type": "user_type_id",
+    "User Types": "user_type_id",
 
+    "Policy Rule Password":"policy_password_id",
+
+    "Entitlements":"id",
+    "Factor": "provider_id",
     # Groups
     "Groups": "group_id",
     "Group Schema Property": "id",
@@ -162,7 +168,9 @@ ENTITY_ID_MAPPING = {
     "Group Memberships": "id",
 
     # Brands
-    "Brand": "brand_id",
+    "Brands": "brand_id",
+
+    # "Behavior":"behavior_id",
 
     # Device Assurance Policies
     "Policy Device Assurance Android": "device_id",
@@ -191,6 +199,8 @@ ENTITY_ID_MAPPING = {
     # SMS Template
     "Sms Template": "sms_id",
 
+    "Themes":"brand_id",
+
     # Organization Security
     "Organization Security": "id",
 
@@ -207,9 +217,11 @@ ENTITY_ID_MAPPING = {
 
     # Policies
     "Policy MFA": "policy_id",
+    "Policy Rule Mfa":"policy_rule_id",
     "Policy Password": "policy_id",
     "Policy Profile Enrollment": "policy_id",
     "Policy Sign On": "policy_signon_id",
+    "Policy Rule Profile Enrollment":"policy_profile_rule_id",
 
     # Network Zone
     "Network Zone": "network_id",
@@ -235,10 +247,13 @@ ENTITY_ID_MAPPING = {
     # Applications
     "App Oauth": "app_id",
     "App Saml": "app_id",
+    "App Saml Settings":"app_id",
     "App Group Assignments": "app_id",
     "App Access Policy Assignment": "app_id",
     "App Signon Policy": "app_policy_id",
-    "App Group Assignment": "app_id",  # NOTE: Actual unique key is app_id+group_id composite
+    "App Signon Policy Rule":"policy_rule_id",
+    "App Shared Credentials":"label",
+    "App Group Assignment": "app_id",
     "App Bookmark": "app_id",
     "App Auto Login": "app_id",
     "App Three Field": "app_id",
@@ -246,11 +261,10 @@ ENTITY_ID_MAPPING = {
     "App User Schema Property": "app_id",
     "App User Base Schema Property": "app_id",
     "App Basic Auth": "app_id",
-    "App Swa": "app_id",
-    "App User": "app_id",
-    "App Oauth Api Scope": "app_id",
-    "APP Oauth Post Logout Redirect Uri": "app_id",
-    "App Oauth Redirect Uri": "app_id",
+    "App SWA": "app_id",
+    "App User": "user_id",
+    "App Oauth Post Logout Redirect Uri":"app_id",
+    "App Oauth Redirect Uri":"app_id",
 }
 
 NON_EDITABLE_FIELDS = {
@@ -260,29 +274,37 @@ NON_EDITABLE_FIELDS = {
     "User Group Memberships": ["user_id"],
     "User Base Schema Properties": ["user_id"],
     "User Admin Roles": ["user_id"],
-    "User Type": ["user_type_id"],
+    "User Types": ["user_type_id"],
+
+    "Entitlements":["data_type"],
 
     # Application entities
     "App Oauth": ["app_id"],
     "App Saml": ["app_id"],
+    "App Saml Settings":["app_id"],
     "App Bookmark": ["app_id"],
     "App Auto Login": ["app_id"],
     "App Basic Auth": ["app_id"],
-    "App Swa": ["app_id"],
-    "App Secure Password Store": ["app_id"],
+    "App SWA": ["app_id"],
     "App Three Field": ["app_id"],
     "App Group Assignments": ["app_id"],
-    "App Access Policy Assignment": ["app_id"],
     "App Group Assignment": ["app_id"],
     "App Signon Policy": ["app_policy_id"],
-    "App User Schema Property": ["app_id"],
     "App User Base Schema Property": ["app_id"],
+    "App User Schema Property": ["app_id"],
+    "App Access Policy Assignment": ["app_id"],
+    "App Secure Password Store": ["app_id"],
+    "App Oauth Post Logout Redirect Uri":["app_id"],
+    "App Oauth Redirect Uri":["app_id"],
 
     # Policy entities
     "Policy MFA": ["policy_id"],
+    "Policy Rule Mfa":["policy_rule_id"],
     "Policy Password": ["policy_id", "priority"],
     "Policy Profile Enrollment": ["policy_id", "priority"],
+    "Policy Rule Profile Enrollment":["policy_profile_rule_id"],
     "Policy Sign On": ["policy_signon_id", "priority"],
+    "Policy Rule Password":["policy_password_id"],
 
     # Auth Server entities
     "Auth Server": ["auth_server_id"],
@@ -300,7 +322,9 @@ NON_EDITABLE_FIELDS = {
     "Group Schema Property": ["group_id"],
 
     # Brand entities
-    "Brand": ["brand_id"],
+    "Brands": ["brand_id"],
+
+    "Organization Security": "id",
 
     # Device Assurance Policy entities
     "Policy Device Assurance Android": ["device_id"],
@@ -328,6 +352,8 @@ NON_EDITABLE_FIELDS = {
 
     # SMS Template
     "Sms Template": ["sms_id"],
+
+    "Factor": ["provider_id"],
 
     # Network Zone
     "Network Zone": ["network_id"],

@@ -221,7 +221,8 @@ def log_terraform_api_call(entity_type, operation, status_code, duration_ms=None
     extra = {
         'component': 'terraform_api',
         'entity_type': entity_type,
-        'operation': operation,
+        'event': operation,
+        'operation':'Log Tf Api-Calls',
         'status_code': status_code,
     }
 
@@ -357,7 +358,7 @@ def log_terraform_plan(changes_add, changes_change, changes_destroy, entity_type
     """
     extra = {
         'component': 'terraform',
-        'operation': 'plan',
+        'operation': 'Log Tf-Plan',
         'changes_add': changes_add,
         'changes_change': changes_change,
         'changes_destroy': changes_destroy,
@@ -389,7 +390,7 @@ def log_input_file_operation(entity_type, operation, file_path, record_count, re
     extra = {
         'component': 'input_file',
         'entity_type': entity_type,
-        'operation': operation,
+        'operation': 'Log Json-File',
         'file_path': str(file_path),
         'resource_count': record_count,
     }
@@ -449,6 +450,7 @@ def log_validation_result(entity_type, is_valid, error_count=0, errors=None, req
         'entity_type': entity_type,
         'is_valid': is_valid,
         'error_count': error_count,
+        'operaion':'Log Data Validation',
     }
 
     if request_id:

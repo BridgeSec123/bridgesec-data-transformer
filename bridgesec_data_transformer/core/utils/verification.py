@@ -64,7 +64,7 @@ def verify_deletion_complete(
         }
     """
     logger.info(f"=" * 80)
-    logger.info(f"DELETION VERIFICATION: {entity_type}")
+    logger.info(f"DELETION VERIFICATION: {entity_type}",extra={"operation":"Verify Deletion"})
     logger.info(f"=" * 80)
 
     verification_results = {
@@ -76,7 +76,7 @@ def verify_deletion_complete(
     }
 
     # CHECK 1: Okta API Verification
-    logger.info("Check 1: Verifying deletion in Okta API...")
+    logger.info("Check 1: Verifying deletion in Okta API...",extra={"operation":"Verify Deletion"})
     if access_token:
         okta_check = verify_okta_deletion(entity_type, entity_record, access_token)
     else:
@@ -88,13 +88,13 @@ def verify_deletion_complete(
     _log_check_result("Okta API", okta_check)
 
     # CHECK 2: MongoDB Verification
-    logger.info("Check 2: Verifying deletion in MongoDB...")
+    logger.info("Check 2: Verifying deletion in MongoDB...",extra={"operation":"Verify Deletion"})
     mongodb_check = verify_mongodb_deletion(entity_type, entity_record)
     verification_results["checks"]["mongodb"] = mongodb_check
     _log_check_result("MongoDB", mongodb_check)
 
     # CHECK 3: Terraform State Verification
-    logger.info("Check 3: Verifying deletion from Terraform state...")
+    logger.info("Check 3: Verifying deletion from Terraform state...",extra={"operation":"Verify Deletion"})
     state_check = verify_terraform_state_deletion(
         entity_type, entity_record, deletion_results
     )
@@ -102,7 +102,7 @@ def verify_deletion_complete(
     _log_check_result("Terraform State", state_check)
 
     # CHECK 4: Find orphaned dependencies
-    logger.info("Check 4: Looking for orphaned dependencies...")
+    logger.info("Check 4: Looking for orphaned dependencies...",extra={"operation":"Verify Deletion"})
     orphaned = find_orphaned_dependencies(entity_type, entity_record, deletion_results)
     verification_results["orphaned_dependencies"] = orphaned
 
@@ -111,7 +111,7 @@ def verify_deletion_complete(
         for orphan in orphaned:
             logger.warning(f"   - {orphan['dependency_type']}: {orphan['resource_key']}")
     else:
-        logger.info("✅ No orphaned dependencies found")
+        logger.info("No orphaned dependencies found",extra={"operation":"Verify Deletion"})
 
     # Determine overall verification status
     verification_results["verified"] = _is_verification_successful(
@@ -120,7 +120,7 @@ def verify_deletion_complete(
     )
 
     logger.info(f"=" * 80)
-    logger.info(f"VERIFICATION RESULT: {'✅ VERIFIED' if verification_results['verified'] else '❌ FAILED'}")
+    logger.info(f"VERIFICATION RESULT: {'VERIFIED' if verification_results['verified'] else 'FAILED'}",extra={"operation":"Verify Deletion"})
     logger.info(f"=" * 80)
 
     return verification_results

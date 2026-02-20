@@ -272,7 +272,7 @@ ENTITY_TYPE_MAPPING = {
         "okta_endpoint": "/api/v1/policies/{policy_id}/rules",
         "attributes": ["id","priority", "name", "actions", "conditions", "status", "type"]
     },
-    "okta_app_saml_settings": {
+    "okta_app_saml_app_settings": {
         "okta_endpoint": "/api/v1/apps",
         "attributes": ["id", "settings", "signOnMode"],
     },
@@ -337,7 +337,7 @@ ENTITY_TYPE_MAPPING = {
         "okta_endpoint": "/api/v1/domains",
         "attributes": ["domain", "brandId", "certificateSourceType"],
     },
-    "okta_app_users": {"okta_endpoint": "/api/v1/apps", "attributes": ["id", "users"]},
+    "okta_app_user": {"okta_endpoint": "/api/v1/apps", "attributes": ["id", "users"]},
     "okta_app_bookmark": {
         "okta_endpoint": "/api/v1/apps",
         "attributes": [

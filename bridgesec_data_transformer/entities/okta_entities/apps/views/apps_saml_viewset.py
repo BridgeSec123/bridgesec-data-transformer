@@ -40,6 +40,7 @@ class AppSAMLViewSet(BaseAppViewSet):
                         "filter_type": s.get("filterType"),
                         "filter_value": s.get("filterValue")
                     })
+                inline_hooks = signon.get("inlineHooks", [])
 
                 formatted_record = {
                     "label": record.get("label", ""),
@@ -64,7 +65,7 @@ class AppSAMLViewSet(BaseAppViewSet):
                     "hide_web": hide.get("web", ""),
                     "honor_force_authn": signon.get("honorForceAuthn", False),
                     "idp_issuer": signon.get("idpIssuer", ""),
-                    "inline_hook_id": signon.get("inlineHooks", ""),
+                    "inline_hook_id" : (inline_hooks[0].get("id") if isinstance(inline_hooks, list) and len(inline_hooks) > 0 else None),
                     "implicit_assignment" : settings.get("implicitAssignment", ""),
                     "key_name": record.get("keyName", ""),
                     "key_years_valid": record.get("keyYearsValid", 2),

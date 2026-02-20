@@ -11,7 +11,7 @@ from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 logger = logging.getLogger(__name__)
 
 class AppSAMLSettingsViewSet(BaseAppViewSet):
-    entity_type = "okta_app_saml_settings"
+    entity_type = "okta_app_saml_app_settings"
     serializer_class =  AppSAMLSettingsSerializer
     model = AppSAMLSettings
     

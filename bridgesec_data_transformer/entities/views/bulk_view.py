@@ -182,25 +182,29 @@ class BulkEntityViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    @action(detail=False, methods=["get"], url_path="resource-names")
+    @action(detail=False, methods=["get"], url_path="resources")
     def get_resource_names(self, request):
         """
         Return available entity types or sub-entities.
         """
+        logger.info("Returning available entity types or sub-entities....",extra={"operation":"FETCH-ENTITIES"})
         try:
             entity_type = request.query_params.get("entity_type")
 
             if entity_type:
+                logger.info("Entities found",extra={"operation":"FETCH-ENTITIES"})
                 entity_type = entity_type.title()
                 sub_entities = RESOURCE_COLLECTION_MAP.get(entity_type)
                 if not sub_entities:
+                    logger.info("Sub entities not found",extra={"operation":"FETCH-ENTITIES"})
                     return Response(
                         {"detail": f"No sub-entities found for '{entity_type}'"},
                         status=status.HTTP_404_NOT_FOUND,
                     )
                 display_names = [value for entry in sub_entities for value in entry.keys()]
                 return Response({"data": display_names}, status=status.HTTP_200_OK)
-
+                                                                                  
+            logger.info("Entities Not found",extra={"operation":"FETCH-ENTITIES"})
             return Response(
                 {"data": sorted(RESOURCE_COLLECTION_MAP.keys())},
                 status=status.HTTP_200_OK,
@@ -226,22 +230,26 @@ class BulkEntityViewSet(viewsets.ViewSet):
         5. Return merged data with non_editable_fields
         """
         # Normalize entity name (remove extra spaces from URL encoding)
+        logger.info("Fetching data from DB...",extra={"operation":'FETCH-CURRENT-DATA'})
         entity_name = " ".join(entity_name.split())
 
         if not date_str or not entity_name:
+            logger.info("No date and enity provided",extra={"operation":'FETCH-CURRENT-DATA'})
             return Response(
                 {"error": "Missing 'date' or 'entity_type' parameter"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
+            logger.info("Got Date and Entity",extra={"operation":'FETCH-CURRENT-DATA'})
             # Validate date format
             datetime.strptime(date_str, "%Y-%m-%d")
 
             # Step 1: Fetch original data (with nested arrays for builder entities like Policy MFA)
+            logger.info("Fetching original data ",extra={"operation":'FETCH-CURRENT-DATA'})
             service = EntityDataService()
             original_data = service.fetch(date_str, entity_name)
-            logger.info(f"Fetched {len(original_data)} original records for {entity_name}")
+            logger.info(f"Fetched {len(original_data)} original records for {entity_name}",extra={"operation":'FETCH-CURRENT-DATA'})
 
             # Get collection metadata
             collection_name = get_collection_name(entity_name)
@@ -249,19 +257,21 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
             if not collection_name or not id_field:
                 # Missing configuration, return original data only
-                logger.warning(f"Missing collection_name or id_field for {entity_name}")
+                logger.warning(f"Missing collection_name or id_field for {entity_name}",extra={"operation":'FETCH-CURRENT-DATA'})
                 return Response({
                     "data": original_data,
                     "non_editable_fields": NON_EDITABLE_FIELDS.get(entity_name, [])
                 }, status=status.HTTP_200_OK)
 
             # Step 2 & 3: Check today's DB for restored collections and merge
+            logger.info("Checking today's DB for restored collections and merging",extra={"operation":'FETCH-CURRENT-DATA'})
             today_str = datetime.now().strftime("%Y-%m-%d")
             db_name = get_latest_db(mongo_client, today_str)
 
             if db_name:
+                logger.info("Found DB",extra={"operation":'FETCH-CURRENT-DATA'})
                 db = mongo_client[db_name]
-                logger.info(f"Checking for restored data in database: {db_name}")
+                logger.info(f"Checking for restored data in database: {db_name}",extra={"operation":'FETCH-CURRENT-DATA'})
 
                 # Fetch and merge restored data (uses functions from restore_utils.py)
                 # This handles:
@@ -272,24 +282,25 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 original_data = fetch_and_merge_restored_data(
                     db, entity_name, collection_name, id_field, original_data
                 )
-                logger.info(f"Merge complete: {len(original_data)} records")
+                logger.info(f"Merge complete: {len(original_data)} records",extra={"operation":'FETCH-CURRENT-DATA'})
             else:
-                logger.info(f"No database found for today ({today_str}), using original data only")
+                logger.info(f"No database found for today ({today_str}), using original data only",extra={"operation":'FETCH-CURRENT-DATA'})
 
             # Step 4: Remove metadata fields (restored_by, restored_from, restored_at, _id)
             remove_metadata_fields(original_data)
-            logger.info("Removed metadata fields from response")
+            logger.info("Removed metadata fields from response",extra={"operation":'FETCH-CURRENT-DATA'})
 
             # Step 5: Return merged data with non_editable_fields
             non_editable_fields = NON_EDITABLE_FIELDS.get(entity_name, [])
 
+            logger.info("Returning data........",extra={"operation":'FETCH-CURRENT-DATA'})
             return Response({
                 "data": original_data,
                 "non_editable_fields": non_editable_fields
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            logger.error(f"Error in get_resource_data: {str(e)}", exc_info=True)
+            logger.error(f"Error in get_resource_data: {str(e)}", exc_info=True,extra={"operation":'FETCH-CURRENT-DATA'})
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -366,7 +377,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     'request_id': request_id,
                     'user': user,
                     'entity_type': entity_name,
-                    'operation_type': operation_type,
+                    'operation': "Restore Modified Data",
                     'record_count': len(modified_data),
                     'source_date': date_str,
                 }
@@ -395,7 +406,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
             if not current_db_name:
                 current_db_name = get_dynamic_db()
-                logger.info(f"No database found for today. Created new database: {current_db_name}")
+                logger.info(f"No database found for today. Created new database: {current_db_name}",extra={"operation":"Restore Modified Data"})
 
             current_db = mongo_client[current_db_name]
             source_db = mongo_client[source_db_name]
@@ -424,7 +435,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                             status=status.HTTP_400_BAD_REQUEST,
                         )
                     deleted_records.append(doc)
-                logger.info(f"Delete operation: {len(deleted_records)} records marked for deletion")
+                logger.info(f"Delete operation: {len(deleted_records)} records marked for deletion",extra={"operation":"Restore Modified Data"})
 
             else:
                 # Auto-detect operation based on presence of ID field
@@ -435,9 +446,9 @@ class BulkEntityViewSet(viewsets.ViewSet):
                         restore_records.append(doc)
                     else:
                         create_records.append(doc)
-                logger.info(f"Auto-detected: {len(restore_records)} restored, {len(create_records)} created")
+                logger.info(f"Auto-detected: {len(restore_records)} restored, {len(create_records)} created",extra={"operation":"Restore Modified Data"})
 
-            logger.info(f"Operation counts: {len(deleted_records)} deleted, {len(restore_records)} restored, {len(create_records)} created")
+            logger.info(f"Operation counts: {len(deleted_records)} deleted, {len(restore_records)} restored, {len(create_records)} created",extra={"operation":"Restore Modified Data"})
 
             # Initialize variables for deletion tracking
             deleted_ids_list = []
@@ -467,7 +478,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     if complete_record:
                         complete_deleted_records.append(complete_record)
 
-                logger.info(f"Fetched {len(complete_deleted_records)} complete records for deletion")
+                logger.info(f"Fetched {len(complete_deleted_records)} complete records for deletion",extra={"operation":"Restore Modified Data"})
 
                 # Store deleted records with metadata in "deletion_pending" status
                 # This allows us to track the deletion attempt before Terraform runs
@@ -484,11 +495,11 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     restored_by, source_db_name
                 )
 
-                logger.info(f"Cascade deletion complete: {len(deleted_ids_list)} total IDs marked as deletion_pending")
+                logger.info(f"Cascade deletion complete: {len(deleted_ids_list)} total IDs marked as deletion_pending",extra={"operation":"Restore Modified Data"})
 
             # Process restore operations
             if restore_records:
-                logger.info(f"Processing {len(restore_records)} restore(s)")
+                logger.info(f"Processing {len(restore_records)} restore(s)",extra={"operation":"Restore Modified Data"})
                 if not mapping_handlers.is_mapped_entity(collection_name):
                     for i, doc in enumerate(restore_records):
                         new_data = fieldfetch.get_collection(source_db, collection_name, doc)
@@ -500,7 +511,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
             # Process create operations
             if create_records:
-                logger.info(f"Processing {len(create_records)} creation(s)")
+                logger.info(f"Processing {len(create_records)} creation(s)",extra={"operation":"Restore Modified Data"})
                 for i, doc in enumerate(create_records):
                     create_records[i] = fieldfetch.transform_data(collection_name, doc)
 
@@ -513,7 +524,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     current_db, entity_name, collection_name,
                     data_for_storage, restored_by, source_db_name
                 )
-                logger.info(f"Stored {len(restore_records)} restored records")
+                logger.info(f"Stored {len(restore_records)} restored records",extra={"operation":"Restore Modified Data"})
 
             if create_records:
                 data_for_storage = copy.deepcopy(create_records)
@@ -521,20 +532,20 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     current_db, entity_name, collection_name,
                     data_for_storage,
                 )
-                logger.info(f"Stored {len(create_records)} created records")
+                logger.info(f"Stored {len(create_records)} created records",extra={"operation":"Restore Modified Data"})
 
             # CRITICAL: Fetch ALL records from source DB and merge with restored/created data
             # This ensures Terraform receives complete state (not just modified records)
             # to prevent unintended resource deletion
 
             logger.info("=" * 80)
-            logger.info("MERGING COLLECTIONS FOR TERRAFORM")
+            logger.info("MERGING COLLECTIONS FOR TERRAFORM",extra={"operation":"Restore Modified Data"})
             logger.info("=" * 80)
 
             # Step 1: Fetch ALL original data from source DB snapshot
             service = EntityDataService()
             original_data = service.fetch(date_str, entity_name)
-            logger.info(f"Step 1: Fetched {len(original_data)} original records from source DB ({source_db_name})")
+            logger.info(f"Step 1: Fetched {len(original_data)} original records from source DB ({source_db_name})",extra={"operation":"Restore Modified Data"})
 
             # Step 2: Merge original data with restored data from today's DB
             # This handles both simple entities and nested entities (with builders)
@@ -542,7 +553,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             merged_data = fetch_and_merge_restored_data(
                 current_db, entity_name, collection_name, id_field, original_data
             )
-            logger.info(f"Step 2: Merged to {len(merged_data)} total records (original + restored, deleted filtered)")
+            logger.info(f"Step 2: Merged to {len(merged_data)} total records (original + restored, deleted filtered)",extra={"operation":"Restore Modified Data"})
 
             # Step 3: Add newly created records (those without IDs in original data)
             # Created records only exist in restored collection with operation_type="created"
@@ -553,7 +564,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             ))
 
             if created_records_from_db:
-                logger.info(f"Step 3: Found {len(created_records_from_db)} newly created records")
+                logger.info(f"Step 3: Found {len(created_records_from_db)} newly created records",extra={"operation":"Restore Modified Data"})
 
                 # For created records with nested data, rebuild nested arrays
                 nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name)
@@ -579,14 +590,14 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
                 # Add created records to merged data
                 merged_data.extend(created_records_from_db)
-                logger.info(f"Step 4: Added created records, total now {len(merged_data)} records")
+                logger.info(f"Step 4: Added created records, total now {len(merged_data)} records",extra={"operation":"Restore Modified Data"})
             else:
-                logger.info("Step 3: No newly created records found")
+                logger.info("Step 3: No newly created records found",extra={"operation":"RestoreModifiedData"})
 
             # Step 4: Filter deleted records from merged state (if any deletions occurred)
             if deleted_ids_list:
                 merged_data = filter_deleted_records_from_state(merged_data, deleted_ids_list, id_field)
-                logger.info(f"Step 5: Filtered deleted records, {len(merged_data)} records remaining")
+                logger.info(f"Step 5: Filtered deleted records, {len(merged_data)} records remaining",extra={"operation":"Restore Modified Data"})
 
             # Step 5: Remove metadata fields before sending to Terraform
             metadata_fields = ["operation_type", "created_at", "updated_at",
@@ -603,10 +614,10 @@ class BulkEntityViewSet(viewsets.ViewSet):
                                 for field in metadata_fields:
                                     item.pop(field, None)
 
-            logger.info(f"Step 6: Removed metadata fields from {len(merged_data)} records")
-            logger.info(f"FINAL: Sending {len(merged_data)} complete records to Terraform")
+            logger.info(f"Step 6: Removed metadata fields from {len(merged_data)} records",extra={"operation":"Restore Modified Data"})
+            logger.info(f"FINAL: Sending {len(merged_data)} complete records to Terraform",extra={"operation":"Restore Modified Data"})
             if deleted_ids_list:
-                logger.info(f"DELETION: Requesting deletion of {len(deleted_ids_list)} IDs: {deleted_ids_list}")
+                logger.info(f"DELETION: Requesting deletion of {len(deleted_ids_list)} IDs: {deleted_ids_list}",extra={"operation":"Restore Modified Data"})
             logger.info("=" * 80)
 
             modified_data = merged_data
@@ -629,7 +640,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             terraform_api = get_terraform_api_for_entity(entity_name)
 
             if not terraform_api:
-                logger.error(f"No Terraform API configured for entity: {entity_name}")
+                logger.error(f"No Terraform API configured for entity: {entity_name}",extra={"operation":"Restore Modified Data"})
                 return Response(
                     {"error": f"Entity '{entity_name}' not configured for Terraform deployment"},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -645,6 +656,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     'entity_type': entity_name,
                     'terraform_url': terraform_url,
                     'params': params,
+                    "operation":"Restore Modified Data",
                 }
             )
 
@@ -686,6 +698,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     'status_code': tf_response.status_code,
                     'duration_ms': duration_ms,
                     'response_message': tf_message,  # Renamed from 'message' (reserved field)
+                    "operation":"Restore Modified Data",
                 }
             )
 
@@ -694,7 +707,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 # Check if Terraform operation was successful (HTTP 2xx)
                 if 200 <= tf_response.status_code < 300:
                     # SUCCESS: Update deletion status from "deletion_pending" to "deleted"
-                    logger.info(f"Terraform deletion successful (status {tf_response.status_code}), updating deletion status")
+                    logger.info(f"Terraform deletion successful (status {tf_response.status_code}), updating deletion status",extra={"operation":"Restore Modified Data"})
 
                     # Update parent records
                     parent_ids = [doc.get(id_field) for doc in complete_deleted_records if doc.get(id_field)]
@@ -715,13 +728,13 @@ class BulkEntityViewSet(viewsets.ViewSet):
                                 nested_ids, new_status="deleted"
                             )
 
-                    logger.info(f"Successfully updated {len(deleted_ids_list)} records to 'deleted' status")
+                    logger.info(f"Successfully updated {len(deleted_ids_list)} records to 'deleted' status",extra={"operation":"Restore Modified Data"})
 
                     # ============================================
                     # NEW: RUN DELETION VERIFICATION
                     # ============================================
                     logger.info("=" * 80)
-                    logger.info("RUNNING DELETION VERIFICATION")
+                    logger.info("RUNNING DELETION VERIFICATION",extra={"operation":"Restore Modified Data"})
                     logger.info("=" * 80)
 
                     from core.utils.verification import verify_deletion_complete
@@ -754,12 +767,12 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     verified_count = sum(1 for v in verification_results if v.get("verified"))
                     failed_count = len(verification_results) - verified_count
 
-                    logger.info(f"VERIFICATION SUMMARY: {verified_count} verified, {failed_count} failed")
+                    logger.info(f"VERIFICATION SUMMARY: {verified_count} verified, {failed_count} failed",extra={"operation":"Restore Modified Data"})
                     logger.info("=" * 80)
 
                 else:
                     # FAILURE: Keep status as "deletion_pending" and return error
-                    logger.error(f"Terraform deletion failed (status {tf_response.status_code}), keeping 'deletion_pending' status")
+                    logger.error(f"Terraform deletion failed (status {tf_response.status_code}), keeping 'deletion_pending' status",extra={"operation":"Restore Modified Data"})
 
                     # Update all records to "deletion_failed" with error message
                     parent_ids = [doc.get(id_field) for doc in complete_deleted_records if doc.get(id_field)]
@@ -852,6 +865,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     'restored_count': len(restore_records),
                     'created_count': len(create_records),  # Renamed from 'created' (reserved field)
                     'terraform_status': tf_response.status_code,
+                    "operation":"Restore Modified Data",
                 }
             )
 
@@ -869,6 +883,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     'user': user,
                     'entity_type': entity_name,
                     'error': str(e),
+                    "operation":"Restore Modified Data",
                 },
                 exc_info=True
             )

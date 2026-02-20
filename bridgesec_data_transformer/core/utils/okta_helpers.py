@@ -115,7 +115,7 @@ def get_okta_headers(request=None):
         return {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
     else:
         # No token available
-        logger.error("No Okta authentication token available! User must be logged in.")
+        logger.error("No Okta authentication token available! User must be logged in.",extra={"operation":"Get Okta Headers"})
         return {}
 
 

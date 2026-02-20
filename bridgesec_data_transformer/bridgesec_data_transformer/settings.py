@@ -62,13 +62,15 @@ OKTA_SCOPES = " ".join([
     "okta.userTypes.manage",
     "okta.userTypes.manage",
 
-    # "okta.idps.read",
+    "okta.idps.read",
+    "okta.idps.manage",
     "okta.brands.read",
     "okta.brands.manage",
     "okta.authenticators.read",
     # "okta.orgs.read",
     "okta.eventHooks.read",
     "okta.inlineHooks.read",
+    "okta.inlineHooks.manage",
     "okta.behaviors.read",
     "okta.deviceAssurance.read",
     "okta.emailServers.read",
@@ -127,7 +129,10 @@ OKTA_API_SCOPE_MAP = {
     "/groups": "okta.groups.read",
     "/policies": "okta.policies.read",
     "/authorizationServers": "okta.authorizationServers.read",
-    "/idps": ["okta.idps.read", "okta.idps.manage", "okta.profileMappings.read", "okta.profileMappings.manage"],
+    "/idps": [
+        "okta.idps.read",
+        "okta.idps.manage"
+    ],
     # Brands endpoint requires multiple scopes for sub-entities
     "/brands": [
         "okta.brands.read",

@@ -242,7 +242,7 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
         "okta_app_signon_policy_rule": "name",
 
         # App-related entities - sorted by id or name
-        "okta_app_users": "id",
+        "okta_app_user": "id",
         "okta_app_user_schema_property": "name",
         "okta_app_user_base_schema_property": "name",
         "okta_app_group_assignment": "id",
@@ -252,7 +252,7 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
         "okta_app_oauth_api_scope": "name",
         "okta_app_oauth_role_assignment": "id",
         "okta_app_access_policy_assignment": "id",
-        "okta_app_saml_settings": "id",
+        "okta_app_saml_app_settings": "id",
 
         # Auth Server entities - sorted by name or id
         "auth_servers": "name",
