@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import time
 
 import requests
 from django.conf import settings
@@ -210,9 +211,21 @@ class OktaCallbackView(APIView):
             }
         )
 
-        response = HttpResponseRedirect(settings.FRONTEND_REDIRECT_URL)
-        response.set_cookie("access_token", jwt_token, httponly=False, secure=False, samesite="Lax")
-        return response
+        session["pending_jwt"] = jwt_token
+        session["pending_jwt_issued_at"] = time.time()
+        session.save()
+
+        logger.info(
+            "Pending JWT stored in session",
+            extra={
+                'component': 'auth',
+                'request_id': request_id,
+                'user': email,
+                'session_key': request.session.session_key,
+            }
+        )
+
+        return HttpResponseRedirect(settings.FRONTEND_REDIRECT_URL)
 
     def _extract_scopes_from_token(self, access_token):
         """Extract scopes from the access token payload."""

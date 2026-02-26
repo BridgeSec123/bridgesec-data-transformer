@@ -2,7 +2,7 @@ from urllib.parse import quote
 import logging
 
 from django.conf import settings
-from django.shortcuts import redirect
+from rest_framework.response import Response
 from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
@@ -61,6 +61,6 @@ class OktaLoginView(APIView):
             }
         )
 
-        return redirect(authorize_url)
+        return Response({"authorization_url": authorize_url})
 
 

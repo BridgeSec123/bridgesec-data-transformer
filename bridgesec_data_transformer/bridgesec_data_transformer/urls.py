@@ -9,6 +9,7 @@ from core.views.user_views import UserCreateView
 from core.views.auth_views import CustomTokenObtainPairView, CustomTokenObtainView, CustomTokenRefreshView
 from core.views.okta_login_viewset import OktaLoginView
 from core.views.okta_callback_viewset import OktaCallbackView
+from core.views.token_retrieval_view import TokenRetrievalView
 
 # Your views
 # from core.views.user_views import UserCreateView
@@ -39,6 +40,7 @@ urlpatterns = [
     path("okta/login/", OktaLoginView.as_view(), name="okta_login"),
     path("okta/callback/", OktaCallbackView.as_view(), name="okta-callback"),
     path("okta/logout/", OktaLogoutView.as_view(), name="okta-logout"),
+    path("api/auth/token/", TokenRetrievalView.as_view(), name="auth-token"),
 ]
     # path("user/", UserCreateView.as_view({"post": "post"}), name="create-user"),
     # path('okta_user/', OktaLoginViewSet.as_view({"post": "create"}), name='okta-login'),
