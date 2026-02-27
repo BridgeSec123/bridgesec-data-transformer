@@ -53,10 +53,15 @@ class TokenRetrievalView(APIView):
             }
         )
 
+        okta_access_token = session.get("okta_access_token")
+        granted_scopes = session.get("okta_granted_scopes", [])
+
         return Response({
             "access_token": pending_jwt,
             "token_type": "Bearer",
             "expires_in": 86400,
+            "okta_access_token": okta_access_token,
+            "granted_scopes": granted_scopes,
             "user": {
                 "email": session.get("email"),
                 "username": session.get("username"),
