@@ -18,6 +18,14 @@ services:
   #      gunicorn bridgesec_data_transformer.wsgi:application --bind 0.0.0.0:8000 --workers 4 --access-logfile - --timeout 120
   #   restart: always
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: bridgesec_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    restart: always
+
   celery_worker:
     build: .
     container_name: bridgesec_celery
@@ -27,11 +35,31 @@ services:
     environment:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672/
     volumes:
      - .:/app
      - ./bridgesec_data_transformer/logs:/app/logs
      - ./bridgesec_data_transformer/output:/app/bridgesec_data_transformer/output
     command: celery -A bridgesec_data_transformer worker --loglevel=INFO
+    restart: always
+
+  celery_beat:
+    build: .
+    container_name: bridgesec_celery_beat
+    working_dir: /app/bridgesec_data_transformer
+    env_file:
+      - .env
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672/
+    volumes:
+      - .:/app
+      - ./bridgesec_data_transformer/logs:/app/logs
+    command: celery -A bridgesec_data_transformer beat --loglevel=INFO
+    depends_on:
+      - rabbitmq
+      - celery_worker
     restart: always
 
   consumer:
@@ -41,6 +69,7 @@ services:
     environment:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672/
     container_name: bridgesec_consumer
     working_dir: /app/bridgesec_data_transformer
     command: python core/rabbitmq_consumer.py
@@ -171,7 +200,7 @@ services:
       - SPLUNK_PASSWORD=${SPLUNK_PASSWORD:-changeme123}
       - SPLUNK_HEC_TOKEN=abcd1234-abcd-1234-abcd-1234abcd1234
     ports:
-      - "8000:8000"      # Splunk Web UI
+      - "8001:8000"      # Splunk Web UI (8001 to avoid conflict with Django on 8000)
       - "8088:8088"      # HEC (HTTP Event Collector)
       - "9997:9997"      # Splunk Forwarder Receiver
     volumes:

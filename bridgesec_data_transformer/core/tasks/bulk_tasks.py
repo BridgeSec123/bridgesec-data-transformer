@@ -368,6 +368,55 @@ def run_bulk_entity_task(
 
 
 @shared_task
+def run_scheduled_bulk_task():
+    """
+    Celery Beat scheduled task — runs daily at midnight UTC.
+
+    Obtains an Okta access token via the Client Credentials grant flow
+    using the configured service app private key, then triggers the full
+    parallel bulk fetch (same as the manual POST /api/bulk/ endpoint).
+
+    No user session is required — the service app authenticates directly
+    with Okta using a signed JWT assertion.
+    """
+    from core.utils.service_token import get_service_access_token
+
+    logger.info(
+        "Scheduled bulk fetch starting: acquiring service app access token...",
+        extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch'}
+    )
+
+    try:
+        access_token, granted_scopes = get_service_access_token()
+        logger.info(
+            f"Service access token obtained. Delegating to run_bulk_entity_task...",
+            extra={
+                'component': 'celery',
+                'task_name': 'scheduled_bulk_fetch',
+                'scope_count': len(granted_scopes),
+            }
+        )
+    except Exception as e:
+        logger.exception(
+            f"Scheduled bulk fetch failed: could not obtain service access token: {e}",
+            extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch'}
+        )
+        notify_backend_via_rabbitmq(
+            "N/A", "failed",
+            [{"entity": "scheduled_task", "error": f"Token acquisition failed: {e}"}]
+        )
+        return {"status": "error", "error": str(e)}
+
+    # Delegate to the existing parallel bulk fetch with the service token.
+    # Called directly (not via .delay()) since we are already inside a Celery task;
+    # the inner group().apply_async() still runs all entity subtasks in parallel.
+    return run_bulk_entity_task(
+        okta_access_token=access_token,
+        okta_granted_scopes=granted_scopes,
+    )
+
+
+@shared_task
 def run_bulk_entity_task_sequential(okta_access_token=None, okta_granted_scopes=None):
     """
     DEPRECATED: Original sequential implementation.

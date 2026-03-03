@@ -36,6 +36,13 @@ FRONTEND_REDIRECT_URL = env("FRONTEND_REDIRECT_URL")
 FRONTEND_URL = env("FRONTEND_URL")
 SERVER_URL = env("SERVER_URL")
 
+# Service App OAuth 2.0 Client Credentials (for scheduled tasks)
+# Used by Celery Beat to get an access token without a user session.
+# The service app must have scopes pre-granted in Okta Admin Console.
+OKTA_SERVICE_CLIENT_ID = env("OKTA_SERVICE_CLIENT_ID", default=None)
+OKTA_SERVICE_PRIVATE_KEY = env("OKTA_SERVICE_PRIVATE_KEY", default=None)
+OKTA_SERVICE_SCOPES = env("OKTA_SERVICE_SCOPES", default="")
+
 # Supabase Configuration (for Terraform state file verification)
 # Add these to your .env file:
 #   SUPABASE_URL=https://your-project.supabase.co
@@ -53,18 +60,10 @@ OKTA_SCOPES = " ".join([
     "email",
     "profile",
     # Okta Admin API scopes
-    "okta.users.read",
-    "okta.apps.read",
-    "okta.groups.read",
-    "okta.policies.read",
-    "okta.authorizationServers.read",
     "okta.authorizationServers.manage",
     "okta.userTypes.manage",
     "okta.userTypes.manage",
-
-    "okta.idps.read",
     "okta.idps.manage",
-    "okta.brands.read",
     "okta.brands.manage",
     "okta.authenticators.read",
     # "okta.orgs.read",
@@ -75,15 +74,11 @@ OKTA_SCOPES = " ".join([
     "okta.deviceAssurance.read",
     "okta.emailServers.read",
     "okta.emailDomains.read",
-    "okta.users.manage.self",
-    "okta.users.manage",
     "okta.groups.manage",
     "okta.directories.groups.manage",
     "okta.apps.manage",
     "okta.schemas.manage",
     "okta.groups.manage",
-    "okta.idps.manage",
-    "okta.idps.read",
     "okta.profileMappings.read",
     "okta.profileMappings.manage",
     "okta.policies.manage",
@@ -459,4 +454,14 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL")
 CELERY_RESULT_BACKEND = "rpc://"  # or another backend like MongoDB or Redis
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+
+# Celery Beat — scheduled tasks
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'scheduled-bulk-fetch': {
+        'task': 'core.tasks.bulk_tasks.run_scheduled_bulk_task',
+        'schedule': timedelta(minutes=10),  # every 10 minutes (for testing)
+    },
+}
 

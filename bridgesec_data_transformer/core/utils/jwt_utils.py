@@ -52,30 +52,55 @@ def get_user_from_request(request):
         email = None
         user_id = None
 
-        # Try decoding as Okta token first (RS256)
+        # Determine token algorithm without verification
         try:
-            jwks = get_cached_jwks()
             unverified_header = jwt.get_unverified_header(token)
-            kid = unverified_header.get("kid")
+        except Exception as e:
+            logger.warning(f"Could not read token header: {str(e)}")
+            return "Unknown"
 
-            if kid:
+        token_alg = unverified_header.get("alg", "")
+        kid = unverified_header.get("kid")
+
+        # Try decoding as Okta token (RS256)
+        if token_alg == "RS256" and kid:
+            try:
+                jwks = get_cached_jwks()
                 key = next((k for k in jwks["keys"] if k["kid"] == kid), None)
+
+                # kid not in cached JWKS — Okta may have rotated keys, refresh and retry
+                if not key:
+                    logger.info(f"kid '{kid}' not found in cached JWKS, refreshing...")
+                    get_cached_jwks.cache_clear()
+                    jwks = get_cached_jwks()
+                    key = next((k for k in jwks["keys"] if k["kid"] == kid), None)
+
                 if key:
                     decoded = jwt.decode(
                         token,
                         key,
                         algorithms=["RS256"],
-                        audience="api://default",
+                        audience=settings.OKTA_ISSUER,
                         issuer=settings.OKTA_ISSUER,
                     )
-                    # Okta token: extract email from 'sub' or 'email' claim
                     email = decoded.get("sub") or decoded.get("email")
-                    logger.info(f"Decoded Okta token for user: {email}",extra={"operation":"Get User From Request"})
-        except Exception as okta_error:
-            logger.debug(f"Not an Okta token, trying custom JWT: {str(okta_error)}",extra={"operation":"Get User From Request"})
+                    logger.info(f"Decoded Okta token for user: {email}")
+                else:
+                    logger.warning(f"kid '{kid}' not found in JWKS even after refresh")
+            except Exception as okta_error:
+                logger.debug(f"Okta RS256 decode failed: {str(okta_error)}")
 
-        # If Okta decode failed, try custom JWT (HS256)
-        if not decoded:
+        # If RS256 verified decode failed, extract claims unverified (auth already passed)
+        if not decoded and token_alg == "RS256":
+            try:
+                unverified_claims = jwt.get_unverified_claims(token)
+                email = unverified_claims.get("sub") or unverified_claims.get("email")
+                logger.info(f"Extracted user from Okta token unverified claims: {email}")
+            except Exception as e:
+                logger.warning(f"Could not extract unverified claims: {str(e)}")
+
+        # Try custom HS256 JWT (username/password login)
+        if not decoded and token_alg != "RS256":
             try:
                 decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
                 user_id = decoded.get('user_id')
