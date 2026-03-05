@@ -461,7 +461,7 @@ from celery.schedules import crontab
 CELERY_BEAT_SCHEDULE = {
     'scheduled-bulk-fetch': {
         'task': 'core.tasks.bulk_tasks.run_scheduled_bulk_task',
-        'schedule': timedelta(minutes=10),  # every 10 minutes (for testing)
+        'schedule': crontab(hour=0, minute=0),  # every night at 12:00 AM (midnight)
     },
 }
 

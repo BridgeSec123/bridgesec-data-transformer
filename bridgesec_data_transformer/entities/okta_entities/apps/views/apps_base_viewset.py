@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 ENTITIES_NEEDING_APP_ITERATION = [
     "okta_app_group_assignment",
     "okta_app_group_assignments",
-    "okta_app_user",
+    "okta_app_users",
     "okta_app_user_schema_property",
     "okta_app_user_base_schema_property"
 ]
