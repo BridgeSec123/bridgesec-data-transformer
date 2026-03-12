@@ -2,6 +2,8 @@ import copy
 import json
 import logging
 import os
+import time
+import traceback
 from datetime import datetime
 
 import requests
@@ -12,12 +14,14 @@ from core.utils.collection_mapping import (ENTITY_ID_MAPPING,
                                            RESOURCE_COLLECTION_MAP)
 from core.utils.db_utils import (ENTITIES_WITH_BUILDERS, extract_time,
                                  get_collection_diff, get_collection_name,
-                                 get_latest_db)
+                                 get_db_map, get_latest_db, list_databases_for_date,
+                                 parse_input_date, resolve_db_name)
 from core.utils.jwt_utils import get_user_from_request
 from core.utils.model_registry import MODEL_REGISTRY
 from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
 from core.utils.nested_mapping import NESTED_FIELD_COLLECTIONS
 from core.utils.okta_helpers import get_okta_headers
+from core.utils.module_mapping import get_terraform_api_for_entity
 from core.utils.restore_utils import (extract_terraform_target_params,
                                       fetch_and_merge_restored_data,
                                       remove_metadata_fields,
@@ -28,13 +32,13 @@ from core.utils.restore_utils import (extract_terraform_target_params,
                                       filter_deleted_records_from_state,
                                       handle_nested_deletion,
                                       validate_deletion_safety)
+from core.utils.verification import verify_deletion_complete
 from core.utils.schema_extractor import get_ui_backend_mapping
 from core.utils.serializer_registry import SERIALIZER_REGISTRY
 from django.conf import settings
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from entities.registry import ENTITY_VIEWSETS
-from core.utils.collection_mapping import ENTITY_ID_MAPPING
 from entities.serializers.restore_serializer import RestoreDataSerializer
 from entities.services.resouce_data_service import EntityDataService
 from pymongo import MongoClient
@@ -155,6 +159,121 @@ class BulkEntityViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @swagger_auto_schema(
+        operation_description=(
+            "Return snapshot database information.\n\n"
+            "**No params** → date-level summary with snapshot counts only.\n"
+            "**?date=DD-MM-YY** → paginated snapshots for that date (use page + page_size).\n"
+            "**?date=DD-MM-YY&time=HH:MM** → confirm a specific snapshot exists."
+        ),
+        manual_parameters=[
+            openapi.Parameter(
+                "date", openapi.IN_QUERY,
+                description="Filter by date. Format: DD-MM-YY or DD-MM-YYYY (e.g. 10-03-26)",
+                type=openapi.TYPE_STRING, required=False,
+            ),
+            openapi.Parameter(
+                "time", openapi.IN_QUERY,
+                description="Confirm a specific snapshot (requires date). Format: HH:MM (e.g. 03:57)",
+                type=openapi.TYPE_STRING, required=False,
+            ),
+            openapi.Parameter(
+                "page", openapi.IN_QUERY,
+                description="Page number for paginated snapshot list (requires date). Default: 1",
+                type=openapi.TYPE_INTEGER, required=False,
+            ),
+            openapi.Parameter(
+                "page_size", openapi.IN_QUERY,
+                description="Number of snapshots per page (requires date). Default: 20",
+                type=openapi.TYPE_INTEGER, required=False,
+            ),
+        ],
+        responses={
+            200: openapi.Response("Snapshot data"),
+            400: "Invalid date, time, or pagination format",
+            404: "No snapshots found",
+        },
+    )
+    @action(detail=False, methods=["get"], url_path="db-map")
+    def get_db_map_view(self, request):
+        """
+        GET /db-map/
+            → date summary: {"10-03-2026": {"snapshot_count": 3}, ...}
+
+        GET /db-map/?date=10-03-26&page=1&page_size=20
+            → paginated snapshots for that date
+
+        GET /db-map/?date=10-03-26&time=03:57
+            → confirm a specific snapshot exists
+        """
+        date_param = request.query_params.get("date")
+        time_param = request.query_params.get("time")
+
+        try:
+            # ?date + ?time — confirm specific snapshot exists
+            if date_param and time_param:
+                parsed = parse_input_date(date_param)
+                if parsed is None:
+                    return Response(
+                        {"error": "Invalid date format. Use DD-MM-YY or DD-MM-YYYY"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                iso_date = parsed.strftime("%Y-%m-%d")
+                db_name = resolve_db_name(iso_date, time_param)
+                if db_name not in mongo_client.list_database_names():
+                    return Response(
+                        {"error": f"No snapshot found for {date_param} at {time_param}"},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+                display_date = f"{iso_date[8:]}-{iso_date[5:7]}-{iso_date[:4]}"
+                return Response(
+                    {
+                        "dates": [
+                            {
+                                "date": display_date,
+                                "snapshot_count": 1,
+                                "snapshots": [{"time": time_param, "db_name": db_name}],
+                            }
+                        ]
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            # ?date only — paginated snapshots for that date
+            if date_param:
+                try:
+                    page = int(request.query_params.get("page", 1))
+                    page_size = int(request.query_params.get("page_size", 20))
+                except ValueError:
+                    return Response(
+                        {"error": "page and page_size must be integers"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if page < 1 or page_size < 1:
+                    return Response(
+                        {"error": "page and page_size must be positive integers"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                result = list_databases_for_date(mongo_client, date_param, page=page, page_size=page_size)
+                if not result.get("dates") or result["dates"][0]["snapshot_count"] == 0:
+                    return Response(
+                        {"error": f"No snapshots found for {date_param}"},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+                return Response(result, status=status.HTTP_200_OK)
+
+            # No params — date summary only (no snapshot details)
+            result = get_db_map(mongo_client)
+            if not result.get("dates"):
+                return Response({"error": "No snapshots found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(result, status=status.HTTP_200_OK)
+
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"get_db_map_view failed: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     @action(detail=False, methods=["get"], url_path="list-databases")
     def list_databases(self, request):
         """
@@ -216,91 +335,65 @@ class BulkEntityViewSet(viewsets.ViewSet):
     @action(
         detail=False,
         methods=["get"],
-        url_path=r"data/(?P<date_str>\d{4}-\d{2}-\d{2})/(?P<entity_name>[^/.]+)",
+        url_path=r"data/(?P<db_name>[^/]+)/(?P<entity_name>[^/.]+)",
     )
-    def get_resource_data(self, request, date_str, entity_name):
+    def get_resource_data(self, request, db_name, entity_name):
         """
-        Fetch resource data and merge with restored changes if available.
+        Fetch resource data from a specific snapshot DB and merge with any restored changes.
 
         Flow:
-        1. Fetch original data from source DB (Policy MFA with nested rules)
-        2. Check for restored collections in today's DB
-        3. If restored data exists for specific policy_id, merge it
-        4. Remove metadata fields (restored_by, restored_from, restored_at)
-        5. Return merged data with non_editable_fields
+        1. Validate db_name exists in MongoDB
+        2. Fetch entity data from the snapshot DB
+        3. Merge with any restored/modified records stored in the same DB
+        4. Remove metadata fields and return
         """
-        # Normalize entity name (remove extra spaces from URL encoding)
-        logger.info("Fetching data from DB...",extra={"operation":'FETCH-CURRENT-DATA'})
+        logger.info("Fetching data from DB...", extra={"operation": 'FETCH-CURRENT-DATA'})
         entity_name = " ".join(entity_name.split())
 
-        if not date_str or not entity_name:
-            logger.info("No date and enity provided",extra={"operation":'FETCH-CURRENT-DATA'})
-            return Response(
-                {"error": "Missing 'date' or 'entity_type' parameter"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         try:
-            logger.info("Got Date and Entity",extra={"operation":'FETCH-CURRENT-DATA'})
-            # Validate date format
-            datetime.strptime(date_str, "%Y-%m-%d")
+            # Validate snapshot DB exists
+            if db_name not in mongo_client.list_database_names():
+                return Response(
+                    {"error": f"Snapshot '{db_name}' not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            logger.info(f"Using snapshot db: {db_name}", extra={"operation": 'FETCH-CURRENT-DATA'})
 
-            # Step 1: Fetch original data (with nested arrays for builder entities like Policy MFA)
-            logger.info("Fetching original data ",extra={"operation":'FETCH-CURRENT-DATA'})
+            # Extract iso_date from db_name: "bridgesec_2026-03-10T0357" → "2026-03-10"
+            iso_date = db_name.split("_", 1)[1].split("T")[0]
+
+            # Fetch entity data from the snapshot DB
             service = EntityDataService()
-            original_data = service.fetch(date_str, entity_name)
-            logger.info(f"Fetched {len(original_data)} original records for {entity_name}",extra={"operation":'FETCH-CURRENT-DATA'})
+            original_data = service.fetch(iso_date, entity_name, db_name=db_name)
+            logger.info(f"Fetched {len(original_data)} records for {entity_name}", extra={"operation": 'FETCH-CURRENT-DATA'})
 
             # Get collection metadata
             collection_name = get_collection_name(entity_name)
             id_field = ENTITY_ID_MAPPING.get(entity_name)
 
             if not collection_name or not id_field:
-                # Missing configuration, return original data only
-                logger.warning(f"Missing collection_name or id_field for {entity_name}",extra={"operation":'FETCH-CURRENT-DATA'})
+                logger.warning(f"Missing collection_name or id_field for {entity_name}", extra={"operation": 'FETCH-CURRENT-DATA'})
                 return Response({
                     "data": original_data,
                     "non_editable_fields": NON_EDITABLE_FIELDS.get(entity_name, [])
                 }, status=status.HTTP_200_OK)
 
-            # Step 2 & 3: Check today's DB for restored collections and merge
-            logger.info("Checking today's DB for restored collections and merging",extra={"operation":'FETCH-CURRENT-DATA'})
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            db_name = get_latest_db(mongo_client, today_str)
+            # Merge restored data from the same snapshot DB
+            db = mongo_client[db_name]
+            original_data = fetch_and_merge_restored_data(
+                db, entity_name, collection_name, id_field, original_data
+            )
+            logger.info(f"Merge complete: {len(original_data)} records", extra={"operation": 'FETCH-CURRENT-DATA'})
 
-            if db_name:
-                logger.info("Found DB",extra={"operation":'FETCH-CURRENT-DATA'})
-                db = mongo_client[db_name]
-                logger.info(f"Checking for restored data in database: {db_name}",extra={"operation":'FETCH-CURRENT-DATA'})
-
-                # Fetch and merge restored data (uses functions from restore_utils.py)
-                # This handles:
-                # - Checking if _okta_policy_mfa exists
-                # - Fetching latest versions by policy_id
-                # - Rebuilding nested arrays from _okta_policy_rule_mfa
-                # - Merging restored changes with original data (field-level merge)
-                original_data = fetch_and_merge_restored_data(
-                    db, entity_name, collection_name, id_field, original_data
-                )
-                logger.info(f"Merge complete: {len(original_data)} records",extra={"operation":'FETCH-CURRENT-DATA'})
-            else:
-                logger.info(f"No database found for today ({today_str}), using original data only",extra={"operation":'FETCH-CURRENT-DATA'})
-
-            # Step 4: Remove metadata fields (restored_by, restored_from, restored_at, _id)
             remove_metadata_fields(original_data)
-            logger.info("Removed metadata fields from response",extra={"operation":'FETCH-CURRENT-DATA'})
 
-            # Step 5: Return merged data with non_editable_fields
-            non_editable_fields = NON_EDITABLE_FIELDS.get(entity_name, [])
-
-            logger.info("Returning data........",extra={"operation":'FETCH-CURRENT-DATA'})
             return Response({
                 "data": original_data,
-                "non_editable_fields": non_editable_fields
+                "non_editable_fields": NON_EDITABLE_FIELDS.get(entity_name, [])
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            logger.error(f"Error in get_resource_data: {str(e)}", exc_info=True,extra={"operation":'FETCH-CURRENT-DATA'})
+            logger.error(f"Error in get_resource_data: {str(e)}", exc_info=True, extra={"operation": 'FETCH-CURRENT-DATA'})
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -344,12 +437,11 @@ class BulkEntityViewSet(viewsets.ViewSet):
     @action(
         detail=False,
         methods=["post"],
-        url_path=r"restore/(?P<date_str>\d{4}-\d{2}-\d{2})/(?P<entity_name>[^/.]+)",
+        url_path=r"restore/(?P<db_name>[^/]+)/(?P<entity_name>[^/.]+)",
     )
-
-    def restore_modified_data(self, request, date_str, entity_name):
+    def restore_modified_data(self, request, db_name, entity_name):
         """
-        Restore data into a new dynamic DB using pymongo only → no ensure_mongo_connection.
+        Restore data into the specified snapshot DB using pymongo only.
 
         Query Parameters:
             - operation_type: "delete", "restore", or "create" (optional)
@@ -358,8 +450,19 @@ class BulkEntityViewSet(viewsets.ViewSet):
         # Get request_id and user for tracing
         request_id = getattr(request, 'request_id', 'N/A')
         user = get_user_from_request(request)
+        restored_by = get_user_from_request(request)
 
         try:
+            # Validate snapshot DB exists
+            if db_name not in mongo_client.list_database_names():
+                return Response(
+                    {"error": f"Snapshot '{db_name}' not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # Extract iso_date from db_name: "bridgesec_2026-03-10T0357" → "2026-03-10"
+            iso_date = db_name.split("_", 1)[1].split("T")[0]
+
             modified_data = request.data.get("data", [])
             if not isinstance(modified_data, list):
                 return Response(
@@ -379,7 +482,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     'entity_type': entity_name,
                     'operation': "Restore Modified Data",
                     'record_count': len(modified_data),
-                    'source_date': date_str,
+                    'source_date': iso_date,
                 }
             )
 
@@ -394,22 +497,10 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     status=status.HTTP_200_OK,
                 )
 
-            source_db_name = get_latest_db(mongo_client, date_str)
-            if not source_db_name:
-                return Response(
-                    {"message": f"No source DB found for date {date_str}"},
-                    status=404,
-                )
+            logger.info(f"Using snapshot db: {db_name}", extra={"operation": "Restore Modified Data"})
 
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            current_db_name = get_latest_db(mongo_client, today_str)
-
-            if not current_db_name:
-                current_db_name = get_dynamic_db()
-                logger.info(f"No database found for today. Created new database: {current_db_name}",extra={"operation":"Restore Modified Data"})
-
-            current_db = mongo_client[current_db_name]
-            source_db = mongo_client[source_db_name]
+            # Both source and write target are the same exact snapshot db
+            current_db = mongo_client[db_name]
 
             # Get ID field for this entity
             id_field = ENTITY_ID_MAPPING.get(entity_name)
@@ -459,7 +550,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 logger.info(f"Processing {len(deleted_records)} deletion(s)")
 
                 # Validate deletion safety
-                errors = validate_deletion_safety(source_db, entity_name, collection_name, deleted_records)
+                errors = validate_deletion_safety(current_db, entity_name, collection_name, deleted_records)
                 if errors:
                     return Response(
                         {"error": "Deletion validation failed", "details": errors},
@@ -471,9 +562,9 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 for doc in deleted_records:
                     record_id = doc.get(id_field)
                     if not mapping_handlers.is_mapped_entity(collection_name):
-                        complete_record = fieldfetch.get_collection(source_db, collection_name, doc)
+                        complete_record = fieldfetch.get_collection(current_db, collection_name, doc)
                     else:
-                        complete_record = fieldfetch.get_mapped_collection(source_db, collection_name, doc)
+                        complete_record = fieldfetch.get_mapped_collection(current_db, collection_name, doc)
 
                     if complete_record:
                         complete_deleted_records.append(complete_record)
@@ -482,31 +573,30 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
                 # Store deleted records with metadata in "deletion_pending" status
                 # This allows us to track the deletion attempt before Terraform runs
-                restored_by = get_user_from_request(request)
                 store_deleted_data_with_metadata(
                     current_db, entity_name, collection_name,
-                    complete_deleted_records, restored_by, source_db_name,
+                    complete_deleted_records, restored_by, db_name,
                     operation_type="deletion_pending"  # PENDING status before Terraform
                 )
 
                 # Handle cascade deletion for nested entities (also with "deletion_pending" status)
                 deleted_ids_list, cascade_info = handle_nested_deletion(
                     current_db, entity_name, complete_deleted_records,
-                    restored_by, source_db_name
+                    restored_by, db_name
                 )
 
                 logger.info(f"Cascade deletion complete: {len(deleted_ids_list)} total IDs marked as deletion_pending",extra={"operation":"Restore Modified Data"})
 
             # Process restore operations
             if restore_records:
-                logger.info(f"Processing {len(restore_records)} restore(s)",extra={"operation":"Restore Modified Data"})
+                logger.info(f"Processing {len(restore_records)} restore(s)", extra={"operation":"Restore Modified Data"})
                 if not mapping_handlers.is_mapped_entity(collection_name):
                     for i, doc in enumerate(restore_records):
-                        new_data = fieldfetch.get_collection(source_db, collection_name, doc)
+                        new_data = fieldfetch.get_collection(current_db, collection_name, doc)
                         restore_records[i] = new_data
                 else:
                     for i, doc in enumerate(restore_records):
-                        data = fieldfetch.get_mapped_collection(source_db, collection_name, doc)
+                        data = fieldfetch.get_mapped_collection(current_db, collection_name, doc)
                         restore_records[i] = data
 
             # Process create operations
@@ -516,13 +606,11 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     create_records[i] = fieldfetch.transform_data(collection_name, doc)
 
             # Store restored and created data (deleted data was already stored above)
-            restored_by = get_user_from_request(request)
-
             if restore_records:
                 data_for_storage = copy.deepcopy(restore_records)
                 store_restored_data_with_metadata(
                     current_db, entity_name, collection_name,
-                    data_for_storage, restored_by, source_db_name
+                    data_for_storage, restored_by, db_name
                 )
                 logger.info(f"Stored {len(restore_records)} restored records",extra={"operation":"Restore Modified Data"})
 
@@ -544,8 +632,8 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
             # Step 1: Fetch ALL original data from source DB snapshot
             service = EntityDataService()
-            original_data = service.fetch(date_str, entity_name)
-            logger.info(f"Step 1: Fetched {len(original_data)} original records from source DB ({source_db_name})",extra={"operation":"Restore Modified Data"})
+            original_data = service.fetch(iso_date, entity_name, db_name=db_name)
+            logger.info(f"Step 1: Fetched {len(original_data)} original records from source DB ({db_name})",extra={"operation":"Restore Modified Data"})
 
             # Step 2: Merge original data with restored data from today's DB
             # This handles both simple entities and nested entities (with builders)
@@ -570,9 +658,6 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name)
                 if nested_mapping:
                     # Rebuild nested arrays for created records
-                    from core.utils.restore_utils import rebuild_restored_data_with_nested_arrays
-
-                    # Get created records with nested arrays rebuilt
                     for created_record in created_records_from_db:
                         unique_id = created_record.get("unique_id")
                         if unique_id:
@@ -635,8 +720,6 @@ class BulkEntityViewSet(viewsets.ViewSet):
             tf_headers = get_okta_headers(request)
 
             # Get module-specific Terraform API endpoint
-            from core.utils.module_mapping import get_terraform_api_for_entity
-
             terraform_api = get_terraform_api_for_entity(entity_name)
 
             if not terraform_api:
@@ -661,7 +744,6 @@ class BulkEntityViewSet(viewsets.ViewSet):
             )
 
             # Send data to module-specific Terraform API with timing
-            import time
             start_time = time.time()
 
             tf_response = requests.post(
@@ -736,8 +818,6 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     logger.info("=" * 80)
                     logger.info("RUNNING DELETION VERIFICATION",extra={"operation":"Restore Modified Data"})
                     logger.info("=" * 80)
-
-                    from core.utils.verification import verify_deletion_complete
 
                     # Get Okta access token from request session
                     okta_access_token = None
@@ -818,7 +898,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             response_data = {
                 "tf_message": tf_message,
                 "message": response_message,
-                "restored_db": current_db_name,
+                "restored_db": db_name,
                 "collection": f"_{collection_name}",
                 "record_count": len(modified_data),
                 "operations": {
@@ -872,7 +952,6 @@ class BulkEntityViewSet(viewsets.ViewSet):
             return Response(response_data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            import traceback
             traceback.print_exc()
 
             logger.error(
@@ -929,7 +1008,6 @@ class BulkEntityViewSet(viewsets.ViewSet):
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            import traceback
             traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -1032,7 +1110,6 @@ class BulkEntityViewSet(viewsets.ViewSet):
             return Response(diff_result, status=status.HTTP_200_OK)
 
         except Exception as e:
-            import traceback
             traceback.print_exc()
             logger.error(f"Error in diff_collections: {str(e)}")
             return Response(

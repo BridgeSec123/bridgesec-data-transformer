@@ -1,7 +1,5 @@
-from typing import Dict, Any, List, Optional
-from pymongo import MongoClient
 from django.conf import settings
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
@@ -19,12 +17,14 @@ from .admin_role_custom_service import AdminRoleCustomDataBuilder
 
 class EntityDataService:
     def __init__(self):
-        self.mongo_client = MongoClient(settings.MONGO_URI)
+        self.mongo_client = settings.MONGO_CLIENT
 
-    def fetch(self, date_str, entity_name):
+    def fetch(self, date_str, entity_name, db_name=None):
         logger.info(f"Fetching data for date: {date_str}, entity: {entity_name}",extra={"operation":"FETCHDBFORDATE"})
 
-        db_name = get_latest_db(self.mongo_client, date_str)
+        if db_name is None:
+            db_name = get_latest_db(self.mongo_client, date_str)
+
         logger.info(f"Found database: {db_name}",extra={"operation":"FETCHDBFORDATE"})
         if not db_name:
             logger.warning(f"No database found for date: {date_str}",extra={"operation":"FETCHDBFORDATE"})

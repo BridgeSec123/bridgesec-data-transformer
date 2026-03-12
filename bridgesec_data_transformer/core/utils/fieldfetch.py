@@ -1,6 +1,7 @@
-from . import mapping_handlers
-import logging
 import json
+import logging
+
+from . import mapping_handlers
 
 logger = logging.getLogger(__name__)
 
@@ -30,12 +31,9 @@ def get_data(db, collection, modified_data = None, mapped=False, id_value=None) 
         id = mapping_handlers.ID_KEYS[collection]  # To handle collections with leading underscore
         if not id_value and modified_data:
             id_value = modified_data.get(id, None)
-        print('collection: ', collection)
-        print('id: ', id)
         if not mapped:
             data = collect.find_one({id: id_value})
             data = transform_data(collection, data)
-            print('data: ', data)
         if mapped and id:
             data = list(collect.find({id: id_value}))
         return data
@@ -88,11 +86,8 @@ def get_mapped_collection(db, collection, modified_data):
     """
     # Get configuration from helpers
     mapped_collection = mapping_handlers.MAPPED_ENTITIES_HELPERS["entity_mapped_collections"][collection]
-    print('mapped_collection: ', mapped_collection)
     parent_id_key = mapping_handlers.ID_KEYS[collection]
-    print('parent_id_key: ', parent_id_key)
     subset_key = mapping_handlers.MAPPED_ENTITIES_HELPERS["entity_subsets"][collection]
-    print('subset_key: ', subset_key)
     
     # Fetch parent document
     parent_data = mapping_handlers.delete_ids(get_data(db, collection, modified_data))
@@ -116,8 +111,6 @@ def get_mapped_collection(db, collection, modified_data):
     if not partial_rules:
         parent_data[subset_key] = clean_rules
     # Otherwise, keep the modified rules from the user (already in parent_data from merge above)
-
-    print('parent_data with subset_key: ', parent_data)
 
     return parent_data
 

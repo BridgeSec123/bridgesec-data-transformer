@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import datetime
 
@@ -8,7 +9,6 @@ from core.utils.nested_mapping import (ENTITIES_WITH_BUILDERS,
                                        NESTED_FIELD_ID_MAPPING)
 from deepdiff import DeepDiff
 from django.conf import settings
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,146 @@ def extract_time(db_name):
     if match:
         return match.group(1)
     return None
+
+
+def parse_input_date(date_str):
+    """
+    Parse a user-supplied date string into a datetime object.
+
+    Accepts:
+        - DD-MM-YY   (e.g. "09-08-25")
+        - DD-MM-YYYY (e.g. "09-08-2025")
+
+    Returns:
+        datetime object on success, None on failure.
+    """
+    for fmt in ("%d-%m-%y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _extract_time_display(time_part):
+    """Convert compact time string to HH:MM. e.g. '0357' → '03:57'."""
+    if len(time_part) == 4 and time_part.isdigit():
+        return f"{time_part[:2]}:{time_part[2:]}"
+    return time_part
+
+
+def _format_date_display(date_part):
+    """Convert YYYY-MM-DD to DD-MM-YYYY. e.g. '2026-03-10' → '10-03-2026'."""
+    try:
+        y, m, d = date_part.split("-")
+        return f"{d}-{m}-{y}"
+    except ValueError:
+        return date_part
+
+
+def resolve_db_name(date_str, time_str):
+    """
+    Reconstruct a MongoDB database name from date and time.
+
+    Args:
+        date_str: YYYY-MM-DD  (e.g. "2026-03-10")
+        time_str: HH:MM       (e.g. "03:57")
+
+    Returns:
+        "bridgesec_2026-03-10T0357"
+    """
+    time_compact = time_str.replace(":", "")  # "03:57" → "0357"
+    return f"{settings.MONGO_DB_NAME}_{date_str}T{time_compact}"
+
+
+def list_databases_for_date(mongo_client, date_str, page=1, page_size=20):
+    """
+    Return paginated snapshots for a given date.
+    """
+    parsed = parse_input_date(date_str)
+    if parsed is None:
+        raise ValueError(
+            f"Cannot parse date '{date_str}'. Use DD-MM-YY or DD-MM-YYYY."
+        )
+
+    iso_date = parsed.strftime("%Y-%m-%d")
+    date_prefix = f"{settings.MONGO_DB_NAME}_{iso_date}"
+    display_date = _format_date_display(iso_date)
+
+    logger.info("Listing databases for date",
+                extra={"operation": "list_databases_for_date", "iso_date": iso_date})
+
+    all_items = []
+    for db in sorted(db for db in mongo_client.list_database_names() if db.startswith(date_prefix)):
+        stripped = db[len(f"{settings.MONGO_DB_NAME}_"):]
+        if "T" not in stripped:
+            continue
+        _, time_part = stripped.split("T", 1)
+        all_items.append({"time": _extract_time_display(time_part), "db_name": db})
+
+    total = len(all_items)
+    start = (page - 1) * page_size
+    end = start + page_size
+
+    return {
+        "dates": [
+            {
+                "date": display_date,
+                "snapshot_count": total,
+                "snapshots": all_items[start:end],
+            }
+        ]
+    }
+
+
+def get_db_map(mongo_client):
+    """
+    Return all dates with all their snapshots grouped by date.
+
+    Returns:
+        {
+          "10-03-2026": {
+            "snapshot_count": 3,
+            "snapshots": [
+              {"time": "00:00", "db_name": "bridgesec_2026-03-10T0000"},
+              {"time": "03:57", "db_name": "bridgesec_2026-03-10T0357"},
+              {"time": "16:17", "db_name": "bridgesec_2026-03-10T1617"},
+            ]
+          },
+          "09-03-2026": {
+            "snapshot_count": 1,
+            "snapshots": [
+              {"time": "12:00", "db_name": "bridgesec_2026-03-09T1200"}
+            ]
+          }
+        }
+    """
+    prefix = f"{settings.MONGO_DB_NAME}_"
+    logger.info("Building full db map", extra={"operation": "get_db_map"})
+
+    grouped = {}
+    for db in sorted(mongo_client.list_database_names()):
+        if not db.startswith(prefix):
+            continue
+        stripped = db[len(prefix):]
+        if "T" not in stripped:
+            continue
+        date_part, time_part = stripped.split("T", 1)
+        display_date = _format_date_display(date_part)
+        if display_date not in grouped:
+            grouped[display_date] = []
+        grouped[display_date].append({"time": _extract_time_display(time_part), "db_name": db})
+
+    return {
+        "dates": [
+            {
+                "date": date,
+                "snapshot_count": len(snaps),
+                "snapshots": snaps
+            }
+            for date, snaps in grouped.items()
+        ]
+    }
 
 
 def get_collection_name(entity_name):
