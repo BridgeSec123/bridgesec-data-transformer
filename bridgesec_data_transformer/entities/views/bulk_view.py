@@ -31,7 +31,8 @@ from core.utils.restore_utils import (extract_terraform_target_params,
                                       update_deletion_status,
                                       filter_deleted_records_from_state,
                                       handle_nested_deletion,
-                                      validate_deletion_safety)
+                                      validate_deletion_safety,
+                                      update_created_records_with_ids)
 from core.utils.verification import verify_deletion_complete
 from core.utils.schema_extractor import get_ui_backend_mapping
 from core.utils.serializer_registry import SERIALIZER_REGISTRY
@@ -643,8 +644,11 @@ class BulkEntityViewSet(viewsets.ViewSet):
             )
             logger.info(f"Step 2: Merged to {len(merged_data)} total records (original + restored, deleted filtered)",extra={"operation":"Restore Modified Data"})
 
-            # Step 3: Add newly created records (those without IDs in original data)
-            # Created records only exist in restored collection with operation_type="created"
+            # Step 3: Add newly created records that are NOT already in merged_data.
+            # Created records with a real ID (written back after Terraform apply) are already
+            # included by merge_restored_with_original() Pass 2. Only add records that are
+            # still missing from merged_data (e.g. ID not yet written back, or nested entities
+            # that need unique_id-based assembly).
             restored_collection = current_db[f"_{collection_name}"]
             created_records_from_db = list(restored_collection.find(
                 {"operation_type": "created"},
@@ -654,14 +658,22 @@ class BulkEntityViewSet(viewsets.ViewSet):
             if created_records_from_db:
                 logger.info(f"Step 3: Found {len(created_records_from_db)} newly created records",extra={"operation":"Restore Modified Data"})
 
+                # Build set of IDs already present in merged_data to avoid duplicates
+                merged_ids = {str(r.get(id_field)) for r in merged_data if r.get(id_field)}
+
                 # For created records with nested data, rebuild nested arrays
                 nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name)
-                if nested_mapping:
-                    # Rebuild nested arrays for created records
-                    for created_record in created_records_from_db:
+                records_to_add = []
+                for created_record in created_records_from_db:
+                    rec_id = created_record.get(id_field)
+                    # Skip if already present in merged_data (added by merge_restored_with_original Pass 2)
+                    if rec_id and str(rec_id) in merged_ids:
+                        logger.info(f"Step 3: Skipping created record id={rec_id} — already in merged_data",extra={"operation":"Restore Modified Data"})
+                        continue
+
+                    if nested_mapping:
                         unique_id = created_record.get("unique_id")
                         if unique_id:
-                            # Fetch nested data for this created record
                             for nested_field, nested_coll_name in nested_mapping.items():
                                 nested_coll = f"_{nested_coll_name}"
                                 if nested_coll in current_db.list_collection_names():
@@ -673,9 +685,10 @@ class BulkEntityViewSet(viewsets.ViewSet):
                                 else:
                                     created_record[nested_field] = []
 
-                # Add created records to merged data
-                merged_data.extend(created_records_from_db)
-                logger.info(f"Step 4: Added created records, total now {len(merged_data)} records",extra={"operation":"Restore Modified Data"})
+                    records_to_add.append(created_record)
+
+                merged_data.extend(records_to_add)
+                logger.info(f"Step 4: Added {len(records_to_add)} new created record(s), total now {len(merged_data)} records",extra={"operation":"Restore Modified Data"})
             else:
                 logger.info("Step 3: No newly created records found",extra={"operation":"RestoreModifiedData"})
 
@@ -883,6 +896,24 @@ class BulkEntityViewSet(viewsets.ViewSet):
                         "failed_ids": deleted_ids_list,
                         "cascade_info": cascade_info
                     }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            # If Terraform succeeded and we created new records, update MongoDB with real Okta IDs.
+            # Terraform state now contains the actual IDs assigned by Okta for newly created resources.
+            # We match records by their label/name field (entity_unique_fields) and write the real ID.
+            if create_records and 200 <= tf_response.status_code < 300:
+                created_resources = tf_data.get("created_resources", [])
+                if created_resources:
+                    label_field = mapping_handlers.MAPPED_ENTITIES_HELPERS["entity_unique_fields"].get(
+                        collection_name, "label"
+                    )
+                    label_to_id_map = {r["label"]: r["id"] for r in created_resources}
+                    update_created_records_with_ids(
+                        current_db, collection_name, id_field, label_field, label_to_id_map
+                    )
+                    logger.info(
+                        f"Updated {len(label_to_id_map)} created record(s) with real IDs from Terraform state",
+                        extra={"operation": "Restore Modified Data"},
+                    )
 
             # Build response message based on operations performed
             operation_summary = []

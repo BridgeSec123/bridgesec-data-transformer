@@ -843,3 +843,48 @@ def merge_restored_with_original(original_data, restored_data, id_field):
             merged_data.append(original_record)
 
     return merged_data
+
+
+def update_created_records_with_ids(db, collection_name, id_field, label_field, label_to_id_map):
+    """
+    After Terraform creates new resources, update MongoDB records with the real Okta IDs.
+
+    Created records are stored in _{collection_name} with operation_type="created" and
+    no value for id_field (since they had no ID when submitted). This function matches
+    them by their label_field value and writes the real ID returned by Terraform.
+
+    Args:
+        db: PyMongo database object (the snapshot DB)
+        collection_name: Base collection name (e.g., "okta_app_oauth")
+        id_field: ID field to populate (e.g., "app_id")
+        label_field: Field used to match records (e.g., "label" for apps, "name" for policies)
+        label_to_id_map: Dict mapping label value → real Okta resource ID
+                         (e.g., {"My New App": "0oaXXXXXXX"})
+    """
+    if not label_to_id_map:
+        return
+
+    collection = db[f"_{collection_name}"]
+    updated_count = 0
+
+    for label_value, resource_id in label_to_id_map.items():
+        result = collection.update_many(
+            {
+                "operation_type": "created",
+                "$or": [{id_field: None}, {id_field: {"$exists": False}}],
+                label_field: label_value,
+            },
+            {"$set": {id_field: resource_id}},
+        )
+        if result.modified_count > 0:
+            updated_count += result.modified_count
+            logger.info(
+                f"Set {id_field}='{resource_id}' on {result.modified_count} created record(s) "
+                f"where {label_field}='{label_value}' in '_{collection_name}'",
+                extra={"operation": "Update Created Records With IDs"},
+            )
+
+    logger.info(
+        f"Total: updated {updated_count} created record(s) in '_{collection_name}' with real Okta IDs",
+        extra={"operation": "Update Created Records With IDs"},
+    )
