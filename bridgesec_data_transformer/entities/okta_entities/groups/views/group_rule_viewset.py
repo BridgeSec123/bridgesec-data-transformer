@@ -59,6 +59,9 @@ class GroupRuleViewSet(BaseGroupViewSet):
 
         extracted_rules = []
         for rule in okta_data:
+            if not isinstance(rule, dict):
+                logger.warning(f"Skipping unexpected group rule item (expected dict, got {type(rule).__name__}): {rule!r}")
+                continue
             conditions = rule.get("conditions", {})
             expressions= conditions.get("expression", {})
             people= conditions.get("people", {})

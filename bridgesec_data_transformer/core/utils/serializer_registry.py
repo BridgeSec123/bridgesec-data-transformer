@@ -88,6 +88,7 @@ SERIALIZER_REGISTRY = {
     "App Oauth Post Logout Redirect Uri":AppOauthPostRedirectUriSerializer,
     "App Oauth Redirect Uri":AppOauthRedirectUriSerializer,
     "App User Schema Property":AppUserSchemaPropertySerializer,
+    "App Oauth Api Scope":AppOauthApiScopeSerializer,
 
     
     "Users":UserSerializer,

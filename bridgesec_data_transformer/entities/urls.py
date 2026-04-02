@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from entities.views.bulk_view import BulkEntityViewSet
 from entities.views.import_view import ImportResourcesView
+from entities.views.confirm_delete_view import ConfirmDeletionView
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from rest_framework import permissions
@@ -23,11 +24,12 @@ urlpatterns = [
     path("api/bulk/", BulkEntityViewSet.as_view({"post": "post"}), name="bulk-api"),
     # path("fetch_db/", BulkEntityViewSet.as_view({"get": "list_databases"}), name="fetch-db"),
     path("resources/", BulkEntityViewSet.as_view({"get": "get_resource_names"}), name="resources"),
-    path("data/<str:db_name>/<str:entity_name>/", BulkEntityViewSet.as_view({"get": "get_resource_data"}), name="data"),
+    path("data/", BulkEntityViewSet.as_view({"get": "get_resource_data"}), name="data"),
     path("restore/<str:db_name>/<str:entity_name>/", BulkEntityViewSet.as_view({"post": "restore_modified_data"}), name="restore-data"),
     path("db-map/", BulkEntityViewSet.as_view({"get": "get_db_map_view"}), name="db-map"),
     path("import/", ImportResourcesView.as_view(), name="import-resources"),
     path("diff-collections/<str:entity_name>/", BulkEntityViewSet.as_view({"get": "diff_collections"}), name="diff-collections"),
     path("entity-schema/<str:entity_name>/", BulkEntityViewSet.as_view({"get": "get_entity_schema"}), name="entity-schema"),
-    path("test-entity/<str:entity_name>/", BulkEntityViewSet.as_view({"get": "test_entity"}), name="test-entity"),
+    # path("test-entity/<str:entity_name>/", BulkEntityViewSet.as_view({"get": "test_entity"}), name="test-entity"),
+    path("confirm-delete/", ConfirmDeletionView.as_view(), name="confirm-delete"),
 ]

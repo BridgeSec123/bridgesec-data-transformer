@@ -4,7 +4,8 @@ import logging
 import os
 import time
 import traceback
-from datetime import datetime
+import uuid
+from datetime import datetime, timedelta
 
 import requests
 from core.authentication import CustomJWTAuthentication
@@ -32,7 +33,9 @@ from core.utils.restore_utils import (extract_terraform_target_params,
                                       filter_deleted_records_from_state,
                                       handle_nested_deletion,
                                       validate_deletion_safety,
-                                      update_created_records_with_ids)
+                                      update_created_records_with_ids,
+                                      delete_latest_record,
+                                      create_deletion_plan)
 from core.utils.verification import verify_deletion_complete
 from core.utils.schema_extractor import get_ui_backend_mapping
 from core.utils.serializer_registry import SERIALIZER_REGISTRY
@@ -323,7 +326,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     )
                 display_names = [value for entry in sub_entities for value in entry.keys()]
                 return Response({"data": display_names}, status=status.HTTP_200_OK)
-                                                                                  
+
             logger.info("Entities Not found",extra={"operation":"FETCH-ENTITIES"})
             return Response(
                 {"data": sorted(RESOURCE_COLLECTION_MAP.keys())},
@@ -333,68 +336,220 @@ class BulkEntityViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    @action(
-        detail=False,
-        methods=["get"],
-        url_path=r"data/(?P<db_name>[^/]+)/(?P<entity_name>[^/.]+)",
+    @swagger_auto_schema(
+        operation_description=(
+            "Fetch paginated resource data from a specific snapshot DB.\n\n"
+            "**`db_name` only** → paginate through all entities: `page` selects the entity "
+            "(total_pages = entity count), `page_size` paginates records within that entity.\n\n"
+            "**`db_name` + `entity_name`** → paginate records for that single entity "
+            "(`page` / `page_size` / `total_pages` all refer to records)."
+        ),
+        manual_parameters=[
+            openapi.Parameter(
+                "db_name", openapi.IN_QUERY,
+                description="Snapshot DB name (e.g. bridgesec_2026-03-10T0357)",
+                type=openapi.TYPE_STRING, required=True,
+            ),
+            openapi.Parameter(
+                "entity_name", openapi.IN_QUERY,
+                description="Entity name (e.g. 'Okta Apps'). Omit to iterate over all entities.",
+                type=openapi.TYPE_STRING, required=False,
+            ),
+            openapi.Parameter(
+                "page", openapi.IN_QUERY,
+                description=(
+                    "Without entity_name: entity index (1 = first entity). "
+                    "With entity_name: record page number. Default: 1"
+                ),
+                type=openapi.TYPE_INTEGER, required=False,
+            ),
+            openapi.Parameter(
+                "page_size", openapi.IN_QUERY,
+                description="Records per page within the selected entity. Default: 20",
+                type=openapi.TYPE_INTEGER, required=False,
+            ),
+            openapi.Parameter(
+                "data_page", openapi.IN_QUERY,
+                description="Record page within the current entity (only used when entity_name is omitted). Default: 1",
+                type=openapi.TYPE_INTEGER, required=False,
+            ),
+        ],
+        responses={
+            200: openapi.Response("Paginated resource data"),
+            400: "Invalid or missing parameters",
+            404: "Snapshot or entity not found",
+        },
     )
-    def get_resource_data(self, request, db_name, entity_name):
+    @action(detail=False, methods=["get"], url_path="data")
+    def get_resource_data(self, request):
         """
-        Fetch resource data from a specific snapshot DB and merge with any restored changes.
+        GET /data/?db_name=<db_name>[&entity_name=<entity_name>][&page=1][&page_size=20]
 
-        Flow:
-        1. Validate db_name exists in MongoDB
-        2. Fetch entity data from the snapshot DB
-        3. Merge with any restored/modified records stored in the same DB
-        4. Remove metadata fields and return
+        Without entity_name: page iterates entities; page_size paginates that entity's records.
+        With entity_name: page/page_size paginate that entity's records directly.
         """
-        logger.info("Fetching data from DB...", extra={"operation": 'FETCH-CURRENT-DATA'})
-        entity_name = " ".join(entity_name.split())
+        db_name = request.query_params.get("db_name")
+        entity_name = request.query_params.get("entity_name")
+
+        if not db_name:
+            return Response(
+                {"error": "Missing required query parameter: 'db_name'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
-            # Validate snapshot DB exists
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 20))
+        except ValueError:
+            return Response(
+                {"error": "page and page_size must be integers"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if page < 1 or page_size < 1:
+            return Response(
+                {"error": "page and page_size must be positive integers"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
             if db_name not in mongo_client.list_database_names():
                 return Response(
                     {"error": f"Snapshot '{db_name}' not found"},
                     status=status.HTTP_404_NOT_FOUND,
                 )
-            logger.info(f"Using snapshot db: {db_name}", extra={"operation": 'FETCH-CURRENT-DATA'})
 
-            # Extract iso_date from db_name: "bridgesec_2026-03-10T0357" → "2026-03-10"
             iso_date = db_name.split("_", 1)[1].split("T")[0]
-
-            # Fetch entity data from the snapshot DB
             service = EntityDataService()
-            original_data = service.fetch(iso_date, entity_name, db_name=db_name)
-            logger.info(f"Fetched {len(original_data)} records for {entity_name}", extra={"operation": 'FETCH-CURRENT-DATA'})
 
-            # Get collection metadata
+            # ── ALL-ENTITIES MODE (no entity_name) ──────────────────────────
+            if not entity_name:
+                logger.info("All-entities paginated fetch", extra={"operation": "FETCH-ALL-ENTITIES"})
+
+                all_entity_names = [
+                    display_name
+                    for entries in RESOURCE_COLLECTION_MAP.values()
+                    for entry in entries
+                    for display_name in entry.keys()
+                    if display_name != "non_editable_field"
+                ]
+                total_entities = len(all_entity_names)
+
+                if page > total_entities:
+                    return Response(
+                        {"error": f"page must be between 1 and {total_entities}"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                current_entity = all_entity_names[page - 1]
+                logger.info(f"Entity page {page}/{total_entities} → {current_entity}", extra={"operation": "FETCH-ALL-ENTITIES"})
+
+                original_data = service.fetch(iso_date, current_entity, db_name=db_name)
+
+                collection_name = get_collection_name(current_entity)
+                id_field = ENTITY_ID_MAPPING.get(current_entity)
+                if collection_name and id_field:
+                    db = mongo_client[db_name]
+                    original_data = fetch_and_merge_restored_data(
+                        db, current_entity, collection_name, id_field, original_data
+                    )
+
+                original_data = [
+                    record for record in original_data
+                    if record.get("operation_type") not in ["deleted", "deletion_pending", "deletion_failed"]
+                ]
+
+                remove_metadata_fields(original_data)
+
+                total_records = len(original_data)
+                data_total_pages = max(1, (total_records + page_size - 1) // page_size)
+                data_page = int(request.query_params.get("data_page", 1))
+                if data_page < 1:
+                    data_page = 1
+                start = (data_page - 1) * page_size
+                end = start + page_size
+
+                logger.info(
+                    f"Returning records {start + 1}–{min(end, total_records)} of {total_records} for {current_entity}",
+                    extra={"operation": "FETCH-ALL-ENTITIES"},
+                )
+
+                return Response(
+                    {
+                        "page": page,
+                        "total_pages": total_entities,
+                        "next_page": page + 1 if page < total_entities else None,
+                        "prev_page": page - 1 if page > 1 else None,
+                        "entity": current_entity,
+                        "data_page": data_page,
+                        "page_size": page_size,
+                        "data_total_pages": data_total_pages,
+                        "total_records": total_records,
+                        "next_data_page": data_page + 1 if data_page < data_total_pages else None,
+                        "prev_data_page": data_page - 1 if data_page > 1 else None,
+                        "non_editable_fields": NON_EDITABLE_FIELDS.get(current_entity, []),
+                        "data": original_data[start:end],
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            # ── SINGLE-ENTITY MODE ───────────────────────────────────────────
+            entity_name = " ".join(entity_name.split())
+            logger.info(f"Single-entity fetch: {entity_name}", extra={"operation": "FETCH-CURRENT-DATA"})
+
+            original_data = service.fetch(iso_date, entity_name, db_name=db_name)
+            logger.info(f"Fetched {len(original_data)} records for {entity_name}", extra={"operation": "FETCH-CURRENT-DATA"})
+
             collection_name = get_collection_name(entity_name)
             id_field = ENTITY_ID_MAPPING.get(entity_name)
+            if collection_name and id_field:
+                db = mongo_client[db_name]
+                original_data = fetch_and_merge_restored_data(
+                    db, entity_name, collection_name, id_field, original_data
+                )
+                logger.info(f"Merge complete: {len(original_data)} records", extra={"operation": "FETCH-CURRENT-DATA"})
 
-            if not collection_name or not id_field:
-                logger.warning(f"Missing collection_name or id_field for {entity_name}", extra={"operation": 'FETCH-CURRENT-DATA'})
-                return Response({
-                    "data": original_data,
-                    "non_editable_fields": NON_EDITABLE_FIELDS.get(entity_name, [])
-                }, status=status.HTTP_200_OK)
-
-            # Merge restored data from the same snapshot DB
-            db = mongo_client[db_name]
-            original_data = fetch_and_merge_restored_data(
-                db, entity_name, collection_name, id_field, original_data
-            )
-            logger.info(f"Merge complete: {len(original_data)} records", extra={"operation": 'FETCH-CURRENT-DATA'})
+            original_data = [
+                record for record in original_data
+                if record.get("operation_type") not in ["deleted", "deletion_pending", "deletion_failed"]
+            ]
 
             remove_metadata_fields(original_data)
 
-            return Response({
-                "data": original_data,
-                "non_editable_fields": NON_EDITABLE_FIELDS.get(entity_name, [])
-            }, status=status.HTTP_200_OK)
+            total_records = len(original_data)
+            total_pages = max(1, (total_records + page_size - 1) // page_size)
+
+            if page > total_pages:
+                return Response(
+                    {"error": f"page must be between 1 and {total_pages}"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            start = (page - 1) * page_size
+            end = start + page_size
+
+            logger.info(
+                f"Returning records {start + 1}–{min(end, total_records)} of {total_records}",
+                extra={"operation": "FETCH-CURRENT-DATA"},
+            )
+
+            return Response(
+                {
+                    "entity": entity_name,
+                    "page": page,
+                    "page_size": page_size,
+                    "total_pages": total_pages,
+                    "total_records": total_records,
+                    "next_page": page + 1 if page < total_pages else None,
+                    "prev_page": page - 1 if page > 1 else None,
+                    "non_editable_fields": NON_EDITABLE_FIELDS.get(entity_name, []),
+                    "data": original_data[start:end],
+                },
+                status=status.HTTP_200_OK,
+            )
 
         except Exception as e:
-            logger.error(f"Error in get_resource_data: {str(e)}", exc_info=True, extra={"operation": 'FETCH-CURRENT-DATA'})
+            logger.error(f"Error in get_resource_data: {str(e)}", exc_info=True, extra={"operation": "FETCH-CURRENT-DATA"})
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -408,7 +563,14 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 type=openapi.TYPE_STRING,
                 required=False,
                 enum=["delete"],
-            )
+            ),
+            openapi.Parameter(
+                name="source_db",
+                in_=openapi.IN_QUERY,
+                description="Source snapshot DB to restore data from (e.g. bridgesec_2026-03-28T0000). Applies to restore operations only — sets 'restored_from' metadata and drives the Terraform merge source. Defaults to db_name in the URL.",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
         ],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
@@ -461,8 +623,25 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            # Extract iso_date from db_name: "bridgesec_2026-03-10T0357" → "2026-03-10"
-            iso_date = db_name.split("_", 1)[1].split("T")[0]
+            # Get operation_type from query parameters
+            operation_type = request.query_params.get("operation_type")
+
+            # "plan" — return terraform plan output to user without executing apply.
+            # Omit (or any other value) to execute immediately (existing behaviour).
+            phase = request.query_params.get("phase")
+
+            # Optional: source snapshot DB to restore from. Applies to restore operations only.
+            # If provided, restored_from metadata and Terraform merge source use this DB instead of db_name.
+            srcdb = request.query_params.get("source_db")
+            if srcdb and srcdb not in mongo_client.list_database_names():
+                return Response(
+                    {"error": f"Source DB '{srcdb}' not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            source_db = srcdb if srcdb else db_name
+
+            # Extract iso_date from source_db: "bridgesec_2026-03-10T0357" → "2026-03-10"
+            iso_date = source_db.split("_", 1)[1].split("T")[0]
 
             modified_data = request.data.get("data", [])
             if not isinstance(modified_data, list):
@@ -470,9 +649,6 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     {"error": "Invalid data format. 'data' must be a list"},
                     status=400,
                 )
-
-            # Get operation_type from query parameters
-            operation_type = request.query_params.get("operation_type")
 
             logger.info(
                 f"Restore operation started: {entity_name}",
@@ -558,10 +734,13 @@ class BulkEntityViewSet(viewsets.ViewSet):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
+                # Generate plan_id early so it can be tagged on every stored record.
+                # This links _<collection_name> records to the plan in pending_deletion_plans.
+                plan_id = uuid.uuid4().hex
+
                 # Fetch complete records from source DB for each deleted record
                 complete_deleted_records = []
                 for doc in deleted_records:
-                    record_id = doc.get(id_field)
                     if not mapping_handlers.is_mapped_entity(collection_name):
                         complete_record = fieldfetch.get_collection(current_db, collection_name, doc)
                     else:
@@ -572,18 +751,19 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
                 logger.info(f"Fetched {len(complete_deleted_records)} complete records for deletion",extra={"operation":"Restore Modified Data"})
 
-                # Store deleted records with metadata in "deletion_pending" status
-                # This allows us to track the deletion attempt before Terraform runs
+                # Store deleted records in _<collection_name> tagged with plan_id.
+                # These ARE the plan data — pending_deletion_plans only stores metadata.
                 store_deleted_data_with_metadata(
                     current_db, entity_name, collection_name,
                     complete_deleted_records, restored_by, db_name,
-                    operation_type="deletion_pending"  # PENDING status before Terraform
+                    operation_type="deletion_pending",
+                    plan_id=plan_id,
                 )
 
-                # Handle cascade deletion for nested entities (also with "deletion_pending" status)
+                # Handle cascade deletion for nested entities (also tagged with plan_id)
                 deleted_ids_list, cascade_info = handle_nested_deletion(
                     current_db, entity_name, complete_deleted_records,
-                    restored_by, db_name
+                    restored_by, db_name, plan_id=plan_id,
                 )
 
                 logger.info(f"Cascade deletion complete: {len(deleted_ids_list)} total IDs marked as deletion_pending",extra={"operation":"Restore Modified Data"})
@@ -611,7 +791,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 data_for_storage = copy.deepcopy(restore_records)
                 store_restored_data_with_metadata(
                     current_db, entity_name, collection_name,
-                    data_for_storage, restored_by, db_name
+                    data_for_storage, restored_by, source_db
                 )
                 logger.info(f"Stored {len(restore_records)} restored records",extra={"operation":"Restore Modified Data"})
 
@@ -633,11 +813,16 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
             # Step 1: Fetch ALL original data from source DB snapshot
             service = EntityDataService()
-            original_data = service.fetch(iso_date, entity_name, db_name=db_name)
-            logger.info(f"Step 1: Fetched {len(original_data)} original records from source DB ({db_name})",extra={"operation":"Restore Modified Data"})
+            original_data = service.fetch(iso_date, entity_name, db_name=source_db)
+            logger.info(f"Step 1: Fetched {len(original_data)} original records from source DB ({source_db})",extra={"operation":"Restore Modified Data"})
 
             # Step 2: Merge original data with restored data from today's DB
             # This handles both simple entities and nested entities (with builders)
+            restored_collection = current_db[f"_{collection_name}"]
+            created_records_from_db = list(restored_collection.find(
+                {"operation_type": "created"},
+                {"_id": 0}
+            ))
             # Note: fetch_and_merge_restored_data now filters out deleted records automatically
             merged_data = fetch_and_merge_restored_data(
                 current_db, entity_name, collection_name, id_field, original_data
@@ -692,7 +877,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             else:
                 logger.info("Step 3: No newly created records found",extra={"operation":"RestoreModifiedData"})
 
-            # Step 4: Filter deleted records from merged state (if any deletions occurred)
+            # Step 4: Filter deleted records from merged state
             if deleted_ids_list:
                 merged_data = filter_deleted_records_from_state(merged_data, deleted_ids_list, id_field)
                 logger.info(f"Step 5: Filtered deleted records, {len(merged_data)} records remaining",extra={"operation":"Restore Modified Data"})
@@ -744,6 +929,74 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
             # Build full Terraform URL with module-based endpoint
             terraform_url = f"{server_url}{terraform_api}"
+
+            # ------------------------------------------------------------------
+            # PLAN GATE: all deletes go through plan/confirm flow.
+            # BDT adds phase=plan internally on the OkTf call — the client
+            # only needs to pass operation_type=delete.
+            # ------------------------------------------------------------------
+            if deleted_records:
+                plan_params = {**params, "phase": "plan"}
+                logger.info(
+                    f"Phase=plan: calling OkTf for plan output (no apply)",
+                    extra={"operation": "Restore Modified Data", "entity": entity_name}
+                )
+                tf_plan_response = requests.post(
+                    terraform_url,
+                    params=plan_params,
+                    json={"data": modified_data},
+                    headers=get_okta_headers(request),
+                )
+                if not tf_plan_response.ok:
+                    try:
+                        err_detail = tf_plan_response.json()
+                    except Exception:
+                        err_detail = {"raw": tf_plan_response.text}
+                    return Response(
+                        {"error": "Terraform plan failed", "details": err_detail},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+
+                plan_output = tf_plan_response.json()
+                deletion_summary = plan_output.pop("deletion_summary", None)
+
+                # Store plan metadata in pending_deletion_plans.
+                # Records are already in _<collection_name> tagged with plan_id —
+                # no duplication here.
+                plans_col = mongo_client[settings.MONGO_DB_NAME]["pending_deletion_plans"]
+                create_deletion_plan(
+                    plan_id=plan_id,
+                    db_name=db_name,
+                    entity_name=entity_name,
+                    collection_name=collection_name,
+                    id_field=id_field,
+                    merged_data=modified_data,
+                    terraform_params=params,   # params WITHOUT phase=plan for Phase 2
+                    terraform_url=terraform_url,
+                    plan_output=plan_output,
+                    cascade_info=cascade_info,
+                    created_by=restored_by,
+                    plans_collection=plans_col,
+                )
+
+                response_data = {
+                    "phase": "plan",
+                    "plan_id": plan_id,
+                    "expires_at": (datetime.utcnow() + timedelta(minutes=15)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "plan_output": plan_output,
+                    "message": (
+                        "Review the plan and confirm deletion via "
+                        f"POST /confirm-delete/{plan_id}/ within 15 minutes."
+                    ),
+                }
+                if deletion_summary is not None:
+                    response_data["deletion_summary"] = deletion_summary
+
+                return Response(response_data, status=status.HTTP_200_OK)
+            # ------------------------------------------------------------------
+            # END PLAN GATE
+            # ------------------------------------------------------------------
+
             logger.info(
                 f"Sending to Terraform API: {terraform_url}",
                 extra={
@@ -765,6 +1018,8 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 json={"data": modified_data},
                 headers=tf_headers,
             )
+            if not tf_response.ok:
+                delete_latest_record(entity_name,mongo_client,iso_date)
 
             duration_ms = int((time.time() - start_time) * 1000)
 

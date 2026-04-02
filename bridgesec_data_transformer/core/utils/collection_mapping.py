@@ -120,7 +120,7 @@ RESOURCE_COLLECTION_MAP = {
         {"Link Definition": "okta_link_definition"}
     ],
     "Applications": [
-        {"App Oauth": "okta_app_oauth", "non_editable_field": ["app_id"]},
+        {"App Oauth": "okta_app_oauth"},
         {"App Saml": "okta_app_saml"},
         {"App Group Assignments": "okta_app_group_assignments"},
         {"App Oauth Role Assignment": "okta_app_oauth_role_assignment"},
@@ -165,7 +165,7 @@ ENTITY_ID_MAPPING = {
     "Group Schema Property": "id",
     "Group Rules": "group_rule_id",
     "Group Roles": "group_role_id",
-    "Group Memberships": "id",
+    "Group Memberships": "group_id",
 
     # Brands
     "Brands": "brand_id",
@@ -265,6 +265,7 @@ ENTITY_ID_MAPPING = {
     "App User": "user_id",
     "App Oauth Post Logout Redirect Uri":"app_id",
     "App Oauth Redirect Uri":"app_id",
+    "App Oauth Api Scope":"app_id",
 }
 
 NON_EDITABLE_FIELDS = {
@@ -296,6 +297,7 @@ NON_EDITABLE_FIELDS = {
     "App Secure Password Store": ["app_id"],
     "App Oauth Post Logout Redirect Uri":["app_id"],
     "App Oauth Redirect Uri":["app_id"],
+    "App Oauth Api Scope":["app_id"],
 
     # Policy entities
     "Policy MFA": ["policy_id"],
@@ -324,7 +326,7 @@ NON_EDITABLE_FIELDS = {
     # Brand entities
     "Brands": ["brand_id"],
 
-    "Organization Security": "id",
+    "Organization Security": ["id"],
 
     # Device Assurance Policy entities
     "Policy Device Assurance Android": ["device_id"],

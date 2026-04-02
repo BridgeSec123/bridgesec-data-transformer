@@ -19,7 +19,7 @@ from entities.okta_entities.apps.apps_models import (
     AppSharedCredentials,AppSAMLSettings,AppOauthPostRedirectUri,AppOauthRedirectUri,
     AppPolicySignOn, AppGroupAssignment, AppBookMark, AppAutoLogin,
     AppThreeField, AppSecurePasswordStore, AppUserSchemaProperty,
-    AppUserBaseSchemaProperty, AppBasicAuth, AppSwa, AppUser,AppPolicySignOnRule,AppOAuthRoleAssignment
+    AppUserBaseSchemaProperty, AppBasicAuth, AppSwa, AppUser,AppPolicySignOnRule,AppOAuthRoleAssignment,AppOauthApiScope
 )
 from entities.okta_entities.groups.group_models import (
     Group, GroupSchemaProperty, GroupRule, GroupRole, GroupMember
@@ -83,6 +83,7 @@ MODEL_REGISTRY = {
     "App Oauth Role Assignment":AppOAuthRoleAssignment,
     "App Oauth Post Logout Redirect Uri":AppOauthPostRedirectUri,
     "App Oauth Redirect Uri":AppOauthRedirectUri,
+    "App Oauth Api Scope":AppOauthApiScope,
     "App User Schema Property":AppUserSchemaProperty,
 
     # Groups

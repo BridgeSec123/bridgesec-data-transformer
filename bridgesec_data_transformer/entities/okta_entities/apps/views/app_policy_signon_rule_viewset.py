@@ -89,7 +89,7 @@ class AppPolicyRuleSignOnViewSet(BaseAppViewSet):
                 "network_includes": record.get("network_includes", []),
                 "platform_include": record.get("platform_include", []),
                 "re_authentication_frequency": record.get("reauth", {}).get("frequency", ""),
-                "priority": record.get("priority", ""),
+                "priority": record.get("priority", "98"),
                 "risk_score": conditions.get("riskScore", ""),
                 "status": record.get("status", ""),
                 "type": verificationMethod.get("type", ""),

@@ -15,6 +15,7 @@ MAPPED_ENTITIES_HELPERS = {
         "okta_app_basic_auth": "label",
         "okta_app_swa": "label",
         "okta_app_signon_policy": "name",
+        "okta_app_oauth_api_scope":"app_id",
 
         "okta_app_group_assignment": "group_id",
         "okta_app_access_policy_assignment" : "policy_id",
@@ -24,6 +25,7 @@ MAPPED_ENTITIES_HELPERS = {
         "okta_app_oauth_redirect_uri":"app_id",
         "okta_app_user_schema_property":"app_id",
         "okta_app_user_base_schema_property":"app_id",
+        "okta_app_secure_password_store":"app_id",
 
         # "okta_app_user": ["user_id","app_id"],
         "okta_app_user": "user_id",
@@ -58,9 +60,10 @@ MAPPED_ENTITIES_HELPERS = {
         "okta_factor":"provider_id",
 
         "okta_behavior":"behavior_id",
+        "okta_group_memberships":"group_id",
     },
     "entities": {
-        "okta_app_signon_policy", 
+        "okta_app_signon_policy",
         "okta_policy_mfa",
         "okta_policy_password",
         "okta_policy_sign_on",
@@ -107,6 +110,7 @@ ID_KEYS = {
     "okta_user_admin_roles": "user_id",
     "okta_user_type": "user_type_id",
     "okta_theme": "brand_id",
+    "okta_app_secure_password_store":"app_id",
 
     "okta_user":"user_id",
 
@@ -133,8 +137,9 @@ ID_KEYS = {
     "okta_app_group_assignment": "app_id",
     "okta_app_group_assignments": "app_id",
     "okta_app_access_policy_assignment": "app_id",
-    
-    "okta_app_user": "user_id",
+    "okta_app_oauth_api_scope":"app_id",
+
+    # "okta_app_user": "user_id",
     "okta_app_user": "app_id",
     "okta_app_oauth_api_scope": "app_id",
     "okta_app_oauth_redirect_uri": "app_id",
@@ -165,6 +170,7 @@ ID_KEYS = {
     "okta_factor":"provider_id",
 
     "okta_behavior":"behavior_id",
+    "okta_group_memberships":"group_id",
 }
 
 NONE_FIELD_LISTS = {

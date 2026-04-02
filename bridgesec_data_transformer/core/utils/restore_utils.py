@@ -4,9 +4,14 @@ Handles both simple entities and entities with nested data (builders).
 """
 import copy
 import logging
-from datetime import datetime
-
+import uuid
+from datetime import datetime, timedelta
+import requests
+import json
+from dotenv import load_dotenv
+import os
 from core.utils.collection_mapping import ENTITY_ID_MAPPING
+from core.utils.db_utils import get_latest_db,get_collection_name
 from core.utils.constants import (ENTITY_TARGET_FIELD_MAP,
                                   SINGLETON_RESOURCE_IDENTIFIERS)
 from core.utils.nested_mapping import (NESTED_FIELD_COLLECTIONS,
@@ -16,6 +21,49 @@ from core.utils.mapping_handlers import MAPPED_ENTITIES_HELPERS
 from django.utils.text import slugify
 
 logger = logging.getLogger(__name__)
+
+from pymongo import DESCENDING
+
+def delete_latest_record(entity_name, mongo_client, date_str):
+    """
+    Delete the most recently inserted document from a collection
+    in the latest database for a given date.
+
+    Args:
+        entity_name (str): Name of the entity (collection without underscore).
+        mongo_client: MongoDB client instance.
+        date_str (str): Date string in format YYYY-MM-DD.
+    """
+
+    # Get latest DB using helper function
+    db_name = get_latest_db(mongo_client, date_str)
+
+    if not db_name:
+        print("No database found for the given date")
+        return None
+
+    # Convert entity to collection format
+    collection_name = f"_{get_collection_name(entity_name)}"
+
+    db = mongo_client[db_name]
+    collection = db[collection_name]
+
+    # Find latest document
+    latest_doc = collection.find_one(sort=[("created_at", DESCENDING)])
+
+    if not latest_doc:
+        print(f"No records found in {collection_name}")
+        return None
+
+    # Delete the document
+    result = collection.delete_one({"_id": latest_doc["_id"]})
+
+    if result.deleted_count:
+        print(f"Deleted latest record from {collection_name}: {latest_doc['_id']}")
+        return latest_doc
+    else:
+        print("Deletion failed")
+        return None
 
 
 def _extract_ids_from_data(data_records, field_name, include_nested=False):
@@ -213,7 +261,7 @@ def store_created_data(db, entity_name, collection_name, created_data):
             for nested_collection_name in nested_mapping.values()
         }
         flattened_parent_data = []
-        
+
         for parent_record in created_data:
             unique_fields = MAPPED_ENTITIES_HELPERS["entity_unique_fields"].get(collection_name, "")
             unique_id = slugify(parent_record.get(unique_fields, "")) if unique_fields else None
@@ -242,8 +290,8 @@ def store_created_data(db, entity_name, collection_name, created_data):
         # No nested data → store collection directly
         _store_collection_simple(db, entity_name, collection_name, created_data)
         return created_data
-                                                     
-def store_deleted_data_with_metadata(db, entity_name, collection_name, deleted_data, deleted_by, source_db_name, cascade_parent_id=None, operation_type="deletion_pending"):
+
+def store_deleted_data_with_metadata(db, entity_name, collection_name, deleted_data, deleted_by, source_db_name, cascade_parent_id=None, operation_type="deletion_pending", plan_id=None):
     """
     Store deleted data with deletion metadata.
 
@@ -256,6 +304,7 @@ def store_deleted_data_with_metadata(db, entity_name, collection_name, deleted_d
         source_db_name: Source database name
         cascade_parent_id: Parent ID if this is a cascaded deletion
         operation_type: Operation status - "deletion_pending" (before Terraform) or "deleted" (after Terraform success)
+        plan_id: UUID linking these records to their deletion plan
 
     Returns:
         Stored data
@@ -298,6 +347,8 @@ def store_deleted_data_with_metadata(db, entity_name, collection_name, deleted_d
         doc_copy["deleted_at"] = deleted_at
         if cascade_parent_id:
             doc_copy["cascade_parent_id"] = cascade_parent_id
+        if plan_id:
+            doc_copy["plan_id"] = plan_id
         doc_copy.pop("_id", None)
 
         id_value = doc_copy.get(id_field)
@@ -394,7 +445,7 @@ def filter_deleted_records_from_state(merged_data, deleted_ids, id_field):
     return filtered_data
 
 
-def handle_nested_deletion(db, entity_name, deleted_parent_records, deleted_by, source_db_name):
+def handle_nested_deletion(db, entity_name, deleted_parent_records, deleted_by, source_db_name, plan_id=None):
     """
     Handle cascade deletion for entities with nested data.
 
@@ -404,6 +455,7 @@ def handle_nested_deletion(db, entity_name, deleted_parent_records, deleted_by, 
         deleted_parent_records: Parent records being deleted
         deleted_by: Username who performed deletion
         source_db_name: Source database name
+        plan_id: UUID linking these records to their deletion plan
 
     Returns:
         Tuple of (all_deleted_ids, cascade_info)
@@ -471,7 +523,8 @@ def handle_nested_deletion(db, entity_name, deleted_parent_records, deleted_by, 
                     store_deleted_data_with_metadata(
                         db, entity_name, nested_collection_name,
                         parent_children, deleted_by, source_db_name,
-                        cascade_parent_id=parent_id
+                        cascade_parent_id=parent_id,
+                        plan_id=plan_id,
                     )
 
             cascade_info["nested_deletions"][nested_field] = {
@@ -724,25 +777,39 @@ def fetch_and_merge_restored_data(db, entity_name, collection_name, id_field, or
         original_data: Original data from main collections
 
     Returns:
-        Merged data with restored changes applied
+
+        Merged data with restored changes applied, with deleted records excluded
+
     """
     restored_collection_name = f"_{collection_name}"
 
     # Check if restored collection exists
     if restored_collection_name not in db.list_collection_names():
-        logger.info(f"No restored collection found: {restored_collection_name}",extra={"operation":'Fetch Merge Restored Data'})
+
+        logger.info(f"No restored collection found: {restored_collection_name}", extra={"operation": 'Fetch Merge Restored Data'})
+
         return original_data
 
-    logger.info(f"Found restored collection: {restored_collection_name}",extra={"operation":'Fetch Merge Restored Data'})
+    logger.info(f"Found restored collection: {restored_collection_name}", extra={"operation": 'Fetch Merge Restored Data'})
+    # Collect IDs of deleted records so they are excluded from the final response.
+    # A record is considered deleted if it has a `deleted_at` field.
+    deleted_ids = set()
+    for doc in db[restored_collection_name].find({"deleted_at": {"$exists": True}}, {id_field: 1, "_id": 0}):
+        val = doc.get(id_field)
+        if val:
+            deleted_ids.add(str(val))
+    if deleted_ids:
+        logger.info(f"Excluding {len(deleted_ids)} deleted record(s) from response: {deleted_ids}", extra={"operation": 'Fetch Merge Restored Data'})
+        original_data = [r for r in original_data if str(r.get(id_field)) not in deleted_ids]
 
     # Rebuild restored data with nested arrays (handles both simple and nested entities)
     restored_data = rebuild_restored_data_with_nested_arrays(
         db, entity_name, collection_name, id_field
     )
-    logger.info(f"Rebuilt {len(restored_data)} restored records",extra={"operation":'Fetch Merge Restored Data'})
+    logger.info(f"Rebuilt {len(restored_data)} restored records", extra={"operation": 'Fetch Merge Restored Data'})
 
     if not restored_data:
-        logger.info("No restored data after rebuild")
+        logger.info("No restored data after rebuild", extra={"operation": 'Fetch Merge Restored Data'})
         return original_data
 
     # Merge restored changes with original data
@@ -803,6 +870,11 @@ def merge_restored_with_original(original_data, restored_data, id_field):
     """
     Merge restored data with original data.
     Handles both simple entities and nested arrays.
+
+    Three cases:
+    1. Record exists in both → overlay restored fields onto original
+    2. Record exists only in original → keep as-is
+    3. Record exists only in restored (created) → append to result
     """
     if not restored_data:
         return original_data
@@ -817,6 +889,8 @@ def merge_restored_with_original(original_data, restored_data, id_field):
     }
 
     merged_data = []
+    merged_original_ids = set()
+    # Pass 1: loop through original — merge or keep each record
     for original_record in original_data:
         record_id = str(original_record.get(id_field)) if original_record.get(id_field) else None
 
@@ -842,6 +916,21 @@ def merge_restored_with_original(original_data, restored_data, id_field):
         else:
             merged_data.append(original_record)
 
+        if record_id:
+            merged_original_ids.add(record_id)
+
+    # Pass 2: append created records from restored that have no match in original
+    for restored_record in restored_data:
+        record_id = str(restored_record.get(id_field)) if restored_record.get(id_field) else None
+        if record_id and record_id not in merged_original_ids:
+            clean_item = copy.deepcopy(restored_record)
+            for field in metadata_fields:
+                clean_item.pop(field, None)
+            merged_data.append(clean_item)
+            logger.info(
+                f"Appended created record id={record_id} from restored collection",
+                extra={"operation": "Fetch Merge Restored Data"}
+            )
     return merged_data
 
 
@@ -887,4 +976,164 @@ def update_created_records_with_ids(db, collection_name, id_field, label_field, 
     logger.info(
         f"Total: updated {updated_count} created record(s) in '_{collection_name}' with real Okta IDs",
         extra={"operation": "Update Created Records With IDs"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Deletion Plan helpers — support for Plan → Confirm → Apply flow
+# ---------------------------------------------------------------------------
+
+def create_deletion_plan(plan_id, db_name, entity_name, collection_name, id_field,
+                         merged_data, terraform_params,
+                         terraform_url, plan_output, cascade_info,
+                         created_by, plans_collection):
+    """
+    Persist a deletion plan to MongoDB and return the plan_id.
+
+    Records tagged with plan_id are already stored in _<collection_name> by the
+    caller (store_deleted_data_with_metadata). This function stores only the plan
+    metadata and merged_data needed for the confirm step — no record duplication.
+
+    Args:
+        plan_id: Pre-generated UUID (generated early so records can be tagged with it)
+
+    Returns:
+        str: plan_id (same value passed in)
+    """
+    now = datetime.utcnow()
+    plans_collection.insert_one({
+        "plan_id": plan_id,
+        "status": "pending",
+        "db_name": db_name,
+        "entity_name": entity_name,
+        "collection_name": collection_name,
+        "id_field": id_field,
+        "created_by": created_by,
+        "merged_data": merged_data,
+        "terraform_params": terraform_params,
+        "terraform_url": terraform_url,
+        "plan_output": plan_output,
+        "cascade_info": cascade_info,
+        "created_at": now,
+        "expires_at": now + timedelta(minutes=15),
+    })
+    logger.info(f"Created deletion plan {plan_id} for {entity_name}",
+                extra={"operation": "Create Deletion Plan"})
+    return plan_id
+
+
+def load_deletion_plan(plan_id, requesting_user, plans_collection):
+    """
+    Load and validate a deletion plan from MongoDB.
+
+    Returns:
+        (plan_doc, None)         on success
+        (None, error_dict)       on any validation failure
+            error_dict keys: "error", "message", "plan_id", "status" (HTTP status code)
+    """
+    plan = plans_collection.find_one({"plan_id": plan_id}, {"_id": 0})
+
+    if not plan:
+        return None, {
+            "error": "plan_not_found",
+            "message": f"Deletion plan '{plan_id}' not found or has already expired.",
+            "plan_id": plan_id,
+            "status": 404,
+        }
+
+    if plan.get("status") == "applied":
+        return None, {
+            "error": "plan_already_applied",
+            "message": f"Deletion plan '{plan_id}' has already been applied.",
+            "plan_id": plan_id,
+            "status": 409,
+        }
+
+    # Belt-and-suspenders expiry check (TTL worker may not have run yet)
+    if datetime.utcnow() > plan.get("expires_at", datetime.min):
+        return None, {
+            "error": "plan_expired",
+            "message": (
+                f"Deletion plan '{plan_id}' expired at "
+                f"{plan['expires_at'].isoformat()}Z. Please create a new plan."
+            ),
+            "plan_id": plan_id,
+            "status": 410,
+        }
+
+    if plan.get("created_by") != requesting_user:
+        return None, {
+            "error": "user_mismatch",
+            "message": "You are not authorised to confirm this deletion plan.",
+            "plan_id": plan_id,
+            "status": 403,
+        }
+
+    return plan, None
+
+
+def mark_plan_applied(plan_id, plans_collection):
+    """
+    Mark a deletion plan as applied.
+
+    Called BEFORE the OkTf HTTP request to prevent double-submit races.
+    If OkTf subsequently fails the plan remains "applied" but MongoDB records
+    will reflect "deletion_failed" — which is the correct observable state.
+    """
+    plans_collection.update_one(
+        {"plan_id": plan_id},
+        {"$set": {"status": "applied"}},
+    )
+    logger.info(f"Marked deletion plan {plan_id} as applied",
+                extra={"operation": "Mark Plan Applied"})
+
+
+def remove_deletion_plan_records(db, collection_name, plan_id, cascade_info=None):
+    """
+    Remove deletion_pending records from _<collection_name> and all cascade
+    nested collections that are tagged with plan_id.
+
+    Called after a successful confirmation so the staging records are cleaned up.
+    On failure, records are kept (updated to deletion_failed) for audit purposes.
+
+    Args:
+        db: MongoDB database instance (snapshot DB)
+        collection_name: Parent collection name (e.g., "okta_app_oauth")
+        plan_id: UUID that was tagged on all records during the plan phase
+        cascade_info: cascade_info dict returned by handle_nested_deletion
+    """
+    parent_col = db[f"_{collection_name}"]
+    result = parent_col.delete_many({"plan_id": plan_id})
+    logger.info(
+        f"Removed {result.deleted_count} deletion_pending record(s) from _{collection_name} for plan {plan_id}",
+        extra={"operation": "Remove Deletion Plan Records"},
+    )
+
+    if cascade_info and "nested_deletions" in cascade_info:
+        for _, nested_info in cascade_info["nested_deletions"].items():
+            nested_col = db[f"_{nested_info['collection']}"]
+            nested_result = nested_col.delete_many({"plan_id": plan_id})
+            logger.info(
+                f"Removed {nested_result.deleted_count} cascade record(s) from "
+                f"_{nested_info['collection']} for plan {plan_id}",
+                extra={"operation": "Remove Deletion Plan Records"},
+            )
+
+
+def cancel_deletion_plan(plan_id, plans_collection):
+    """
+    Delete a pending deletion plan from MongoDB (user-initiated cancellation).
+
+    Removes the plan document from pending_deletion_plans. The caller is
+    responsible for cleaning up the staged _<collection> records first via
+    remove_deletion_plan_records().
+
+    Args:
+        plan_id: UUID of the plan to cancel
+        plans_collection: MongoDB collection for pending_deletion_plans
+    """
+    result = plans_collection.delete_one({"plan_id": plan_id})
+    logger.info(
+        f"Cancelled deletion plan {plan_id} — removed {result.deleted_count} plan document(s)",
+        extra={"operation": "Cancel Deletion Plan"},
     )

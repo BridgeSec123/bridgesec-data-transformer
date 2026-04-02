@@ -88,11 +88,14 @@ OKTA_SCOPES = " ".join([
     # "okta.threatInsights.read",
     "okta.rateLimits.read",
     "okta.roles.read",
+    "okta.roles.manage",
     # "okta.resourceSets.read",
     # "okta.captchas.read",
     "okta.schemas.read",
     "okta.userTypes.read",
     "okta.users.manage.self",
+    "okta.appGrants.manage",
+    "okta.logs.read",
     "okta.users.manage",
     "okta.apps.manage",
     # "okta.clients.read",
@@ -190,9 +193,10 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_yasg',
     'core',
-    'entities',
+    'entities.apps.EntitiesConfig',
     'rest_framework_simplejwt',
     'corsheaders',
+    'dotenv',
 
 ]
 
@@ -234,7 +238,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)], 
+            "hosts": [("127.0.0.1", 6379)],
         },
     },
 }
@@ -275,8 +279,8 @@ USE_I18N = True
 USE_TZ = True
 
 SESSION_COOKIE_HTTPONLY = False
-SESSION_COOKIE_SECURE = False          # Only if using HTTPS
-SESSION_COOKIE_SAMESITE = "Lax" 
+# SESSION_COOKIE_SECURE = False          # Only if using HTTPS
+# SESSION_COOKIE_SAMESITE = "Lax"
 
 
 # Static files (CSS, JavaScript, Images)
@@ -294,6 +298,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MONGO_DB_NAME = env("MONGO_DB_NAME")
 MONGO_URI = env("MONGO_URI")
 MONGO_CLIENT = MongoClient(MONGO_URI)
+# TF_STATE_API_KEY = env("TF_STATE_API_KEY")
 
 connect(db=MONGO_DB_NAME, host=MONGO_URI)
 connect_to_mongo()
@@ -331,11 +336,22 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "https://bridgesec-fe.vercel.app",
     "http://31.97.229.6:3000",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
 ]
 
 CORS_ALLOW_CREDENTIALS = True
 
+# Cookie settings — env-aware
+# Local HTTP dev:  SameSite=Lax,  Secure=False
+# Production HTTPS: SameSite=None, Secure=True  (required for cross-origin cookies)
+_IS_PRODUCTION = os.environ.get("DJANGO_ENV") == "production"
+SESSION_COOKIE_SAMESITE = "None" if _IS_PRODUCTION else "Lax"
+SESSION_COOKIE_SECURE = _IS_PRODUCTION
+SESSION_COOKIE_DOMAIN = None if _IS_PRODUCTION else "localhost"
+CSRF_COOKIE_SAMESITE = "None" if _IS_PRODUCTION else "Lax"
+CSRF_COOKIE_SECURE = _IS_PRODUCTION
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
