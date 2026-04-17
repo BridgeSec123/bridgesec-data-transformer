@@ -179,6 +179,8 @@ if not READ_ONLY:
 
 if __name__ == "__main__":
     import uvicorn
+    from starlette.middleware.trustedhost import TrustedHostMiddleware
     port = int(os.environ.get("MCP_PORT", 8002))
     app = mcp.streamable_http_app()
+    app = TrustedHostMiddleware(app, allowed_hosts=["*"])
     uvicorn.run(app, host="0.0.0.0", port=port)
