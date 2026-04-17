@@ -177,10 +177,24 @@ if not READ_ONLY:
 
 # ─── ENTRY POINT ─────────────────────────────────────────────────────────────
 
+class HostOverrideMiddleware:
+    """Rewrites the Host header to localhost before the MCP transport validates it."""
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            headers = [
+                (b"host", b"localhost") if k == b"host" else (k, v)
+                for k, v in scope.get("headers", [])
+            ]
+            scope["headers"] = headers
+        await self.app(scope, receive, send)
+
+
 if __name__ == "__main__":
     import uvicorn
-    from starlette.middleware.trustedhost import TrustedHostMiddleware
     port = int(os.environ.get("MCP_PORT", 8002))
     app = mcp.streamable_http_app()
-    app = TrustedHostMiddleware(app, allowed_hosts=["*"])
+    app = HostOverrideMiddleware(app)
     uvicorn.run(app, host="0.0.0.0", port=port)
