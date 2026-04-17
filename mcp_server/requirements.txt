@@ -1,0 +1,4 @@
+mcp[cli]
+python-jose[cryptography]
+requests
+python-dotenv
