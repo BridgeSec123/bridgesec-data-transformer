@@ -5,6 +5,7 @@ RESOURCE_COLLECTION_MAP = {
         {"User Group Memberships": "okta_user_group_memberships"},
         {"User Base Schema Properties": "okta_user_base_schema_property"},
         {"User Admin Roles": "okta_user_admin_roles"},
+        {"User Risk": "okta_user_risk"},
     ],
     "User Types": [
         {"User Types": "okta_user_type"}
@@ -46,7 +47,16 @@ RESOURCE_COLLECTION_MAP = {
     "Requests": [
         {"Request Condition": "okta_request_conditions"},
         {"Request Sequence": "okta_request_sequences"},
-        {"Request Settings": "okta_request_settings"}
+        {"Request Settings": "okta_request_settings"},
+        {"Request Type": "okta_request_types"},
+    ],
+    "Catalog": [
+        {"Catalog Entry Default": "okta_catalog_entry_default"},
+        {"Catalog Entry User Access Request Fields": "okta_catalog_entry_user_access_request_fields"},
+        {"End User My Requests": "okta_end_user_my_requests"},
+    ],
+    "Reviews": [
+        {"Review": "okta_reviews"}
     ],
     "Sms Template": [
         {"Sms Template": "okta_template_sms"}
@@ -71,8 +81,8 @@ RESOURCE_COLLECTION_MAP = {
         {"Auth Server Policy": "okta_auth_server_policy"},
         {"Auth Server Policy Rule": "okta_auth_server_policy_rule"},
         {"Auth Server Scope": "okta_auth_server_scope"},
-        {"Auth Server Policy": "okta_auth_server_policy"},
-        {"Auth Server Policy Rule": "okta_auth_server_policy_rule"},
+        {"Auth Server Client": "okta_auth_server_clients"},
+        {"Auth Server Key": "okta_auth_server_keys"},
     ],
     "Identity Providers": [
         {"IDP OIDC": "okta_idp_oidc"},
@@ -110,14 +120,33 @@ RESOURCE_COLLECTION_MAP = {
     "Inline Hooks": [
         {"Inline Hook": "okta_inline_hook"}
     ],
-    "Event_Hook": [
+    "Event Hook": [
         {"Event Hook": "okta_event_hook"}
     ],
-    # "Domains": [
-    #     {"Domain": "okta_domain"}
-    # ],
+    "Hook Keys": [
+        {"Hook Key": "okta_hook_key"}
+    ],
+    "Api Tokens": [
+        {"Api Token": "okta_api_token"}
+    ],
+    "Domains": [
+        {"Domain": "okta_domain"}
+    ],
+    "Push Providers": [
+        {"Push Provider": "okta_push_provider"}
+    ],
+    "Api Service Integrations": [
+        {"Api Service Integration": "okta_api_service_integration"}
+    ],
+    "UI Schemas": [
+        {"Ui Schema": "okta_ui_schema"}
+    ],
     "Link": [
         {"Link Definition": "okta_link_definition"}
+    ],
+    "Entity Risk Policy": [
+        {"Entity Risk Policy": "okta_entity_risk_policy"},
+        {"Entity Risk Policy Rule": "okta_entity_risk_policy_rule"},
     ],
     "Applications": [
         {"App Oauth": "okta_app_oauth"},
@@ -141,8 +170,12 @@ RESOURCE_COLLECTION_MAP = {
         {"App SWA": "okta_app_swa"},
         {"App User": "okta_app_user"},
         {"App Oauth Api Scope": "okta_app_oauth_api_scope"},
+        {"App Token": "okta_app_token"},
         {"App Oauth Post Logout Redirect Uri": "okta_app_oauth_post_logout_redirect_uri"},
         {"App Oauth Redirect Uri": "okta_app_oauth_redirect_uri"},
+        {"App Connection": "okta_app_connection"},
+        {"App Federated Claim": "okta_app_federated_claim"},
+        {"App Push Groups": "okta_app_push_groups"},
     ]
 }
 
@@ -155,11 +188,13 @@ ENTITY_ID_MAPPING = {
     "User Base Schema Properties": "user_id",
     "User Admin Roles": "user_id",
     "User Types": "user_type_id",
+    "User Risk": "user_id",
 
     "Policy Rule Password":"policy_password_id",
 
     "Entitlements":"id",
     "Factor": "provider_id",
+    "Authenticator": "key",
     # Groups
     "Groups": "group_id",
     "Group Schema Property": "id",
@@ -169,6 +204,7 @@ ENTITY_ID_MAPPING = {
 
     # Brands
     "Brands": "brand_id",
+    "Email Domain": "email_domain_id",
 
     # "Behavior":"behavior_id",
 
@@ -182,19 +218,28 @@ ENTITY_ID_MAPPING = {
     "Email SMTP Server": "id",
 
     # Rate Limits
-    "Principal Rate Limit": "id",
-    "Rate Limit Admin Notification": "id",
-    "Rate Limit Admin Notification Settings": "id",
-    "Rate Limit Warning Threshold Percentage": "id",
+    "Principal Rate Limit": "rate_limit_id",
+    "Rate Limit Admin Notification": "notification_id",
+    "Rate Limit Admin Notification Settings": "notification_id",
+    "Rate Limit Warning Threshold Percentage": "threshold_id",
 
     # Entitlements
-    "Entitlement Bundle": "id",
-    "Principal Entitlement": "id",
+    "Entitlement Bundle": "bundle_id",
+    "Principal Entitlement": "entitlement_id",
 
     # Requests
-    "Request Condition": "id",
-    "Request Sequence": "id",
+    "Request Condition": "condition_id",
+    "Request Sequence": "sequence_id",
     "Request Settings": "id",
+    "Request Type": "request_id",
+
+    # Catalog
+    "Catalog Entry Default": "entry_id",
+    "Catalog Entry User Access Request Fields": "field_id",
+    "End User My Requests": "request_id",
+
+    # Reviews
+    "Review": "review_id",
 
     # SMS Template
     "Sms Template": "sms_id",
@@ -205,10 +250,12 @@ ENTITY_ID_MAPPING = {
     "Organization Security": "id",
 
     # Threat Insights
-    "okta_threat_insight_settings": "action",
+    "Threat Insights": "action",
 
     # Authorization Servers
     "Auth Server": "auth_server_id",
+    "Auth Server Client": "token_id",
+    "Auth Server Key": "key_id",
 
     # Identity Providers
     "IDP OIDC": "idp_id",
@@ -229,6 +276,9 @@ ENTITY_ID_MAPPING = {
     # Behavior
     "Behavior": "behavior_id",
 
+    # Domain
+    "Domain": "domain_id",
+
     # Administrator Roles
     "Admin Role Custom": "custom_role_id",
 
@@ -239,10 +289,12 @@ ENTITY_ID_MAPPING = {
     "Inline Hook": "inline_hook_id",
 
     # Event Hooks
-    "Event_Hook": "event_id",
+    "Event Hook": "event_id",
+    "Hook Key": "hook_key_id",
+    "Api Token": "token_id",
 
     # Link Definition
-    "okta_link_definition": "primary_name",
+    "Link Definition": "primary_name",
 
     # Applications
     "App Oauth": "app_id",
@@ -252,6 +304,7 @@ ENTITY_ID_MAPPING = {
     "App Access Policy Assignment": "app_id",
     "App Signon Policy": "app_policy_id",
     "App Signon Policy Rule":"policy_rule_id",
+    "App Oauth Role Assignment": "client_id",
     "App Shared Credentials":"label",
     "App Group Assignment": "app_id",
     "App Bookmark": "app_id",
@@ -266,16 +319,26 @@ ENTITY_ID_MAPPING = {
     "App Oauth Post Logout Redirect Uri":"app_id",
     "App Oauth Redirect Uri":"app_id",
     "App Oauth Api Scope":"app_id",
+    "App Token": "token_id",
+    "App Connection": "app_id",
+    "App Federated Claim": "claim_id",
+    "App Push Groups": "push_group_id",
+    "Push Provider": "push_provider_id",
+    "Api Service Integration": "api_service_integration_id",
+    "Ui Schema": "ui_schema_id",
+    "Entity Risk Policy": "policy_id",
+    "Entity Risk Policy Rule": "policy_rule_id",
 }
 
 NON_EDITABLE_FIELDS = {
     # User entities
-    "User": ["user_id"],
+    "Users": ["user_id"],
     "User Schema Properties": ["user_id"],
     "User Group Memberships": ["user_id"],
     "User Base Schema Properties": ["user_id"],
     "User Admin Roles": ["user_id"],
     "User Types": ["user_type_id"],
+    "User Risk": ["user_id", "risk_id"],
 
     "Entitlements":["data_type"],
 
@@ -294,10 +357,18 @@ NON_EDITABLE_FIELDS = {
     "App User Base Schema Property": ["app_id"],
     "App User Schema Property": ["app_id"],
     "App Access Policy Assignment": ["app_id"],
+    "App Oauth Role Assignment": ["client_id"],
     "App Secure Password Store": ["app_id"],
     "App Oauth Post Logout Redirect Uri":["app_id"],
     "App Oauth Redirect Uri":["app_id"],
     "App Oauth Api Scope":["app_id"],
+    "App Token": ["token_id", "client_id", "user_id", "created", "expires_at", "scopes", "issuer", "status"],
+    "App Connection": ["status"],
+    "App Federated Claim": ["claim_id", "app_id"],
+    "App Push Groups": ["push_group_id", "app_id", "source_group_id", "status"],
+    "Push Provider": ["push_provider_id", "last_updated_date"],
+    "Api Service Integration": ["api_service_integration_id", "name", "config_guide_url", "created", "created_at"],
+    "Ui Schema": ["ui_schema_id", "created", "last_updated"],
 
     # Policy entities
     "Policy MFA": ["policy_id"],
@@ -310,6 +381,8 @@ NON_EDITABLE_FIELDS = {
 
     # Auth Server entities
     "Auth Server": ["auth_server_id"],
+    "Auth Server Client": ["token_id", "auth_server_id", "client_id", "created", "expires_at", "issuer", "last_updated", "scopes", "status", "user_id"],
+    "Auth Server Key": ["key_id", "auth_server_id", "alg", "e", "kid", "n", "status", "use"],
 
     # Identity Provider entities
     "IDP OIDC": ["idp_id"],
@@ -325,6 +398,7 @@ NON_EDITABLE_FIELDS = {
 
     # Brand entities
     "Brands": ["brand_id"],
+    "Email Domain": ["email_domain_id"],
 
     "Organization Security": ["id"],
 
@@ -338,30 +412,43 @@ NON_EDITABLE_FIELDS = {
     "Email SMTP Server": ["id"],
 
     # Rate Limits
-    "Principal Rate Limit": ["id", "principal_id", "created_by", "created_date", "last_update", "last_updated_by", "org_id"],
-    "Rate Limit Admin Notification": ["id"],
-    "Rate Limit Admin Notification Settings": ["id"],
-    "Rate Limit Warning Threshold Percentage": ["id"],
+    "Principal Rate Limit": ["rate_limit_id", "principal_id", "created_by", "created_date", "last_update", "last_updated_by", "org_id"],
+    "Rate Limit Admin Notification": ["notification_id"],
+    "Rate Limit Admin Notification Settings": ["notification_id"],
+    "Rate Limit Warning Threshold Percentage": ["threshold_id"],
 
     # Entitlements
-    "Entitlement Bundle": ["id"],
-    "Principal Entitlement": ["id"],
+    "Entitlement Bundle": ["bundle_id"],
+    "Principal Entitlement": ["entitlement_id"],
 
     # Requests
-    "Request Condition": ["id"],
-    "Request Sequence": ["id"],
+    "Request Condition": ["condition_id"],
+    "Request Sequence": ["sequence_id"],
     "Request Settings": ["id"],
+    "Request Type": ["request_id"],
+
+    # Catalog
+    "Catalog Entry Default": ["entry_id"],
+    "Catalog Entry User Access Request Fields": ["field_id"],
+    "End User My Requests": ["request_id"],
+
+    # Reviews
+    "Review": ["review_id"],
 
     # SMS Template
     "Sms Template": ["sms_id"],
 
     "Factor": ["provider_id"],
+    "Authenticator": ["key"],
 
     # Network Zone
-    "Network Zone": ["network_id"],
+    "Network Zone": ["network_id", "system"],
 
     # Behavior
     "Behavior": ["behavior_id"],
+
+    # Domain
+    "Domain": ["domain_id", "validation_status", "dns_records", "public_certificate"],
 
     # Administrator Roles
     "Admin Role Custom": ["custom_role_id"],
@@ -373,5 +460,9 @@ NON_EDITABLE_FIELDS = {
     "Inline Hook": ["inline_hook_id"],
 
     # Event Hooks
-    "Event_Hook": ["event_id"],
+    "Event Hook": ["event_id"],
+    "Hook Key": ["hook_key_id", "key_id", "created", "is_used", "last_updated"],
+    "Api Token": ["token_id", "created"],
+    "Entity Risk Policy": ["policy_id", "name", "status"],
+    "Entity Risk Policy Rule": ["policy_rule_id", "policy_id"],
 }

@@ -65,6 +65,7 @@ class IdentityProviderSAMLViewSet(BaseIdentityProviderViewSet):
                     "subject_match_type": policy.get("subject", {}).get("matchType", ""),
                     "suspended_action": provisioning.get("conditions", {}).get("suspended", {}).get("action", ""),
                     "username_template": policy.get("subject", {}).get("userNameTemplate", {}).get("template"),
+                    "trust_claims": credentials.get("trust", {}).get("claims", []),
                 }
                 formatted_data.append(formatted_record)
         logger.info("Extracted and formatted %d Identity Provider records from Okta", len(formatted_data))

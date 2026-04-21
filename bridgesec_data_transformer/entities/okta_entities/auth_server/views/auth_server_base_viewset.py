@@ -40,6 +40,24 @@ class BaseAuthServerViewSet(BaseEntityViewSet):
                     if extracted:
                         extracted_data[entity_name].extend(extracted)
 
+            elif entity_name == "auth_server_clients":
+                extracted_data[entity_name] = []
+
+                for auth_server in extracted_data.get("auth_servers", []):
+                    auth_server_id = auth_server.get("auth_server_id")
+                    if not auth_server_id:
+                        continue
+
+                    clients = viewset_instance.fetch_clients(auth_server_id, request=request)
+                    for client in (clients if isinstance(clients, list) else []):
+                        client_id = client.get("client_id") if isinstance(client, dict) else client
+                        if not client_id:
+                            continue
+                        tokens = viewset_instance.fetch_tokens(auth_server_id, client_id, request=request)
+                        extracted = viewset_instance.extract_data(tokens, auth_server_id, client_id)
+                        if extracted:
+                            extracted_data[entity_name].extend(extracted)
+
             else:
                 extracted_data[entity_name] = []
                 for auth_server in extracted_data.get("auth_servers", []):

@@ -120,7 +120,9 @@ class AppOauthViewSet(BaseAppViewSet):
                     "user_name_template_push_status": record.get("user_name_template_push_status", ""),
                     "user_name_template_suffix": record.get("user_name_template_suffix", ""),
                     "user_name_template_type": userNameTemplate.get("type", ""),
-                    "wildcard_redirect": oauthClient_settings.get("wildcard_redirect", "")
+                    "wildcard_redirect": oauthClient_settings.get("wildcard_redirect", ""),
+                    "frontchannel_logout_uri": oauthClient_settings.get("frontchannel_logout_uri", ""),
+                    "participate_slo": oauthClient_settings.get("participate_slo", False),
                 }
                 # based on the app type we can set some mandatory fields checks.
                 if type == "web":

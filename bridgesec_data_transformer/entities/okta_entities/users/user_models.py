@@ -52,7 +52,8 @@ class User(BaseEntityModel):
     title = StringField(null=True, required=False)
     user_type = StringField(null=True, required=False)
     zip_code = StringField(null=True, required=False)
-  
+    realm_id = StringField(null=True, required=False)
+
     meta = {"collection": "okta_user"}
 
 
@@ -134,3 +135,12 @@ class UserGroupMemberships(BaseEntityModel):
     groups = ListField(StringField(), required=True)
 
     meta = {"collection": "okta_user_group_memberships"}
+
+
+class UserRisk(BaseEntityModel):
+    user_id = StringField(required=True)
+    risk_id = StringField(required=False)
+    risk_level = StringField(required=False)
+    reason = StringField(required=False, null=True)
+
+    meta = {"collection": "okta_user_risk"}

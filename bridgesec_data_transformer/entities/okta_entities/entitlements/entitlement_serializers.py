@@ -1,38 +1,33 @@
 from rest_framework import serializers
 
 
-class TargetSerializer(serializers.Serializer):
-    external_id = serializers.CharField(max_length=255, required=True)
-    type = serializers.CharField(max_length=100, required=True)
-
-
-class EntitlementNestedSerializer(serializers.Serializer):
-    id = serializers.CharField(max_length=255, required=True)
-    values = serializers.ListField(required=True)
-
-
-class ParentSerializer(serializers.Serializer):
-    external_id = serializers.CharField(max_length=255, required=True)
-    type = serializers.CharField(max_length=100, required=True)
-
-
-class TargetPrincipalSerializer(serializers.Serializer):
-    external_id = serializers.CharField(max_length=255, required=True)
-    type = serializers.CharField(max_length=100, required=True)
-
-
 class EntitlementBundleSerializer(serializers.Serializer):
+    bundle_id = serializers.CharField(required=True)
     name = serializers.CharField(max_length=255, required=True)
-    target = TargetSerializer(required=True)
-    entitlements = serializers.ListField(child=EntitlementNestedSerializer(), required=True)
-    description = serializers.CharField(max_length=500, required=False)
-    target_resource_orn = serializers.CharField(max_length=255, required=False)
-    status = serializers.CharField(max_length=50, required=False)
+    description = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    target_resource_orn = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    status = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    target = serializers.DictField(required=False)
+    entitlements = serializers.ListField(child=serializers.DictField(), required=False)
+    created = serializers.CharField(required=False, allow_blank=True)
+    last_updated = serializers.CharField(required=False, allow_blank=True)
+    created_by = serializers.CharField(required=False, allow_blank=True)
+    last_updated_by = serializers.CharField(required=False, allow_blank=True)
 
 
 class PrincipalEntitlementSerializer(serializers.Serializer):
-    parent = ParentSerializer(required=True)
-    target_principal = TargetPrincipalSerializer(required=True)
+    entitlement_id = serializers.CharField(required=True)
+    name = serializers.CharField(required=False, allow_blank=True)
+    description = serializers.CharField(required=False, allow_blank=True)
+    data_type = serializers.CharField(required=False, allow_blank=True)
+    multi_value = serializers.BooleanField(required=False)
+    required = serializers.BooleanField(required=False)
+    external_value = serializers.CharField(required=False, allow_blank=True)
+    parent_resource_orn = serializers.CharField(required=False, allow_blank=True)
+    target_principal_orn = serializers.CharField(required=False, allow_blank=True)
+    parent = serializers.DictField(required=False)
+    target_principal = serializers.DictField(required=False)
+    values = serializers.ListField(child=serializers.DictField(), required=False)
 
 
 class ValuesSerializer(serializers.Serializer):

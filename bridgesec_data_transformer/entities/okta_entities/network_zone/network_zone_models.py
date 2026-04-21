@@ -1,4 +1,4 @@
-from mongoengine import ListField, StringField
+from mongoengine import BooleanField, ListField, StringField
 
 from entities.models.base import BaseEntityModel
 
@@ -17,5 +17,6 @@ class NetworkZone(BaseEntityModel):
     proxies = ListField(required=False, null=True)
     status = StringField(required=False, null=True)
     usage = StringField(required=False, null=True)
-    
+    system = BooleanField(required=False, null=True)
+
     meta = {"collection": "okta_network_zone"}

@@ -45,7 +45,8 @@ class UserSerializer(serializers.Serializer):
     title = serializers.CharField(required=False, allow_null=True)
     user_type = serializers.CharField(required=False, allow_null=True)
     zip_code = serializers.CharField(required=False, allow_null=True)
-    
+    realm_id = serializers.CharField(required=False, allow_null=True)
+
 
 class UserTypeSerializer(serializers.Serializer):
     name = serializers.CharField()
@@ -108,3 +109,10 @@ class UserBaseSchemaPropertySerializer(serializers.Serializer):
 class UserGroupMembershipsSerializer(serializers.Serializer):
     user_id = serializers.CharField()
     groups = serializers.CharField()
+
+
+class UserRiskSerializer(serializers.Serializer):
+    user_id = serializers.CharField(required=True)
+    risk_id = serializers.CharField(required=False, allow_blank=True)
+    risk_level = serializers.CharField(required=False, allow_blank=True)
+    reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)

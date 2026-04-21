@@ -20,7 +20,15 @@ class BaseRequestConditionViewSet(BaseEntityViewSet):
             logger.info(f"Processing entity: {entity_name}")
             viewset_instance = viewset_class()
             extracted_data[entity_name] = []
-            # Fetch full Okta response and extract based on type inside extract_data
+
+            # If the sub-viewset overrides fetch_and_store_data, delegate fully to it
+            if type(viewset_instance).fetch_and_store_data is not BaseEntityViewSet.fetch_and_store_data:
+                result = viewset_instance.fetch_and_store_data(db_name, request)
+                extracted_data[entity_name] = result.get(entity_name, [])
+                logger.info(f"Delegated fetch_and_store_data for {entity_name}: {len(extracted_data[entity_name])} records.")
+                continue
+
+            # Default: fetch + extract + store
             okta_response, _, _ = viewset_instance.fetch_from_okta(request=request)
             entity_data = viewset_instance.extract_data(okta_response)
             extracted_data.setdefault(entity_name, []).extend(entity_data)
@@ -28,6 +36,9 @@ class BaseRequestConditionViewSet(BaseEntityViewSet):
 
         for entity_name, data in extracted_data.items():
             viewset_instance = REQUEST_ENTITY_VIEWSETS[entity_name]()
+            # Skip store for entities that already handled it in fetch_and_store_data
+            if type(viewset_instance).fetch_and_store_data is not BaseEntityViewSet.fetch_and_store_data:
+                continue
             viewset_instance.store_data(data, db_name)
 
         return extracted_data

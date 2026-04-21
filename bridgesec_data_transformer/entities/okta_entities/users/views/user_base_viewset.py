@@ -100,6 +100,15 @@ class BaseUserViewSet(BaseEntityViewSet):
 
                     extracted_data[entity_name] = group_membership_data
 
+                elif entity_name == 'okta_user_risk':
+                    risk_data = []
+                    for user_id in user_ids:
+                        data = viewset_instance.fetch_from_okta(user_id=user_id, request=request)
+                        extracted = viewset_instance.extract_data(data, user_id)
+                        if extracted:
+                            risk_data.extend(extracted)
+                    extracted_data[entity_name] = risk_data
+
                 else:
                     data, status_code, rate_limit = viewset_instance.fetch_from_okta(request=request)
                     if status_code == 200:

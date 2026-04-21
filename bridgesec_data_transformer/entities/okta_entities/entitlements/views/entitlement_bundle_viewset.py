@@ -14,23 +14,59 @@ class EntitlementBundleViewSet(BaseEntityViewSet):
     model = EntitlementBundle
 
     def extract_data(self, okta_data):
-        """Extract and format entitlement bundle data from Okta response"""
-        formatted_data = []
-
-        # Check if okta_data is a list or single object
         items = okta_data if isinstance(okta_data, list) else [okta_data]
+        formatted_data = []
 
         for item in items:
             if not isinstance(item, dict):
-                logger.warning(f"Skipping invalid record (not a dict): {item}")
+                logger.warning("Skipping invalid record (not a dict): %s", item)
                 continue
+
+            raw_entitlements = item.get("entitlements", [])
+            entitlements = []
+            for e in (raw_entitlements if isinstance(raw_entitlements, list) else []):
+                if not isinstance(e, dict):
+                    continue
+                raw_values = e.get("values", [])
+                entitlements.append({
+                    "id": e.get("id", ""),
+                    "name": e.get("name", ""),
+                    "description": e.get("description", ""),
+                    "data_type": e.get("dataType", ""),
+                    "external_value": e.get("externalValue", ""),
+                    "multi_value": e.get("multiValue", False),
+                    "required": e.get("required", False),
+                    "values": [
+                        {
+                            "id": v.get("id", ""),
+                            "name": v.get("name", ""),
+                            "description": v.get("description", ""),
+                            "external_id": v.get("externalId", ""),
+                            "external_value": v.get("externalValue", ""),
+                        }
+                        for v in (raw_values if isinstance(raw_values, list) else [])
+                        if isinstance(v, dict)
+                    ],
+                })
+
+            raw_target = item.get("target", {})
+            target = {
+                "external_id": raw_target.get("externalId", ""),
+                "type": raw_target.get("type", ""),
+            } if isinstance(raw_target, dict) else {}
+
             formatted_data.append({
+                "bundle_id": item.get("id", ""),
                 "name": item.get("name", ""),
-                "target": item.get("target", {}),
-                "entitlements": item.get("entitlements", []),
                 "description": item.get("description", ""),
                 "target_resource_orn": item.get("targetResourceOrn", ""),
-                "status": item.get("status", "")
+                "status": item.get("status", ""),
+                "target": target,
+                "entitlements": entitlements,
+                "created": item.get("created", ""),
+                "last_updated": item.get("lastUpdated", ""),
+                "created_by": item.get("createdBy", ""),
+                "last_updated_by": item.get("lastUpdatedBy", ""),
             })
 
         logger.info("Extracted %d Entitlement Bundle records", len(formatted_data))

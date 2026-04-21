@@ -14,19 +14,15 @@ class RateLimitAdminNotificationViewSet(BaseEntityViewSet):
     model = RateLimitAdminNotification
 
     def extract_data(self, okta_data):
-        """Extract and format rate limit admin notification data from Okta response"""
-        formatted_data = []
-
-        # Check if okta_data is a list or single object
         items = okta_data if isinstance(okta_data, list) else [okta_data]
-
+        formatted_data = []
         for item in items:
             if not isinstance(item, dict):
-                logger.warning(f"Skipping invalid record (not a dict): {item}")
+                logger.warning("Skipping invalid record (not a dict): %s", item)
                 continue
             formatted_data.append({
-                "notifications_enabled": item.get("notificationsEnabled", "")
+                "notification_id": item.get("id", ""),
+                "notifications_enabled": str(item.get("notificationsEnabled", "")),
             })
-
         logger.info("Extracted %d Rate Limit Admin Notification records", len(formatted_data))
         return formatted_data

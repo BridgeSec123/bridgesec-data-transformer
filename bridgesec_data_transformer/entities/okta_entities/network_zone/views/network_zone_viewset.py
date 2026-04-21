@@ -32,11 +32,12 @@ class NetworkZoneViewSet(BaseEntityViewSet):
 
             zone_type = item.get("type")
             record = {
-                "network_id" : item.get("id"),
+                "network_id": item.get("id"),
                 "name": zone_name,
                 "type": zone_type,
                 "status": item.get("status"),
                 "usage": item.get("usage"),
+                "system": item.get("system"),
             }
 
             # Handle IP type fields
@@ -53,7 +54,7 @@ class NetworkZoneViewSet(BaseEntityViewSet):
                     if locations.get("include"):
                         record["dynamic_locations"] = locations.get("include")
                     if zone_type == "DYNAMIC_V2" and locations.get("exclude"):
-                        record["dynamic_locations_exclude"] = locations.get("exclude")
+                        record["dynamic_locations_excluded"] = locations.get("exclude")
 
                 ip_services = item.get("ipServiceCategories", {})
                 if ip_services:

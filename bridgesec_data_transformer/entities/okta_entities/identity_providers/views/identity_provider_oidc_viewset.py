@@ -72,6 +72,7 @@ class IdentityProviderOIDCViewSet(BaseIdentityProviderViewSet):
                     "user_info_binding": endpoints.get("userInfo", {}).get("binding", ""),
                     "user_info_url": endpoints.get("userInfo", {}).get("url", ""),
                     "username_template": policy.get("subject", {}).get("userNameTemplate", {}).get("template", ""),
+                    "trust_claims": protocol.get("credentials", {}).get("trust", {}).get("claims", []),
                 }
                 formatted_data.append(formatted_record)
         logger.info("Extracted and formatted %d Identity Provider records from Okta", len(formatted_data))

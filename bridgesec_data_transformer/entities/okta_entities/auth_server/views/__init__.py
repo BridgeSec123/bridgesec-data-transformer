@@ -1,4 +1,6 @@
 from .auth_server_base_viewset import BaseAuthServerViewSet
+from .auth_server_clients_viewset import AuthorizationServerClientsViewSet
+from .auth_server_keys_viewset import AuthorizationServerKeysViewSet
 from .auth_server_claim_default_viewset import AuthorizationServerClaimDefaultViewSet
 from .auth_server_viewset import AuthorizationServerViewSet
 from .auth_server_default_viewset import AuthorizationServerDefaultViewSet

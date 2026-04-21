@@ -63,20 +63,23 @@ class PrincipalRateLimitViewSet(BaseEntityViewSet):
         return all_data, 200, {}
 
     def extract_data(self, okta_data):
-        """Extract and format principal rate limit data from Okta response"""
-        formatted_data = []
-
-        # Check if okta_data is a list or single object
         items = okta_data if isinstance(okta_data, list) else [okta_data]
-
+        formatted_data = []
         for item in items:
             if not isinstance(item, dict):
-                logger.warning(f"Skipping invalid record (not a dict): {item}")
+                logger.warning("Skipping invalid record (not a dict): %s", item)
                 continue
             formatted_data.append({
+                "rate_limit_id": item.get("id", ""),
                 "principal_id": item.get("principalId", ""),
                 "principal_type": item.get("principalType", ""),
+                "default_percentage": item.get("defaultPercentage"),
+                "default_concurrency_percentage": item.get("defaultConcurrencyPercentage"),
+                "created_by": item.get("createdBy", ""),
+                "created_date": item.get("createdDate", ""),
+                "last_update": item.get("lastUpdate", ""),
+                "last_updated_by": item.get("lastUpdatedBy", ""),
+                "org_id": item.get("orgId", ""),
             })
-
         logger.info("Extracted %d Principal Rate Limit records", len(formatted_data))
         return formatted_data

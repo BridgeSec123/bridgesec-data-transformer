@@ -17,14 +17,20 @@ class AccessDurationSettingsSerializer(serializers.Serializer):
 
 
 class RequestConditionSerializer(serializers.Serializer):
+    condition_id = serializers.CharField(max_length=255, required=True)
     resource_id = serializers.CharField(max_length=255, required=True)
-    approval_sequence_id = serializers.CharField(max_length=255, required=True)
+    approval_sequence_id = serializers.CharField(max_length=255, required=False, allow_blank=True)
     name = serializers.CharField(max_length=255, required=True)
-    access_scope_settings = serializers.ListField(child=AccessScopeSettingsSerializer(), required=True)
-    requester_settings = serializers.ListField(child=RequesterSettingsSerializer(), required=True)
-    description = serializers.CharField(max_length=500, required=False)
+    status = serializers.CharField(max_length=50, required=False, allow_blank=True)
     priority = serializers.IntegerField(required=False)
-    access_duration_settings = serializers.ListField(child=AccessDurationSettingsSerializer(), required=False)
+    description = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    created = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    created_by = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    last_updated = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    last_updated_by = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    access_scope_settings = serializers.ListField(child=serializers.DictField(), required=False)
+    requester_settings = serializers.ListField(child=serializers.DictField(), required=False)
+    access_duration_settings = serializers.ListField(child=serializers.DictField(), required=False)
 
 
 class RequestSequenceSerializer(serializers.Serializer):
@@ -59,6 +65,19 @@ class RequesterFieldValuesSerializer(serializers.Serializer):
 
 
 class RequestTypeSerializer(serializers.Serializer):
-    requested = RequestedSerializer(required=True)
-    requested_for = RequestedForSerializer(required=True)
-    requester_field_values = RequesterFieldValuesSerializer(required=False)
+    request_id = serializers.CharField(required=True)
+    requested = serializers.DictField(required=True)
+    requested_for = serializers.DictField(required=True)
+    requester_field_values = serializers.DictField(required=False)
+    status = serializers.CharField(required=False, allow_blank=True)
+    created = serializers.CharField(required=False, allow_blank=True)
+    created_by = serializers.CharField(required=False, allow_blank=True)
+    last_updated = serializers.CharField(required=False, allow_blank=True)
+    last_updated_by = serializers.CharField(required=False, allow_blank=True)
+    access_duration = serializers.CharField(required=False, allow_blank=True)
+    granted = serializers.CharField(required=False, allow_blank=True)
+    grant_status = serializers.CharField(required=False, allow_blank=True)
+    resolved = serializers.CharField(required=False, allow_blank=True)
+    revocation_scheduled = serializers.CharField(required=False, allow_blank=True)
+    revocation_status = serializers.CharField(required=False, allow_blank=True)
+    revoked = serializers.CharField(required=False, allow_blank=True)

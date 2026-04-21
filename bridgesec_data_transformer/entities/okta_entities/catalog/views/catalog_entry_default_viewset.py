@@ -15,14 +15,26 @@ class CatalogEntryDefaultViewSet(BaseEntityViewSet):
 
     def extract_data(self, okta_data):
         """Extract and format catalog entry default data from Okta response"""
+        if isinstance(okta_data, dict):
+            items = okta_data.get("value", okta_data.get("entries", []))
+        elif isinstance(okta_data, list):
+            items = okta_data
+        else:
+            items = []
+
         formatted_data = []
-
-        # Check if okta_data is a list or single object
-        items = okta_data if isinstance(okta_data, list) else [okta_data]
-
         for item in items:
+            if not isinstance(item, dict):
+                logger.warning("Skipping invalid record (not a dict): %s", item)
+                continue
             formatted_data.append({
-                "entry_id": item.get("entryId", "")
+                "entry_id": item.get("id", ""),
+                "name": item.get("name", ""),
+                "requestable": str(item.get("requestable", "")),
+                "label": item.get("label", ""),
+                "description": item.get("description", ""),
+                "parent": item.get("parent", ""),
+                "counts": item.get("counts", {}),
             })
 
         logger.info("Extracted %d Catalog Entry Default records", len(formatted_data))

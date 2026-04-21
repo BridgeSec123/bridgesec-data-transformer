@@ -68,6 +68,7 @@ class UserViewSet(BaseUserViewSet):
                 "title": record.get("title", ""),
                 "user_type": record.get("userType", ""),
                 "zip_code": record.get("zipCode", ""),
+                "realm_id": record.get("realmId", ""),
             }
             formatted_data.append(formatted_record)
         logger.info("Extracted and formatted %d user records from Okta", len(formatted_data))  

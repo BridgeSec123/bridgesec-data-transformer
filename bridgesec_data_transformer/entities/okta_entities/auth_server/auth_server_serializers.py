@@ -76,3 +76,27 @@ class AuthorizationServerScopeSerializer(serializers.Serializer):
 class AuthTrustedServerSerializer(serializers.Serializer):
     auth_server_id = serializers.CharField()
     trusted = serializers.ListField(child=serializers.CharField())
+
+
+class AuthorizationServerKeySerializer(serializers.Serializer):
+    key_id = serializers.CharField(required=True)
+    auth_server_id = serializers.CharField(required=False, allow_blank=True)
+    alg = serializers.CharField(required=False, allow_blank=True)
+    e = serializers.CharField(required=False, allow_blank=True)
+    kid = serializers.CharField(required=False, allow_blank=True)
+    n = serializers.CharField(required=False, allow_blank=True)
+    status = serializers.CharField(required=False, allow_blank=True)
+    use = serializers.CharField(required=False, allow_blank=True)
+
+
+class AuthorizationServerClientSerializer(serializers.Serializer):
+    token_id = serializers.CharField(required=True)
+    auth_server_id = serializers.CharField(required=False, allow_blank=True)
+    client_id = serializers.CharField(required=False, allow_blank=True)
+    created = serializers.CharField(required=False, allow_blank=True)
+    expires_at = serializers.CharField(required=False, allow_blank=True)
+    issuer = serializers.CharField(required=False, allow_blank=True)
+    last_updated = serializers.CharField(required=False, allow_blank=True)
+    scopes = serializers.ListField(child=serializers.CharField(), required=False)
+    status = serializers.CharField(required=False, allow_blank=True)
+    user_id = serializers.CharField(required=False, allow_blank=True)

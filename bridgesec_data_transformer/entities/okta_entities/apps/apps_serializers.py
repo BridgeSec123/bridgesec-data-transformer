@@ -50,6 +50,8 @@ class AppOauthSerializer(serializers.Serializer):
     user_name_template_suffix = serializers.CharField(required=False, allow_null=True)
     user_name_template_type = serializers.CharField(required=False, allow_null=True)
     wildcard_redirect = serializers.CharField(required=False, allow_null=True)
+    frontchannel_logout_uri = serializers.CharField(required=False, allow_null=True)
+    participate_slo = serializers.BooleanField(required=False, allow_null=True)
 
     def validate(self, data):
         app_type = data.get('type')
@@ -176,7 +178,7 @@ class AppPolicySignOnRuleSerializer(serializers.Serializer):
     name = serializers.CharField(required=True)
     policy_id = serializers.CharField(required=True)
     access = serializers.CharField(required=False, allow_null=True)
-    constraints = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    constraints = serializers.ListField(child=serializers.DictField(), required=False, allow_null=True)
     custom_expression = serializers.CharField(required=False, allow_null=True)
     device_assurances_included = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
     device_is_managed = serializers.BooleanField(required=False, default=False)
@@ -445,6 +447,39 @@ class AppUserSchemaPropertySerializer(serializers.Serializer):
     scope = serializers.CharField(required=False, allow_null=True)
     unique = serializers.CharField(required=False, allow_null=True)
     union = serializers.BooleanField(required=False, allow_null=True)
+
+
+class AppTokenSerializer(serializers.Serializer):
+    token_id = serializers.CharField(required=True)
+    client_id = serializers.CharField(required=False, allow_blank=True)
+    user_id = serializers.CharField(required=False, allow_blank=True)
+    status = serializers.CharField(required=False, allow_blank=True)
+    created = serializers.CharField(required=False, allow_blank=True)
+    expires_at = serializers.CharField(required=False, allow_blank=True)
+    scopes = serializers.ListField(child=serializers.CharField(), required=False)
+    issuer = serializers.CharField(required=False, allow_blank=True)
+
+
+class AppConnectionSerializer(serializers.Serializer):
+    app_id = serializers.CharField(required=True)
+    status = serializers.CharField(required=False, allow_blank=True)
+    auth_scheme = serializers.CharField(required=False, allow_blank=True)
+    base_url = serializers.CharField(required=False, allow_blank=True)
+    profile = serializers.DictField(required=False)
+
+
+class AppFederatedClaimSerializer(serializers.Serializer):
+    claim_id = serializers.CharField(required=True)
+    app_id = serializers.CharField(required=True)
+    name = serializers.CharField(required=True)
+    expression = serializers.CharField(required=True)
+
+
+class AppPushGroupSerializer(serializers.Serializer):
+    push_group_id = serializers.CharField(required=True)
+    app_id = serializers.CharField(required=True)
+    source_group_id = serializers.CharField(required=False, allow_blank=True)
+    status = serializers.CharField(required=False, allow_blank=True)
    
     
    

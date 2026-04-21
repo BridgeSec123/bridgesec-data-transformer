@@ -19,14 +19,20 @@ class AccessDurationSettings(EmbeddedDocument):
 
 
 class RequestCondition(BaseEntityModel):
+    condition_id = StringField(required=True)
     resource_id = StringField(required=True)
-    approval_sequence_id = StringField(required=True)
+    approval_sequence_id = StringField(required=False)
     name = StringField(required=True)
-    access_scope_settings = EmbeddedDocumentListField(AccessScopeSettings, required=True)
-    requester_settings = EmbeddedDocumentListField(RequesterSettings, required=True)
-    description = StringField(required=False)
+    status = StringField(required=False)
     priority = IntField(required=False)
-    access_duration_settings = EmbeddedDocumentListField(AccessDurationSettings, required=False)
+    description = StringField(required=False)
+    created = StringField(required=False)
+    created_by = StringField(required=False)
+    last_updated = StringField(required=False)
+    last_updated_by = StringField(required=False)
+    access_scope_settings = ListField(DictField(), required=False)
+    requester_settings = ListField(DictField(), required=False)
+    access_duration_settings = ListField(DictField(), required=False)
 
     meta = {"collection": "okta_request_conditions"}
 
@@ -67,8 +73,21 @@ class RequesterFieldValues(EmbeddedDocument):
 
 
 class RequestType(BaseEntityModel):
-    requested = EmbeddedDocumentField(Requested, required=True)
-    requested_for = EmbeddedDocumentField(RequestedFor, required=True)
-    requester_field_values = EmbeddedDocumentField(RequesterFieldValues, required=False)
+    request_id = StringField(required=True)
+    requested = DictField(required=True)
+    requested_for = DictField(required=True)
+    requester_field_values = DictField(required=False)
+    status = StringField(required=False)
+    created = StringField(required=False)
+    created_by = StringField(required=False)
+    last_updated = StringField(required=False)
+    last_updated_by = StringField(required=False)
+    access_duration = StringField(required=False)
+    granted = StringField(required=False)
+    grant_status = StringField(required=False)
+    resolved = StringField(required=False)
+    revocation_scheduled = StringField(required=False)
+    revocation_status = StringField(required=False)
+    revoked = StringField(required=False)
 
     meta = {"collection": "okta_request_types"}

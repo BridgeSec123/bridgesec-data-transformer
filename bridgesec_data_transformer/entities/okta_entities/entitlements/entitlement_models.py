@@ -1,42 +1,37 @@
-from mongoengine import StringField, DictField, ListField, BooleanField, EmbeddedDocument, EmbeddedDocumentField, EmbeddedDocumentListField
+from mongoengine import StringField, DictField, ListField, BooleanField, EmbeddedDocument, EmbeddedDocumentListField
 
 from entities.models.base import BaseEntityModel
 
 
-class Target(EmbeddedDocument):
-    external_id = StringField(required=True)
-    type = StringField(required=True)
-
-
-class EntitlementNested(EmbeddedDocument):
-    id = StringField(required=True)
-    values = ListField(required=True)
-
-
-class Parent(EmbeddedDocument):
-    external_id = StringField(required=True)
-    type = StringField(required=True)
-
-
-class TargetPrincipal(EmbeddedDocument):
-    external_id = StringField(required=True)
-    type = StringField(required=True)
-
-
 class EntitlementBundle(BaseEntityModel):
+    bundle_id = StringField(required=True)
     name = StringField(required=True)
-    target = EmbeddedDocumentField(Target, required=True)
-    entitlements = EmbeddedDocumentListField(EntitlementNested, required=True)
     description = StringField(required=False)
     target_resource_orn = StringField(required=False)
     status = StringField(required=False)
+    target = DictField(required=False)
+    entitlements = ListField(DictField(), required=False)
+    created = StringField(required=False)
+    last_updated = StringField(required=False)
+    created_by = StringField(required=False)
+    last_updated_by = StringField(required=False)
 
     meta = {"collection": "okta_entitlement_bundle"}
 
 
 class PrincipalEntitlement(BaseEntityModel):
-    parent = EmbeddedDocumentField(Parent, required=True)
-    target_principal = EmbeddedDocumentField(TargetPrincipal, required=True)
+    entitlement_id = StringField(required=True)
+    name = StringField(required=False)
+    description = StringField(required=False)
+    data_type = StringField(required=False)
+    multi_value = BooleanField(required=False)
+    required = BooleanField(required=False)
+    external_value = StringField(required=False)
+    parent_resource_orn = StringField(required=False)
+    target_principal_orn = StringField(required=False)
+    parent = DictField(required=False)
+    target_principal = DictField(required=False)
+    values = ListField(DictField(), required=False)
 
     meta = {"collection": "okta_principal_entitlements"}
 

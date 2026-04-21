@@ -38,7 +38,8 @@ class IdentityProviderOIDCSerializer(serializers.Serializer):
     user_info_binding = serializers.CharField(required=False)
     username_template = serializers.CharField(required=False)
     user_info_url = serializers.CharField(required=False)
-    
+    trust_claims = serializers.ListField(child=serializers.CharField(), required=False)
+
 
 class IdentityProviderSAMLSerializer(serializers.Serializer):
     name = serializers.CharField(required=True)
@@ -71,6 +72,7 @@ class IdentityProviderSAMLSerializer(serializers.Serializer):
     subject_match_type = serializers.CharField(required=False)
     suspended_action = serializers.CharField(required=False)
     username_template = serializers.CharField(required=False)
+    trust_claims = serializers.ListField(child=serializers.CharField(), required=False)
 
 class IdentityProviderSocialSerializer(serializers.Serializer):
     name = serializers.CharField(required=True)

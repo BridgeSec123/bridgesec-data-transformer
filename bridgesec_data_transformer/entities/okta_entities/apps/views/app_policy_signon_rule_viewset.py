@@ -1,4 +1,5 @@
 import logging
+import threading
 
 import requests
 from core.utils.okta_helpers import get_okta_headers
@@ -11,6 +12,11 @@ from entities.okta_entities.apps.apps_serializers import \
 from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
 
 logger = logging.getLogger(__name__)
+
+# Serialises concurrent fetches for this endpoint — Okta returns intermittent
+# HTTP 500s when multiple policy-rule requests hit simultaneously.
+_fetch_lock = threading.Lock()
+
 
 class AppPolicyRuleSignOnViewSet(BaseAppViewSet):
     okta_endpoint = "/api/v1/policies/{policy_id}/rules"
@@ -26,30 +32,31 @@ class AppPolicyRuleSignOnViewSet(BaseAppViewSet):
 
         okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(policy_id=policy_id)}"
         headers = get_okta_headers(request)
-        
+
         logger.info(f"Fetching data from Okta endpoint: {self.okta_endpoint}")
-        
-        while True:  # Keep retrying if rate limited
-            response = requests.get(okta_url, headers=headers)
 
-            if handle_rate_limit(response):  # Handle rate limit
-                logger.warning("Rate limit reached. Retrying...")
-                continue  # Retry after waiting
+        with _fetch_lock:
+            while True:  # Keep retrying if rate limited
+                response = requests.get(okta_url, headers=headers)
 
-            if response.status_code != 200:
-                logger.error(f"Failed to fetch data from Okta: {response.text}")
-                return {"error": f"Failed to fetch data from Okta API: {response.text}"}, response.status_code, rate_limit_headers(response)
+                if handle_rate_limit(response):  # Handle rate limit
+                    logger.warning("Rate limit reached. Retrying...")
+                    continue  # Retry after waiting
 
-            response_data = response.json()
-            logger.info(f"Successfully fetched data from Okta ({len(response_data)} records)")
-            
-            # Check if pagination is needed
-            next_url = response.links.get("next", {}).get("url")
-            if next_url:
-                all_data = fetch_all_pages(okta_url, headers)
-                return all_data, 200, rate_limit_headers(response)
+                if response.status_code != 200:
+                    logger.error(f"Failed to fetch data from Okta: {response.text}")
+                    return {"error": f"Failed to fetch data from Okta API: {response.text}"}, response.status_code, rate_limit_headers(response)
 
-            return response_data, 200, rate_limit_headers(response)
+                response_data = response.json()
+                logger.info(f"Successfully fetched data from Okta ({len(response_data)} records)")
+
+                # Check if pagination is needed
+                next_url = response.links.get("next", {}).get("url")
+                if next_url:
+                    all_data = fetch_all_pages(okta_url, headers)
+                    return all_data, 200, rate_limit_headers(response)
+
+                return response_data, 200, rate_limit_headers(response)
 
 
     def extract_data(self, okta_data, parent_record=None):

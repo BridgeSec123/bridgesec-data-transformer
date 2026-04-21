@@ -95,5 +95,33 @@ class AuthorizationServerScope(BaseEntityModel):
 class AuthTrustedServer(BaseEntityModel):
     auth_server_id = StringField()
     trusted = ListField()
-    
+
     meta = {"collection" : "okta_trusted_server"}
+
+
+class AuthorizationServerKey(BaseEntityModel):
+    key_id = StringField(required=True)
+    auth_server_id = StringField(required=False)
+    alg = StringField(required=False)
+    e = StringField(required=False)
+    kid = StringField(required=False)
+    n = StringField(required=False)
+    status = StringField(required=False)
+    use = StringField(required=False)
+
+    meta = {"collection": "okta_auth_server_keys"}
+
+
+class AuthorizationServerClient(BaseEntityModel):
+    token_id = StringField(required=True)
+    auth_server_id = StringField(required=False)
+    client_id = StringField(required=False)
+    created = StringField(required=False)
+    expires_at = StringField(required=False)
+    issuer = StringField(required=False)
+    last_updated = StringField(required=False)
+    scopes = ListField(StringField(), required=False)
+    status = StringField(required=False)
+    user_id = StringField(required=False)
+
+    meta = {"collection": "okta_auth_server_clients"}

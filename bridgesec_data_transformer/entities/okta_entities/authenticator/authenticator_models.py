@@ -1,4 +1,4 @@
-from mongoengine import BooleanField, IntField, StringField
+from mongoengine import BooleanField, DictField, IntField, StringField
 
 from entities.models.base import BaseEntityModel
 
@@ -16,7 +16,7 @@ class Authenticator(BaseEntityModel):
     provider_secret_key = StringField(null=True,required=False)
     provider_shared_secret = StringField(null=True,required=False)
     provider_user_name_template = StringField(null=True,required=False)
-    settings = StringField(null=True,required=False)
+    settings = DictField(null=True,required=False)
     
     meta = {"collection" : "okta_authenticator"}
 

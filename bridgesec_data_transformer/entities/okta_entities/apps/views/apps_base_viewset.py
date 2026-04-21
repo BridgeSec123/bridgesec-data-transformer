@@ -11,7 +11,10 @@ ENTITIES_NEEDING_APP_ITERATION = [
     "okta_app_group_assignments",
     "okta_app_user",
     "okta_app_user_schema_property",
-    "okta_app_user_base_schema_property"
+    "okta_app_user_base_schema_property",
+    "okta_app_connection",
+    "okta_app_federated_claim",
+    "okta_app_push_groups",
 ]
 
 PARENT_ENTITY_MAPPINGS = {
@@ -19,6 +22,7 @@ PARENT_ENTITY_MAPPINGS = {
     "okta_app_oauth_role_assignment": {"parent": "okta_app_oauth", "id_field": "client_id"},
     "okta_app_signon_policy_rule": {"parent": "okta_app_policy_sign_on", "id_field": "app_policy_id"},
     "okta_app_oauth_api_scope": {"parent": "okta_app_oauth", "id_field": "app_id"},
+    "okta_app_token": {"parent": "okta_app_oauth", "id_field": "app_id"},
     "okta_apps_oauth_redirect_uri": {"parent": "okta_app_oauth", "id_field": "app_id", "no_fetch": True},
     "okta_apps_oauth_post_redirect_uri": {"parent": "okta_app_oauth", "id_field": "app_id", "no_fetch": True},
 }

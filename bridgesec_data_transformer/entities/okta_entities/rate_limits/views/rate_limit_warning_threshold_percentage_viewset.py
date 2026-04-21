@@ -14,19 +14,15 @@ class RateLimitWarningThresholdViewSet(BaseEntityViewSet):
     model = RateLimitWarningThreshold
 
     def extract_data(self, okta_data):
-        """Extract and format rate limit warning threshold percentage data from Okta response"""
-        formatted_data = []
-
-        # Check if okta_data is a list or single object
         items = okta_data if isinstance(okta_data, list) else [okta_data]
-
+        formatted_data = []
         for item in items:
             if not isinstance(item, dict):
-                logger.warning(f"Skipping invalid record (not a dict): {item}")
+                logger.warning("Skipping invalid record (not a dict): %s", item)
                 continue
             formatted_data.append({
-                "warning_threshold": item.get("warningThreshold", 90)
+                "threshold_id": item.get("id", ""),
+                "warning_threshold": item.get("warningThreshold"),
             })
-
         logger.info("Extracted %d Rate Limit Warning Threshold Percentage records", len(formatted_data))
         return formatted_data

@@ -73,6 +73,8 @@ class AppOauth(BaseEntityModel):
     user_name_template_suffix = StringField(null=True,required=False)
     user_name_template_type = StringField(null=True,required=False)
     wildcard_redirect = StringField(null=True,required=False)
+    frontchannel_logout_uri = StringField(null=True, required=False)
+    participate_slo = BooleanField(null=True, required=False)
 
     meta = {"collection" : "okta_app_oauth"}
 
@@ -182,7 +184,7 @@ class AppPolicySignOnRule(BaseEntityModel):
     name = StringField(required=True)
     policy_id = StringField(required=True)
     access = StringField(required=False, null=True)
-    constraints = ListField(StringField(), required=False, null=True)
+    constraints = ListField(DictField(), required=False, null=True)
     custom_expression = StringField(required=False, null=True)
     device_assurances_included = ListField(StringField(), required=False, null=True)
     device_is_managed = BooleanField(required=False, null=True)
@@ -491,3 +493,44 @@ class AppUserSchemaProperty(BaseEntityModel):
     union = BooleanField(required=False, null=True)
 
     meta = {"collection": "okta_app_user_schema_property"}
+
+
+class AppToken(BaseEntityModel):
+    token_id = StringField(required=True)
+    client_id = StringField(required=False)
+    user_id = StringField(required=False)
+    status = StringField(required=False)
+    created = StringField(required=False)
+    expires_at = StringField(required=False)
+    scopes = ListField(StringField(), required=False)
+    issuer = StringField(required=False)
+
+    meta = {"collection": "okta_app_token"}
+
+
+class AppConnection(BaseEntityModel):
+    app_id = StringField(required=True)
+    status = StringField(required=False)
+    auth_scheme = StringField(required=False)
+    base_url = StringField(required=False)
+    profile = DictField(required=False)
+
+    meta = {"collection": "okta_app_connection"}
+
+
+class AppFederatedClaim(BaseEntityModel):
+    claim_id = StringField(required=True)
+    app_id = StringField(required=True)
+    name = StringField(required=True)
+    expression = StringField(required=True)
+
+    meta = {"collection": "okta_app_federated_claim"}
+
+
+class AppPushGroup(BaseEntityModel):
+    push_group_id = StringField(required=True)
+    app_id = StringField(required=True)
+    source_group_id = StringField(required=False)
+    status = StringField(required=False)
+
+    meta = {"collection": "okta_app_push_groups"}

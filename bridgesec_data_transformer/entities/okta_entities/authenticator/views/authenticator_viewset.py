@@ -1,3 +1,4 @@
+import json
 import logging
 
 from entities.okta_entities.authenticator.authenticator_models import Authenticator
@@ -18,20 +19,29 @@ class AuthenticatorViewSet(BaseEntityViewSet):
         extracted_data = super().extract_data(okta_data)
         formatted_data = []
         for data in extracted_data:
+            provider = data.get("provider") or {}
+            configuration = provider.get("configuration") or {}
+
+            user_name_template = configuration.get("userNameTemplate")
+            if isinstance(user_name_template, dict):
+                user_name_template = json.dumps(user_name_template)
+            else:
+                user_name_template = user_name_template or ""
+
             formatted_record = {
                 "name": data.get("name"),
                 "key": data.get("key"),
-                "status": data.get("status", "" ),
+                "status": data.get("status", ""),
                 "legacy_ignore_name": data.get("legacy_ignore_name", False),
-                "provider_auth_port": data.get("provider_auth_port", 0),
-                "provider_host": data.get("provider_host", ""),
-                "provider_hostname": data.get("provider_hostname", ""),
-                "provider_integration_key": data.get("provider_integration_key", ""),
-                "provider_json": data.get("provider_json", ""),
-                "provider_secret_key": data.get("provider_secret_key", ""),
-                "provider_shared_secret": data.get("provider_shared_secret", ""),
-                "provider_user_name_template": data.get("provider_user_name_template", ""),
-                "settings": data.get("settings", {}),
+                "provider_auth_port": configuration.get("authPort") or 0,
+                "provider_host": configuration.get("host") or "",
+                "provider_hostname": configuration.get("hostName") or "",
+                "provider_integration_key": configuration.get("integrationKey") or "",
+                "provider_json": json.dumps(configuration) if configuration else "",
+                "provider_secret_key": configuration.get("secretKey") or "",
+                "provider_shared_secret": configuration.get("sharedSecret") or "",
+                "provider_user_name_template": user_name_template,
+                "settings": data.get("settings") or {},
             }
             formatted_data.append(formatted_record)
         

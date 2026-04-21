@@ -41,7 +41,8 @@ class IdentityProviderOIDC(BaseEntityModel):
     user_info_binding = StringField(null = True, required=False)
     user_info_url = StringField(null = True, required=False)
     username_template = StringField(null = True, required=False)
-    
+    trust_claims = ListField(StringField(), null=True, required=False)
+
     meta = {'collection': 'okta_idp_oidc'}
 
 
@@ -77,6 +78,7 @@ class IdentityProviderSAML(BaseEntityModel):
     subject_match_type = StringField(null = True, required=False)
     suspended_action = StringField(null = True, required=False)
     username_template = StringField(null = True, required=False)
+    trust_claims = ListField(StringField(), null=True, required=False)
 
     meta = {"collection": "okta_idp_saml"}
 

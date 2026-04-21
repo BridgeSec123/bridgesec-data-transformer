@@ -9,3 +9,4 @@ from .user_group_memberships_viewset import *
 from .user_schema_property_viewset import *
 from .user_factor_viewset import *
 from .user_type_viewset import *
+from .user_risk_viewset import *
