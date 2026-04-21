@@ -24,9 +24,16 @@ ENTITY_TARGET_FIELD_MAP = {
     "okta_app_oauth_server_policy": "app_id",
     "okta_app_oauth_redirect_uri" : "app_id",
     "okta_app_oauth_post_redirect_uri" : "app_id",
+    "okta_app_connection": "app_id",
+    "okta_principal_rate_limits": "rate_limit_id",
+    "okta_app_federated_claim": "app_id",
+    "okta_push_provider": "push_provider_id",
+    "okta_api_service_integration": "api_service_integration_id",
+    "okta_ui_schema": "ui_schema_id",
 
     # User and Group entities
     "okta_user": "user_id",
+    "okta_user_risk": "user_id",
     "okta_user_type": "user_type_id",
     "User Group Memberships" : "user_id",
     "Group Memberships" : "group_id",
@@ -41,6 +48,9 @@ ENTITY_TARGET_FIELD_MAP = {
     # Network and Security entities
     "okta_network_zone": "network_id",
     "okta_behavior": "behavior_id",
+    "okta_domain": "domain_id",
+    "okta_hook_key": "hook_key_id",
+    "okta_api_token": "token_id",
 
     # Email entities
     "okta_email_domain": "email_domain_id",
@@ -89,4 +99,22 @@ ENTITY_TARGET_FIELD_MAP = {
     "okta_policy_sign_on": ["policy_signon_id", "policy_signon_rule_id"],
 
     "okta_admin_role_custom": ["custom_role_id", "role_id"],
+
+    # Reviews
+    "okta_review": "review_id",
+
+    # Entity Risk Policy
+    "okta_entity_risk_policy_rule": "policy_rule_id",
+
+    # Request Conditions
+    "okta_request_condition": "condition_id",
+
+    # Request Sequences
+    "okta_request_sequence": "sequence_id",
+
+    # Request v2
+    "okta_request_v2": "request_id",
+
+    # End User My Requests
+    "okta_end_user_my_requests": "request_id",
 }

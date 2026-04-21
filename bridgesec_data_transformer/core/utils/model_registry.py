@@ -6,8 +6,8 @@ Used for dynamic schema extraction and entity operations.
 
 # Import all model classes
 from entities.okta_entities.brands.brand_models import EmailDomain
-from entities.okta_entities.users.user_models import User,UserSchemaProperty,UserAdminRoles,UserBaseSchemaProperty,UserGroupMemberships,UserType
-from entities.okta_entities.auth_server.auth_server_models import AuthorizationServer
+from entities.okta_entities.users.user_models import User,UserSchemaProperty,UserAdminRoles,UserBaseSchemaProperty,UserGroupMemberships,UserType,UserRisk
+from entities.okta_entities.auth_server.auth_server_models import AuthorizationServer, AuthorizationServerClient, AuthorizationServerKey
 from entities.okta_entities.policies.policy_models import (
     PolicyMFA, PolicyPassword, PolicyProfileEnrollment, PolicySignOn,PolicyRuleMFA,PolicyRulePassword,PolicyRuleProfileEnrollment,PolicyRuleSignOn
 )
@@ -19,8 +19,12 @@ from entities.okta_entities.apps.apps_models import (
     AppSharedCredentials,AppSAMLSettings,AppOauthPostRedirectUri,AppOauthRedirectUri,
     AppPolicySignOn, AppGroupAssignment, AppBookMark, AppAutoLogin,
     AppThreeField, AppSecurePasswordStore, AppUserSchemaProperty,
-    AppUserBaseSchemaProperty, AppBasicAuth, AppSwa, AppUser,AppPolicySignOnRule,AppOAuthRoleAssignment,AppOauthApiScope
+    AppUserBaseSchemaProperty, AppBasicAuth, AppSwa, AppUser,AppPolicySignOnRule,AppOAuthRoleAssignment,AppOauthApiScope,
+    AppToken, AppConnection, AppFederatedClaim, AppPushGroup
 )
+from entities.okta_entities.push_providers.push_provider_models import PushProvider
+from entities.okta_entities.api_service_integrations.api_service_integration_models import ApiServiceIntegration
+from entities.okta_entities.ui_schemas.ui_schema_models import UiSchema
 from entities.okta_entities.groups.group_models import (
     Group, GroupSchemaProperty, GroupRule, GroupRole, GroupMember
 )
@@ -36,13 +40,19 @@ from entities.okta_entities.identity_providers.identity_provider_models import (
 )
 from entities.okta_entities.network_zone.network_zone_models import NetworkZone
 from entities.okta_entities.behavior.behavior_models import Behavior
+from entities.okta_entities.domain.domain_models import Domain
+from entities.okta_entities.hook_keys.hook_key_models import HookKey
+from entities.okta_entities.api_tokens.api_token_models import ApiToken
 from entities.okta_entities.trusted_origins.trusted_origin_models import TrustedOrigin
 from entities.okta_entities.inline_hooks.inline_hook_models import InlineHook
 from entities.okta_entities.event_hook.event_hook_models import EventHook
 from entities.okta_entities.email.email_models import EmailSmtpServer
 from entities.okta_entities.entitlements.entitlement_models import EntitlementBundle, PrincipalEntitlement,Entitlement
-from entities.okta_entities.requests.request_condition_models import RequestCondition, RequestSequence, RequestSettings
+from entities.okta_entities.requests.request_condition_models import RequestCondition, RequestSequence, RequestSettings, RequestType
+from entities.okta_entities.catalog.catalog_models import CatalogEntryDefault, CatalogEntryUserAccessRequestFields, EndUserMyRequests
+from entities.okta_entities.reviews.review_models import Review
 from entities.okta_entities.rate_limits.rate_limit_models import PrincipalRateLimit, RateLimitAdminNotification, RateLimitWarningThreshold
+from entities.okta_entities.entity_risk_policy.entity_risk_policy_models import EntityRiskPolicy, EntityRiskPolicyRule
 # from entities.okta_entities.link.link_models import LinkDefinition
 
 
@@ -50,6 +60,8 @@ from entities.okta_entities.rate_limits.rate_limit_models import PrincipalRateLi
 MODEL_REGISTRY = {
     # Authorization Servers
     "Auth Server": AuthorizationServer,
+    "Auth Server Client": AuthorizationServerClient,
+    "Auth Server Key": AuthorizationServerKey,
 
     # Policies
     "Policy MFA": PolicyMFA,
@@ -84,6 +96,13 @@ MODEL_REGISTRY = {
     "App Oauth Post Logout Redirect Uri":AppOauthPostRedirectUri,
     "App Oauth Redirect Uri":AppOauthRedirectUri,
     "App Oauth Api Scope":AppOauthApiScope,
+    "App Token": AppToken,
+    "App Connection": AppConnection,
+    "App Federated Claim": AppFederatedClaim,
+    "App Push Groups": AppPushGroup,
+    "Push Provider": PushProvider,
+    "Api Service Integration": ApiServiceIntegration,
+    "Ui Schema": UiSchema,
     "App User Schema Property":AppUserSchemaProperty,
 
     # Groups
@@ -123,6 +142,15 @@ MODEL_REGISTRY = {
     "Request Condition": RequestCondition,
     "Request Sequence": RequestSequence,
     "Request Settings": RequestSettings,
+    "Request Type": RequestType,
+
+    # Catalog
+    "Catalog Entry Default": CatalogEntryDefault,
+    "Catalog Entry User Access Request Fields": CatalogEntryUserAccessRequestFields,
+    "End User My Requests": EndUserMyRequests,
+
+    # Reviews
+    "Review": Review,
 
     # SMS Templates
     "Sms Template": SmsTemplate,
@@ -144,6 +172,15 @@ MODEL_REGISTRY = {
     # Behavior
     "Behavior": Behavior,
 
+    # Domain
+    "Domain": Domain,
+
+    # Hook Keys
+    "Hook Key": HookKey,
+
+    # API Tokens
+    "Api Token": ApiToken,
+
     # Trusted Origins
     "Trusted Origin": TrustedOrigin,
 
@@ -159,9 +196,12 @@ MODEL_REGISTRY = {
     "User Base Schema Properties":UserBaseSchemaProperty,
     "User Admin Roles":UserAdminRoles,
     "User Types":UserType,
+    "User Risk":UserRisk,
 
     "Factor":OktaFactor,
 
+    "Entity Risk Policy": EntityRiskPolicy,
+    "Entity Risk Policy Rule": EntityRiskPolicyRule,
 
     # Link
     # "Link Definition": LinkDefinition,

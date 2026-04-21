@@ -1,3 +1,4 @@
+import collections.abc
 import logging
 import re
 from datetime import datetime
@@ -201,6 +202,125 @@ def get_latest_db(mongo_client, date_str):
         return None
 
 
+def get_previous_db(mongo_client, current_db_name):
+    """Return the snapshot DB immediately before current_db_name, or None if first."""
+    logger.info(
+        "Finding previous DB snapshot",
+        extra={'operation': 'get_previous_db', 'current_db': current_db_name}
+    )
+    prefix = f"{settings.MONGO_DB_NAME}_"
+    all_dbs = sorted(
+        db for db in mongo_client.list_database_names()
+        if db.startswith(prefix) and extract_time(db)
+    )
+    try:
+        idx = all_dbs.index(current_db_name)
+        if idx == 0:
+            logger.info(
+                "No previous DB — current_db_name is the first snapshot",
+                extra={'operation': 'get_previous_db', 'current_db': current_db_name}
+            )
+            return None
+        previous_db = all_dbs[idx - 1]
+        logger.info(
+            f"Previous DB found: {previous_db}",
+            extra={'operation': 'get_previous_db', 'previous_db': previous_db}
+        )
+        return previous_db
+    except ValueError:
+        logger.warning(
+            f"'{current_db_name}' not found in DB list — cannot determine previous snapshot",
+            extra={'operation': 'get_previous_db', 'current_db': current_db_name}
+        )
+        return None
+
+
+def compute_entity_diff_summary(old_docs, new_docs, id_field, entity_name=None):
+    """
+    Storage-friendly diff summary built on top of get_collection_diff().
+
+    get_collection_diff()'s `changed` list contains ALL differing records —
+    added (DeepDiff({}, new_doc)), removed (DeepDiff(old_doc, {})), and modified.
+    We filter by common_ids to isolate truly modified records, and compute
+    added_ids / removed_ids directly from the id sets.
+    """
+    logger.debug(
+        f"Computing diff summary for '{entity_name}' "
+        f"({len(old_docs)} old docs, {len(new_docs)} new docs)",
+        extra={'operation': 'compute_entity_diff_summary', 'entity': entity_name}
+    )
+
+    old_ids = {str(doc[id_field]) for doc in old_docs if id_field in doc}
+    new_ids = {str(doc[id_field]) for doc in new_docs if id_field in doc}
+
+    added_ids   = sorted(new_ids - old_ids)
+    removed_ids = sorted(old_ids - new_ids)
+    common_ids  = old_ids & new_ids
+
+    diff_result = get_collection_diff(old_docs, new_docs, id_field, entity_name=entity_name)
+
+    # Build id→doc lookups so _deepdiff_to_field_changes can resolve actual old/new values.
+    old_docs_map = {str(doc[id_field]): doc for doc in old_docs if id_field in doc}
+    new_docs_map = {str(doc[id_field]): doc for doc in new_docs if id_field in doc}
+
+    # Filter to only records present in BOTH snapshots (i.e. truly modified) and
+    # transform the raw DeepDiff dict into a clean {field: {old, new}} format that
+    # is BSON-serializable and human-readable.
+    modified = []
+    for item in diff_result["changed"]:
+        item_id = str(item.get(id_field, ""))
+        if item_id not in common_ids:
+            continue
+        try:
+            changes = _deepdiff_to_field_changes(
+                item.get("diff", {}),
+                old_docs_map.get(item_id, {}),
+                new_docs_map.get(item_id, {}),
+            )
+        except Exception as exc:
+            logger.warning(
+                f"Failed to parse DeepDiff output for '{entity_name}' id={item_id}: {exc}",
+                extra={'operation': 'compute_entity_diff_summary',
+                       'entity': entity_name, 'item_id': item_id},
+            )
+            changes = {}
+        clean_item = {id_field: item.get(id_field), "changes": changes}
+        if item.get("nested_changes"):
+            clean_item["nested_changes"] = item["nested_changes"]
+        modified.append(clean_item)
+
+    modified_count  = len(modified)
+    unchanged_count = max(0, len(common_ids) - modified_count)
+
+    logger.debug(
+        f"Diff summary for '{entity_name}': "
+        f"+{len(added_ids)} added  -{len(removed_ids)} removed  "
+        f"~{modified_count} modified  ={unchanged_count} unchanged",
+        extra={
+            'operation': 'compute_entity_diff_summary',
+            'entity':    entity_name,
+            'added':     len(added_ids),
+            'removed':   len(removed_ids),
+            'modified':  modified_count,
+            'unchanged': unchanged_count,
+        }
+    )
+
+    return {
+        "added_ids":       added_ids,
+        "removed_ids":     removed_ids,
+        "modified":        modified[:500],    # cap at 500 to stay under MongoDB 16 MB limit
+        "truncated":       len(modified) > 500,
+        "added_count":     len(added_ids),
+        "removed_count":   len(removed_ids),
+        "modified_count":  modified_count,    # real count (not the capped len)
+        "unchanged_count": unchanged_count,
+        "total_current":   len(new_ids),
+        "total_previous":  len(old_ids),
+        "net_change":      len(new_ids) - len(old_ids),
+    }
+
+
 def _build_item_dict(items, id_field):
     """Convert list to dict keyed by ID field."""
     return {
@@ -292,7 +412,9 @@ def compare_nested_arrays(old_doc, new_doc, entity_name):
 
 def _get_main_doc_diff(old_doc, new_doc, entity_name=None):
     """Compute DeepDiff for main document fields (excluding nested for builder entities)."""
-    if not old_doc or not new_doc:
+    old_doc = old_doc or {}
+    new_doc = new_doc or {}
+    if not old_doc and not new_doc:
         return None
 
     if entity_name in ENTITIES_WITH_BUILDERS:
@@ -304,13 +426,100 @@ def _get_main_doc_diff(old_doc, new_doc, entity_name=None):
     return DeepDiff(old_doc, new_doc, ignore_order=True)
 
 
-def get_collection_diff(old_docs, new_docs, id_field, entity_name=None, date1=None, date2=None):
+def _parse_deepdiff_path(path: str) -> str:
+    """Convert a DeepDiff path like "root['a']['b']" to "a.b". Handles integer indices too."""
+    parts = re.findall(r"\['([^']+)'\]|\[(\d+)\]", path)
+    return ".".join(p[0] if p[0] else p[1] for p in parts)
+
+
+def _get_nested_value(doc: dict, dot_path: str):
+    """Get a value from a nested dict using dot notation. Returns None if path not found."""
+    val = doc
+    for part in dot_path.split("."):
+        if isinstance(val, dict):
+            val = val.get(part)
+        else:
+            return None
+    return val
+
+
+def _deepdiff_to_field_changes(deepdiff_dict: dict, old_doc: dict, new_doc: dict) -> dict:
+    """
+    Transform a DeepDiff .to_dict() output into a clean {field: {old: ..., new: ...}} dict.
+
+    DeepDiff's raw format uses path strings (root['field']), Python sets for
+    dictionary_item_added/removed (not BSON-serializable), and Python type objects for
+    type_changes. This function converts all of those into plain field names with explicit
+    old/new values that are safe to store in MongoDB.
+    """
+    changes = {}
+
+    for path, info in deepdiff_dict.get("values_changed", {}).items():
+        field = _parse_deepdiff_path(path)
+        if field:
+            changes[field] = {"old": info.get("old_value"), "new": info.get("new_value")}
+
+    for path, info in deepdiff_dict.get("type_changes", {}).items():
+        field = _parse_deepdiff_path(path)
+        if field:
+            changes[field] = {"old": info.get("old_value"), "new": info.get("new_value")}
+
+    for path in deepdiff_dict.get("dictionary_item_added", set()):
+        field = _parse_deepdiff_path(path)
+        if field:
+            changes[field] = {"old": None, "new": _get_nested_value(new_doc, field)}
+
+    for path in deepdiff_dict.get("dictionary_item_removed", set()):
+        field = _parse_deepdiff_path(path)
+        if field:
+            changes[field] = {"old": _get_nested_value(old_doc, field), "new": None}
+
+    # For array item changes, store the whole parent array's before/after value
+    array_parents: set = set()
+    for path in list(deepdiff_dict.get("iterable_item_added", {}).keys()) + \
+                list(deepdiff_dict.get("iterable_item_removed", {}).keys()):
+        field = _parse_deepdiff_path(path)
+        parent = ".".join(field.split(".")[:-1]) or field
+        array_parents.add(parent)
+    for parent in array_parents:
+        if parent and parent not in changes:
+            changes[parent] = {
+                "old": _get_nested_value(old_doc, parent),
+                "new": _get_nested_value(new_doc, parent),
+            }
+
+    return changes
+
+
+def _sanitize_deepdiff(obj):
+    """
+    Recursively convert non-JSON-serializable objects produced by DeepDiff.
+
+    DeepDiff.to_dict() can contain:
+      - Python `type` objects in `type_changes` (old_type / new_type)  → convert to __name__
+      - Python `set` objects in `dictionary_item_added/removed`        → convert to sorted list
+    """
+    if isinstance(obj, type):
+        return obj.__name__
+    if isinstance(obj, collections.abc.Set):
+        try:
+            return sorted(_sanitize_deepdiff(i) for i in obj)
+        except TypeError:
+            return [_sanitize_deepdiff(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: _sanitize_deepdiff(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_deepdiff(i) for i in obj]
+    return obj
+
+
+def get_collection_diff(old_docs, new_docs, id_field, entity_name=None, base_db=None, target_db=None):
     """Compare two lists of documents and return detailed diff."""
     old_map = {str(doc[id_field]): doc for doc in old_docs if id_field in doc}
     new_map = {str(doc[id_field]): doc for doc in new_docs if id_field in doc}
 
     is_builder = entity_name in ENTITIES_WITH_BUILDERS if entity_name else False
-    all_ids = set(old_map) | set(new_map)
+    all_ids = sorted(set(old_map) | set(new_map))
 
     changed = []
     comparison_pairs = []
@@ -324,7 +533,7 @@ def get_collection_diff(old_docs, new_docs, id_field, entity_name=None, date1=No
 
             main_diff = _get_main_doc_diff(old_doc, new_doc, entity_name)
             if main_diff or nested_diff:
-                entry = {id_field: doc_id, "diff": main_diff.to_dict() if main_diff else {}}
+                entry = {id_field: doc_id, "diff": _sanitize_deepdiff(main_diff.to_dict()) if main_diff else {}}
                 if nested_diff:
                     entry["nested_changes"] = nested_diff
                 changed.append(entry)
@@ -332,7 +541,7 @@ def get_collection_diff(old_docs, new_docs, id_field, entity_name=None, date1=No
             comparison_pairs.append([old_doc or {}, new_doc or {}])
             main_diff = _get_main_doc_diff(old_doc, new_doc, entity_name)
             if main_diff:
-                changed.append({id_field: doc_id, "diff": main_diff.to_dict()})
+                changed.append({id_field: doc_id, "diff": _sanitize_deepdiff(main_diff.to_dict())})
 
     return {
         "comparison": comparison_pairs,
@@ -343,8 +552,8 @@ def get_collection_diff(old_docs, new_docs, id_field, entity_name=None, date1=No
         },
         "metadata": {
             "entity_name": entity_name or "Unknown",
-            "date1": date1 or "",
-            "date2": date2 or "",
+            "base_db": base_db or "",
+            "target_db": target_db or "",
             "id_field": id_field,
         },
     }

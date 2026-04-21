@@ -10,13 +10,13 @@ IDP_BASE_CONFIG = {
 ENTITY_TYPE_MAPPING = {
     "authenticators": {
         "okta_endpoint": "/api/v1/authenticators",
-        "attributes": ["key", "name", "status", "settings"],
+        "attributes": ["key", "name", "status", "settings", "provider"],
     },
     "trusted_origins": {
         "okta_endpoint": "/api/v1/trustedOrigins",
         "attributes": ["id","name", "origin", "scopes", "status"],
     },
-    "okta_users": {"okta_endpoint": "/api/v1/users", "attributes": ["id", "profile"]},
+    "okta_users": {"okta_endpoint": "/api/v1/users", "attributes": ["id", "profile", "realmId"]},
     "user_factors": {
         "okta_endpoint": "/api/v1/users/{userId}/factors",
         "attributes": ["id", "status"],
@@ -126,7 +126,9 @@ ENTITY_TYPE_MAPPING = {
             "ipServiceCategories",
             "locations",
             "status",
-            "usage"
+            "usage",
+            "system",
+            "dynamicProxyType",
         ],
     },
     "behavior": {

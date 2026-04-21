@@ -4,7 +4,7 @@ Maps entity names (from RESOURCE_COLLECTION_MAP) to their corresponding serializ
 Used for validating data before storing in MongoDB.
 """
 from entities.okta_entities.brands.brand_serializers import EmailDomainSerializer
-from entities.okta_entities.users.user_serializers import UserTypeSerializer,UserSerializer,UserSchemaPropertySerializer,UserAdminRolesSerializer,UserGroupMembershipsSerializer,UserBaseSchemaPropertySerializer
+from entities.okta_entities.users.user_serializers import UserTypeSerializer,UserSerializer,UserSchemaPropertySerializer,UserAdminRolesSerializer,UserGroupMembershipsSerializer,UserBaseSchemaPropertySerializer,UserRiskSerializer
 from entities.okta_entities.administrators.administrators_serializers import \
     AdminRoleCustomSerializer
 from entities.okta_entities.brands.brand_serializers import OktaThemeSerializer 
@@ -21,11 +21,19 @@ from entities.okta_entities.apps.apps_serializers import (
     AppSecurePasswordStoreSerializer, AppSharedCredentialsSerializer,
     AppSwaSerializer, AppThreeFieldSerializer,
     AppUserBaseSchemaPropertySerializer, AppUserSchemaPropertySerializer,
-    AppUserSerializer)
-from entities.okta_entities.auth_server.auth_server_serializers import \
-    AuthorizationServerSerializer
+    AppUserSerializer, AppTokenSerializer, AppConnectionSerializer,
+    AppFederatedClaimSerializer, AppPushGroupSerializer)
+from entities.okta_entities.push_providers.push_provider_serializers import PushProviderSerializer
+from entities.okta_entities.api_service_integrations.api_service_integration_serializers import ApiServiceIntegrationSerializer
+from entities.okta_entities.ui_schemas.ui_schema_serializers import UiSchemaSerializer
+from entities.okta_entities.auth_server.auth_server_serializers import (
+    AuthorizationServerSerializer, AuthorizationServerClientSerializer,
+    AuthorizationServerKeySerializer)
 from entities.okta_entities.behavior.behavior_serializer import \
     BehaviorSerializer
+from entities.okta_entities.domain.domain_serializers import DomainSerializer
+from entities.okta_entities.hook_keys.hook_key_serializers import HookKeySerializer
+from entities.okta_entities.api_tokens.api_token_serializers import ApiTokenSerializer
 from entities.okta_entities.brands.brand_serializers import BrandSerializer
 from entities.okta_entities.device_assurance_policies.device_assurance_policy_serializers import (
     DeviceAndroidSerializer, DeviceIosSerializer, DeviceMacOSSerializer,
@@ -55,13 +63,17 @@ from entities.okta_entities.rate_limits.rate_limit_serializer import (
     RateLimitWarningThresholdSerializer)
 from entities.okta_entities.requests.request_condition_serializers import (
     RequestConditionSerializer, RequestSequenceSerializer,
-    RequestSettingsSerializer)
+    RequestSettingsSerializer, RequestTypeSerializer)
+from entities.okta_entities.catalog.catalog_serializers import CatalogEntryDefaultSerializer, CatalogEntryUserAccessRequestFieldsSerializer, EndUserMyRequestsSerializer
+from entities.okta_entities.reviews.review_serializers import ReviewSerializer
 from entities.okta_entities.sms_templates.sms_template_serializers import \
     SmsTemplateSerializer
 from entities.okta_entities.threat_insights.threat_insight_serializer import \
     ThreatInsightSerializer
 from entities.okta_entities.trusted_origins.trusted_origin_serializers import \
     TrustedOriginSerializer
+from entities.okta_entities.entity_risk_policy.entity_risk_policy_serializers import (
+    EntityRiskPolicySerializer, EntityRiskPolicyRuleSerializer)
 
 # Serializer Registry - Maps entity display names to their serializer classes
 SERIALIZER_REGISTRY = {
@@ -89,6 +101,13 @@ SERIALIZER_REGISTRY = {
     "App Oauth Redirect Uri":AppOauthRedirectUriSerializer,
     "App User Schema Property":AppUserSchemaPropertySerializer,
     "App Oauth Api Scope":AppOauthApiScopeSerializer,
+    "App Token": AppTokenSerializer,
+    "App Connection": AppConnectionSerializer,
+    "App Federated Claim": AppFederatedClaimSerializer,
+    "App Push Groups": AppPushGroupSerializer,
+    "Push Provider": PushProviderSerializer,
+    "Api Service Integration": ApiServiceIntegrationSerializer,
+    "Ui Schema": UiSchemaSerializer,
 
     
     "Users":UserSerializer,
@@ -96,8 +115,8 @@ SERIALIZER_REGISTRY = {
     "User Group Memberships":UserGroupMembershipsSerializer,
     "User Base Schema Properties":UserBaseSchemaPropertySerializer,
     "User Admin Roles":UserAdminRolesSerializer,
-
     "User Types":UserTypeSerializer,
+    "User Risk":UserRiskSerializer,
 
     # Groups
     "Groups": GroupSerializer,
@@ -135,6 +154,15 @@ SERIALIZER_REGISTRY = {
     "Request Condition": RequestConditionSerializer,
     "Request Sequence": RequestSequenceSerializer,
     "Request Settings": RequestSettingsSerializer,
+    "Request Type": RequestTypeSerializer,
+
+    # Catalog
+    "Catalog Entry Default": CatalogEntryDefaultSerializer,
+    "Catalog Entry User Access Request Fields": CatalogEntryUserAccessRequestFieldsSerializer,
+    "End User My Requests": EndUserMyRequestsSerializer,
+
+    # Reviews
+    "Review": ReviewSerializer,
 
     # SMS Templates
     "Sms Template": SmsTemplateSerializer,
@@ -147,6 +175,8 @@ SERIALIZER_REGISTRY = {
 
     # Authorization Servers
     "Auth Server": AuthorizationServerSerializer,
+    "Auth Server Client": AuthorizationServerClientSerializer,
+    "Auth Server Key": AuthorizationServerKeySerializer,
 
     # Identity Providers
     "IDP OIDC": IdentityProviderOIDCSerializer,
@@ -158,6 +188,15 @@ SERIALIZER_REGISTRY = {
 
     # Behavior
     "Behavior": BehaviorSerializer,
+
+    # Domain
+    "Domain": DomainSerializer,
+
+    # Hook Keys
+    "Hook Key": HookKeySerializer,
+
+    # API Tokens
+    "Api Token": ApiTokenSerializer,
 
     # Administrator Roles
     "Admin Role Custom": AdminRoleCustomSerializer,
@@ -181,4 +220,7 @@ SERIALIZER_REGISTRY = {
     "Policy Rule Profile Enrollment":PolicyRuleProfileEnrollmentSerializer,
 
     "Factor":OktaFactorSerializer,
+
+    "Entity Risk Policy": EntityRiskPolicySerializer,
+    "Entity Risk Policy Rule": EntityRiskPolicyRuleSerializer,
 }

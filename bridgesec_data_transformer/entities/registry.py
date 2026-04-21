@@ -18,17 +18,27 @@ from entities.okta_entities.apps.views.apps_access_policy_assignment_viewset imp
 from entities.okta_entities.apps.views.apps_auto_login_viewset import \
     AppAutoLoginViewSet
 from entities.okta_entities.apps.views.apps_base_viewset import BaseAppViewSet
+from entities.okta_entities.apps.views.app_token_viewset import AppTokenViewSet
+from entities.okta_entities.apps.views.app_connection_viewset import AppConnectionViewSet
+from entities.okta_entities.apps.views.app_federated_claim_viewset import AppFederatedClaimViewSet
+from entities.okta_entities.apps.views.app_push_groups_viewset import AppPushGroupsViewSet
+from entities.okta_entities.push_providers.views import PushProviderViewSet
+from entities.okta_entities.api_service_integrations.views import ApiServiceIntegrationViewSet
+from entities.okta_entities.ui_schemas.views import UiSchemaViewSet
 from entities.okta_entities.apps.views.apps_basic_auth_viewset import \
     AppBasicAuthViewSet
 from entities.okta_entities.auth_server.views import (
     AuthorizationServerClaimDefaultViewSet, AuthorizationServerClaimViewSet,
-    AuthorizationServerDefaultViewSet, AuthorizationServerPolicyRuleViewSet,
+    AuthorizationServerClientsViewSet, AuthorizationServerDefaultViewSet,
+    AuthorizationServerKeysViewSet, AuthorizationServerPolicyRuleViewSet,
     AuthorizationServerPolicyViewSet, AuthorizationServerScopeViewSet,
-    AuthorizationServerViewSet, AuthTrustedServerViewSet,
-    BaseAuthServerViewSet)
+    AuthorizationServerViewSet, AuthTrustedServerViewSet, BaseAuthServerViewSet)
 from entities.okta_entities.authenticator.views import (
     AuthenticatorViewSet, BaseAuthenticatorViewSet, OktaFactorViewSet)
 from entities.okta_entities.behavior.views import BehaviorViewSet
+from entities.okta_entities.domain.views import DomainViewSet
+from entities.okta_entities.hook_keys.views import HookKeyViewSet
+from entities.okta_entities.api_tokens.views import ApiTokenViewSet
 from entities.okta_entities.brands.views import (BaseBrandViewSet,
                                                  BrandEntityViewSet,
                                                  EmailDomainViewset,
@@ -47,6 +57,8 @@ from entities.okta_entities.email.views import (BaseEmailViewSet,
 from entities.okta_entities.entitlements.views import (
     BaseEntitlementViewSet, EntitlementBundleViewSet, EntitlementViewSet,
     PrincipalEntitlementsViewSet)
+from entities.okta_entities.entity_risk_policy.views import (
+    BaseEntityRiskPolicyViewSet, EntityRiskPolicyViewSet, EntityRiskPolicyRuleViewSet)
 from entities.okta_entities.event_hook.views import EventHookViewSet
 from entities.okta_entities.groups.views import (BaseGroupViewSet,
                                                  GroupEntityViewSet,
@@ -77,6 +89,7 @@ from entities.okta_entities.requests.views import (BaseRequestConditionViewSet,
                                                    RequestSequenceViewSet,
                                                    RequestSettingsViewSet,
                                                    RequestTypeViewSet)
+from entities.okta_entities.reviews.views import ReviewViewSet
 from entities.okta_entities.sms_templates.views import SmsTemplateViewSet
 from entities.okta_entities.threat_insights.views import ThreatInsightViewSet
 from entities.okta_entities.trusted_origins.views import TrustedOriginViewSet
@@ -87,6 +100,7 @@ from entities.okta_entities.users.views import (AdminRoleTargetsViewSet,
                                                 UserBaseSchemaPropertyViewSet,
                                                 UserFactorViewSet,
                                                 UserGroupMembershipsViewSet,
+                                                UserRiskViewSet,
                                                 UserSchemaPropertyViewSet,
                                                 UserTypeViewSet, UserViewSet)
 
@@ -95,13 +109,19 @@ ENTITY_VIEWSETS = {
     "users": BaseUserViewSet,
     "identity_providers": BaseIdentityProviderViewSet,
     "behavior": BehaviorViewSet,
+    # "domains": DomainViewSet,
+    # "hook_keys": HookKeyViewSet,
+    # "api_tokens": ApiTokenViewSet,
+    # "push_providers": PushProviderViewSet,
+    # "api_service_integrations": ApiServiceIntegrationViewSet,
+    # "ui_schemas": UiSchemaViewSet,
     "orgs": OrgViewSet,
     "authenticators": BaseAuthenticatorViewSet,
     "groups": BaseGroupViewSet,
     "brands": BaseBrandViewSet,
-     "sms_templates": SmsTemplateViewSet,
+    # "sms_templates": SmsTemplateViewSet,
     "threat_insights": ThreatInsightViewSet,
-     "network_zones": NetworkZoneViewSet,
+    # "network_zones": NetworkZoneViewSet,
     "inline_hooks": InlineHookEntityViewSet,
     "event_hooks": EventHookViewSet,
     "auth_server": BaseAuthServerViewSet,
@@ -109,20 +129,22 @@ ENTITY_VIEWSETS = {
     "device_assurance_policy": BaseDeviceAssurancePolicyViewSet,
     "policies": BasePolicyViewSet,
     "apps": BaseAppViewSet,
-     "administrators": BaseAdministratorViewSet,
-     "links": BaseLinkViewSet,
-     "captchas": BaseCaptchaViewSet,
+    "administrators": BaseAdministratorViewSet,
+    "links": BaseLinkViewSet,
+    "captchas": BaseCaptchaViewSet,
     "emails": BaseEmailViewSet,
     "rate_limits": BaseRateLimitViewSet,
     "entitlements": BaseEntitlementViewSet,
-    # "requests": BaseRequestConditionViewSet,
-    # "catalogs": BaseCatalogViewSet,
-    # "campaigns": CampaignViewSet,
+    "reviews": ReviewViewSet,
+    "requests": BaseRequestConditionViewSet,
+    "catalogs": BaseCatalogViewSet,
+    "campaigns": CampaignViewSet,
+    # "entity_risk_policy": BaseEntityRiskPolicyViewSet,
 }
 
 GROUP_ENTITY_VIEWSETS = {
     "group": GroupEntityViewSet,
-    # "group_memberships": GroupMembershipViewSet,
+    "group_memberships": GroupMembershipViewSet,
     # "group_owners": GroupOwnerViewSet,
     "group_roles": GroupRoleViewSet,
     "group_rules": GroupRuleViewSet,
@@ -137,6 +159,8 @@ AUTH_SERVER_ENTITY_VIEWSETS = {
     "auth_server_policy_rules": AuthorizationServerPolicyRuleViewSet,
     "auth_server_scopes": AuthorizationServerScopeViewSet,
     "auth_trusted_servers": AuthTrustedServerViewSet,
+    "auth_server_clients": AuthorizationServerClientsViewSet,
+    "auth_server_keys": AuthorizationServerKeysViewSet,
 }
 
 USER_ENTITY_VIEWSETS = {
@@ -148,7 +172,8 @@ USER_ENTITY_VIEWSETS = {
     "user_factors": UserFactorViewSet,
     "user_schema_properties": UserSchemaPropertyViewSet,
     "user_base_schema_property": UserBaseSchemaPropertyViewSet,
-    "okta_user_group_memberships": UserGroupMembershipsViewSet
+    "okta_user_group_memberships": UserGroupMembershipsViewSet,
+    "okta_user_risk": UserRiskViewSet,
 }
 
 IDENTITY_PROVIDER_ENTITY_VIEWSETS = {
@@ -170,7 +195,7 @@ POLICY_ENTITY_VIEWSETS = {
     "okta_policy_password": PolicyPasswordViewSet,
     "okta_policy_profile_enrollment": PolicyProfileEnrollmentViewSet,
     "okta_policy_profile_enrollment_apps": PolicyProfileEnrollmentAppsViewSet,
-    "okta_policy_rule_idp_discovery": PolicyRuleIDPDiscoveryViewSet,
+    # "okta_policy_rule_idp_discovery": PolicyRuleIDPDiscoveryViewSet,
     "okta_policy_rule_password": PolicyRulePasswordViewSet,
     "okta_policy_rule_profile_enrollment": PolicyRuleProfileEnrollmentViewSet,
     "okta_policy_signon": PolicySignOnViewSet,
@@ -214,8 +239,8 @@ APP_ENTITY_VIEWSETS = {
     "okta_app_bookmark": AppBookmarkViewSet,
     "okta_app_auto_login": AppAutoLoginViewSet,
     "okta_app_basic_auth": AppBasicAuthViewSet,
-    "okta_app_swa": AppSwaViewSet, 
-    "okta_app_users": AppUserViewSet,
+    "okta_app_swa": AppSwaViewSet,
+    "okta_app_user": AppUserViewSet,
     "okta_app_user_base_schema_property": AppUserBaseSchemaPropertyViewSet,
     "okta_app_user_schema_property": AppUserSchemaPropertyViewSet,
     "okta_app_secure_password_store": AppSecurePasswordStoreViewSet,
@@ -223,6 +248,10 @@ APP_ENTITY_VIEWSETS = {
     "okta_apps_oauth_post_redirect_uri": AppOauthPostRedirectUriViewSet,
     "okta_apps_oauth_redirect_uri": AppOauthRedirectUriViewSet,
     "okta_app_oauth_api_scope": AppOauthApiScopeViewSet,
+    "okta_app_token": AppTokenViewSet,
+    "okta_app_connection": AppConnectionViewSet,
+    "okta_app_federated_claim": AppFederatedClaimViewSet,
+    "okta_app_push_groups": AppPushGroupsViewSet,
 }
 
 ADMINISTRATORS_ENTITY_VIEWSETS = {
@@ -254,4 +283,9 @@ CATALOG_ENTITY_VIEWSETS = {
     "okta_catalog_entry_default": CatalogEntryDefaultViewSet,
     "okta_catalog_entry_user_access_request_fields": CatalogEntryUserAccessRequestFieldsViewSet,
     "okta_end_user_my_requests": EndUserMyRequestsViewSet,
+}
+
+ENTITY_RISK_POLICY_VIEWSETS = {
+    "okta_entity_risk_policy": EntityRiskPolicyViewSet,
+    "okta_entity_risk_policy_rule": EntityRiskPolicyRuleViewSet,
 }

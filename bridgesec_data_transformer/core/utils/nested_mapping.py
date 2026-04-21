@@ -74,7 +74,7 @@ NESTED_FIELD_ID_MAPPING = {
     },
     "policy_password_rules": {
         "parent_id_field": "policy_id",
-        "child_id_field": "policy_id"
+        "child_id_field": "policy_rule_id"
     },
     "policy_signon_rules": {
         "parent_id_field": "policy_id",
