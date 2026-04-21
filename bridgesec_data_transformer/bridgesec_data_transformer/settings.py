@@ -470,9 +470,20 @@ SWAGGER_SETTINGS = {
 }
 
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL")
-CELERY_RESULT_BACKEND = "rpc://"  # or another backend like MongoDB or Redis
+CELERY_RESULT_BACKEND = 'core.celery_backend:MongoSRVBackend'
+CELERY_MONGODB_BACKEND_SETTINGS = {
+    'database': 'celery_results',
+    'taskmeta_collection': 'celery_taskmeta',
+}
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+
+# Explicitly include task modules so they are registered in every worker
+# process at startup — regardless of autodiscovery behaviour.
+CELERY_IMPORTS = [
+    'core.tasks.bulk_tasks',
+    'core.tasks.diff_tasks',
+]
 
 # Celery Beat — scheduled tasks
 from celery.schedules import crontab

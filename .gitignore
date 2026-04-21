@@ -12,6 +12,5 @@ venv
 ven
 staticfiles
 private_key.pem
-CLAUDE.md
 *.md
 *.txt

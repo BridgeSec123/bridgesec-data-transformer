@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import requests
 from core.authentication import CustomJWTAuthentication
 from core.tasks.bulk_tasks import run_bulk_entity_task
+from core.utils.progress_store import create_bulk_job
 from core.utils.collection_mapping import (ENTITY_ID_MAPPING,
                                            NON_EDITABLE_FIELDS,
                                            RESOURCE_COLLECTION_MAP)
@@ -95,11 +96,18 @@ class BulkEntityViewSet(viewsets.ViewSet):
             okta_access_token = request.session.get('okta_access_token')
             okta_granted_scopes = request.session.get('okta_granted_scopes', [])
 
-        # Pass access token, scopes, and request_id to Celery task for Bearer token authentication
+        # Generate db_name here so the job doc and the Celery task use the same value.
+        # create_bulk_job is called synchronously BEFORE .delay() so the job doc exists
+        # in MongoDB by the time the frontend receives the response and subscribes to the
+        # SSE stream — avoids "Job not found" race condition.
+        db_name = get_dynamic_db()
+        create_bulk_job(request_id, db_name, list(ENTITY_VIEWSETS.keys()))
+
         run_bulk_entity_task.delay(
             okta_access_token=okta_access_token,
             okta_granted_scopes=okta_granted_scopes,
-            request_id=request_id
+            request_id=request_id,
+            db_name=db_name,
         )
 
         logger.info(
@@ -112,7 +120,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
         )
 
         return Response(
-            {"message": "Data fetch task triggered successfully"},
+            {"message": "Data fetch task triggered successfully", "request_id": request_id},
             status=status.HTTP_201_CREATED,
         )
 
@@ -1300,16 +1308,16 @@ class BulkEntityViewSet(viewsets.ViewSet):
     @swagger_auto_schema(
         manual_parameters=[
             openapi.Parameter(
-                "date1",
+                "base_db",
                 openapi.IN_QUERY,
-                description="First date in YYYY-MM-DD format",
+                description="Base snapshot DB name (e.g. bridgesec_2026-03-10T0357)",
                 type=openapi.TYPE_STRING,
                 required=True,
             ),
             openapi.Parameter(
-                "date2",
+                "target_db",
                 openapi.IN_QUERY,
-                description="Second date in YYYY-MM-DD format",
+                description="Target snapshot DB name to compare against base",
                 type=openapi.TYPE_STRING,
                 required=True,
             ),
@@ -1322,12 +1330,12 @@ class BulkEntityViewSet(viewsets.ViewSet):
     )
     def diff_collections(self, request, entity_name=None):
         """
-        Compare two collection snapshots by date.
+        Compare two collection snapshots by DB name.
         """
         try:
             # Get query parameters
-            date1 = request.query_params.get("date1")
-            date2 = request.query_params.get("date2")
+            base_db = request.query_params.get("base_db")
+            target_db = request.query_params.get("target_db")
 
             # Validation
             if not entity_name:
@@ -1336,9 +1344,9 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            if not date1 or not date2:
+            if not base_db or not target_db:
                 return Response(
-                    {"error": "Query parameters 'date1' and 'date2' are required"},
+                    {"error": "Query parameters 'base_db' and 'target_db' are required"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -1351,30 +1359,48 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Validate date formats
-            try:
-                datetime.strptime(date1, "%Y-%m-%d")
-                datetime.strptime(date2, "%Y-%m-%d")
-            except ValueError:
-                return Response(
-                    {"error": "Invalid date format. Use YYYY-MM-DD"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            # Validate DB snapshots exist
+            mongo_client = settings.MONGO_CLIENT
+            for db_param, label in [(base_db, "base_db"), (target_db, "target_db")]:
+                if db_param not in mongo_client.list_database_names():
+                    return Response(
+                        {"error": f"Snapshot '{db_param}' not found", "param": label},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
 
             # Get ID field for this entity
             id_field = ENTITY_ID_MAPPING[entity_name]
 
+            # Extract iso dates from db names for service calls
+            base_date = base_db.split("_", 1)[1].split("T")[0]
+            target_date = target_db.split("_", 1)[1].split("T")[0]
+
             # Use EntityDataService to get rebuilt data with nested arrays
             service = EntityDataService()
-            old_docs = service.fetch(date1, entity_name)
-            new_docs = service.fetch(date2, entity_name)
+            old_docs = service.fetch(base_date, entity_name, db_name=base_db)
+            new_docs = service.fetch(target_date, entity_name, db_name=target_db)
+
+            # Merge any restored/reverted records from _<collection> into both sides
+            # so that reverted fields are reflected before diffing.
+            # Also strip internal metadata fields (operation_type, restored_by, etc.)
+            # to prevent them from surfacing as false field-level changes.
+            collection_name = get_collection_name(entity_name)
+            if collection_name:
+                old_docs = fetch_and_merge_restored_data(
+                    mongo_client[base_db], entity_name, collection_name, id_field, old_docs
+                )
+                new_docs = fetch_and_merge_restored_data(
+                    mongo_client[target_db], entity_name, collection_name, id_field, new_docs
+                )
+                remove_metadata_fields(old_docs)
+                remove_metadata_fields(new_docs)
 
             if not old_docs and not new_docs:
                 return Response(
                     {
-                        "error": f"No data found for entity '{entity_name}' on either date",
-                        "date1": date1,
-                        "date2": date2
+                        "error": f"No data found for entity '{entity_name}' in either snapshot",
+                        "base_db": base_db,
+                        "target_db": target_db
                     },
                     status=status.HTTP_404_NOT_FOUND
                 )
@@ -1385,8 +1411,8 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 new_docs,
                 id_field,
                 entity_name=entity_name,
-                date1=date1,
-                date2=date2
+                base_db=base_db,
+                target_db=target_db
             )
 
             # Add non-editable fields configuration to response

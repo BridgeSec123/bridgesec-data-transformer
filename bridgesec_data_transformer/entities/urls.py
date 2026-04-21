@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from entities.views.bulk_view import BulkEntityViewSet
 from entities.views.import_view import ImportResourcesView
 from entities.views.confirm_delete_view import ConfirmDeletionView
+from entities.views.progress_view import BulkProgressView, BulkProgressStreamView, DiffReportView
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from rest_framework import permissions
@@ -32,4 +33,7 @@ urlpatterns = [
     path("entity-schema/<str:entity_name>/", BulkEntityViewSet.as_view({"get": "get_entity_schema"}), name="entity-schema"),
     # path("test-entity/<str:entity_name>/", BulkEntityViewSet.as_view({"get": "test_entity"}), name="test-entity"),
     path("confirm-delete/", ConfirmDeletionView.as_view(), name="confirm-delete"),
+    path("api/bulk/progress/", BulkProgressView.as_view(), name="bulk-progress"),
+    path("api/bulk/progress/stream/", BulkProgressStreamView.as_view(), name="bulk-progress-stream"),
+    path("api/diff-report/<str:db_name>/", DiffReportView.as_view(), name="diff-report"),
 ]
