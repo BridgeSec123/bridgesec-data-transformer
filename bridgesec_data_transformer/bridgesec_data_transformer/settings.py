@@ -304,6 +304,9 @@ connect(db=MONGO_DB_NAME, host=MONGO_URI)
 connect_to_mongo()
 MONGO_CONNECTIONS = set()
 
+# Elasticsearch Configuration (for log querying)
+ELASTICSEARCH_URL = env("ELASTICSEARCH_URL", default="http://localhost:9200")
+
 # ========================================
 # LOGGING CONFIGURATION
 # ========================================
