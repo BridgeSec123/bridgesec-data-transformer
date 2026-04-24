@@ -749,6 +749,20 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 # Fetch complete records from source DB for each deleted record
                 complete_deleted_records = []
                 for doc in deleted_records:
+                    record_id = doc.get(id_field)
+
+                    # For staged records (created/restored) not yet in the main collection,
+                    # fetch full data from the metadata collection.
+                    in_main = bool(record_id and current_db[collection_name].find_one({id_field: record_id}, {"_id": 1}))
+                    if not in_main and record_id:
+                        meta_record = current_db[f"_{collection_name}"].find_one(
+                            {id_field: record_id, "operation_type": {"$in": ["created", "restored"]}},
+                            {"_id": 0, "operation_type": 0, "restored_by": 0, "db_name": 0, "timestamp": 0},
+                        )
+                        if meta_record:
+                            complete_deleted_records.append(meta_record)
+                            continue
+
                     if not mapping_handlers.is_mapped_entity(collection_name):
                         complete_record = fieldfetch.get_collection(current_db, collection_name, doc)
                     else:

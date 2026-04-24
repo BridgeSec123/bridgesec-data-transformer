@@ -569,9 +569,16 @@ def validate_deletion_safety(source_db, entity_name, collection_name, deleted_re
             errors.append(f"Record at index {i} missing required ID field '{id_field}'")
             continue
 
-        # Check resource exists in source DB
+        # Check resource exists in source DB (main collection or staged metadata)
         source_collection = source_db[collection_name]
         existing_record = source_collection.find_one({id_field: record_id}, {"_id": 0})
+
+        if not existing_record:
+            meta_collection = source_db[f"_{collection_name}"]
+            existing_record = meta_collection.find_one(
+                {id_field: record_id, "operation_type": {"$in": ["created", "restored"]}},
+                {"_id": 0}
+            )
 
         if not existing_record:
             errors.append(f"Record with {id_field}='{record_id}' not found in source database")

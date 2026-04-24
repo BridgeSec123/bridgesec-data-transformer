@@ -41,3 +41,24 @@ class ReviewViewSet(BaseEntityViewSet):
             })
         logger.info("Extracted %d Review records", len(formatted_data))
         return formatted_data
+
+    def fetch_and_store_data(self, db_name, request=None):
+        try:
+            okta_response, status_code, _ = self.fetch_from_okta(request=request)
+            logger.info("Fetched Review data from Okta")
+
+            if status_code == 200:
+                extracted_data = self.extract_data(okta_response)
+                logger.info("Extracted %d Review records from Okta response", len(extracted_data))
+
+                self.store_data(extracted_data, db_name=db_name)
+                logger.info("Stored %d Review records in MongoDB database: %s", len(extracted_data), db_name)
+
+                return {"reviews": extracted_data}
+            return {"reviews": []}
+        except Exception as e:
+            logger.error("Error in fetch_and_store_data: %s", str(e), exc_info=True)
+            return {
+                "error": str(e),
+                "message": "Failed to fetch and store Review data."
+            }

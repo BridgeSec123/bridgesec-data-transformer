@@ -337,6 +337,19 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
 
         return db_name
     
+    def fetch_and_store_data(self, db_name, request=None):
+        """Default fetch-extract-store pipeline. Subclasses override to customise."""
+        try:
+            okta_response, status_code, _ = self.fetch_from_okta(request=request)
+            if status_code == 200:
+                extracted_data = self.extract_data(okta_response)
+                self.store_data(extracted_data, db_name=db_name)
+                return {self.entity_type: extracted_data}
+            return {self.entity_type: []}
+        except Exception as e:
+            logger.exception("Error in BaseEntityViewSet.fetch_and_store_data: %s", str(e))
+            return {self.entity_type: []}
+
     @action(detail=False, methods=["get"], url_path="fetch")
     def fetch_data(self, request):
         """
