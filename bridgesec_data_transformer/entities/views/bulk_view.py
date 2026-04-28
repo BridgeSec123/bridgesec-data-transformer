@@ -66,6 +66,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
     authentication_classes = [CustomJWTAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = RestoreDataSerializer
+    entity_type = "bulk"
 
     @swagger_auto_schema(
         operation_description="Fetch data from all registered entity APIs and store them in MongoDB",

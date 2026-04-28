@@ -251,8 +251,28 @@ services:
       splunk-server:
         condition: service_healthy
     restart: unless-stopped
-    # profiles:
-    #   - splunk
+
+  # ============================================================================
+  # OPA (Open Policy Agent) - Authorization Policy Engine
+  # ============================================================================
+  # Policies live in MongoDB and are pushed to OPA via /v1/policies HTTP API
+  # on Django startup. NO volumes, NO --watch, NO bind-mounts.
+  opa:
+    image: openpolicyagent/opa:latest-rootless
+    container_name: bridgesec_opa
+    ports:
+      - "8181:8181"
+    command:
+      - run
+      - --server
+      - --log-level=info
+      - --addr=:8181
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8181/health"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+    restart: unless-stopped
 
 volumes:
   static_volume:

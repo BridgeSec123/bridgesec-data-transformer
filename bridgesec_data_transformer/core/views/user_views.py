@@ -5,6 +5,8 @@ from core.serializers.user_serializer import UserCreateSerializer
 from core.utils.jwt_utils import generate_jwt_token
 
 class UserCreateView(viewsets.ViewSet):
+    entity_type = "users"
+
     @swagger_auto_schema(
         request_body=UserCreateSerializer,
         operation_description="Create a new user account",
@@ -19,4 +21,4 @@ class UserCreateView(viewsets.ViewSet):
                 {"detail": "User created successfully", "token": token},
                 status=status.HTTP_201_CREATED
             )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST) 
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

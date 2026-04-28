@@ -192,7 +192,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'drf_yasg',
-    'core',
+    'core.apps.CoreConfig',
     'entities.apps.EntitiesConfig',
     'rest_framework_simplejwt',
     'corsheaders',
@@ -435,10 +435,20 @@ LOGGING = {
     },
 }
 
+# ========================================
+# OPA (Open Policy Agent) Configuration
+# ========================================
+OPA_URL         = env("OPA_URL", default="http://localhost:8181")
+OPA_ENABLED     = env.bool("OPA_ENABLED", default=True)
+OPA_TIMEOUT_SEC = env.int("OPA_TIMEOUT_SEC", default=2)
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "core.authentication.CustomJWTAuthentication",
-    )
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "core.permissions.opa_permission.OPAPermission",
+    ),
 }
 
 

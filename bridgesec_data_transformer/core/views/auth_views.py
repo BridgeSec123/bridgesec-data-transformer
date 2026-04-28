@@ -9,6 +9,7 @@ from core.serializers.login_serializer import UserLoginSerializer
 from core.utils.jwt_utils import generate_jwt_token
 
 class CustomTokenObtainPairView(TokenObtainPairView):
+    entity_type = "auth"
     # @swagger_auto_schema(
     #     operation_description="Obtain a new JWT token by providing valid user credentials",
     #     responses={200: openapi.Response('Token pair obtained')}
@@ -31,6 +32,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 
 class CustomTokenRefreshView(TokenRefreshView):
+    entity_type = "auth"
     @swagger_auto_schema(
         operation_description="Refresh your JWT token using a valid refresh token",
         responses={200: openapi.Response('Token refreshed')},
@@ -38,9 +40,10 @@ class CustomTokenRefreshView(TokenRefreshView):
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
-    
+
 
 class CustomTokenObtainView(APIView):
+    entity_type = "auth"
     @swagger_auto_schema(
         request_body=UserLoginSerializer,
         operation_description="Login and get JWT token",
@@ -51,10 +54,10 @@ class CustomTokenObtainView(APIView):
         serializer = UserLoginSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.validated_data["user"]
-            
+
             #  Generate a JWT with user_id, email, role, exp
             token = generate_jwt_token(user)
-            
+
             # Return token to frontend
             return Response({"token": token}, status=status.HTTP_200_OK)
 
