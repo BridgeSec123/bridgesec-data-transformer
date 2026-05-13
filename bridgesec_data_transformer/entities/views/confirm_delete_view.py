@@ -18,6 +18,7 @@ from core.authentication import CustomJWTAuthentication
 from core.utils.jwt_utils import get_user_from_request
 from core.utils.mongo_utils import ensure_mongo_connection
 from core.utils.okta_helpers import get_okta_headers
+from core.utils.tenant_utils import get_tenant_from_request, get_mongo_client_for_tenant
 from core.utils.restore_utils import (
     load_deletion_plan,
     mark_plan_applied,
@@ -33,6 +34,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from core.permissions.opa_permission import OPAPermission
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +57,7 @@ class ConfirmDeletionView(APIView):
     within the last 15 minutes and by the same user making this request.
     """
     authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, OPAPermission]
 
     @swagger_auto_schema(
         manual_parameters=[
@@ -77,6 +79,13 @@ class ConfirmDeletionView(APIView):
         ]
     )
     def post(self, request):
+        from core.utils.tenant_utils import is_super_admin
+        if is_super_admin(request.user):
+            return Response(
+                {"error": "Super admin cannot perform delete operations."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         plan_id = request.query_params.get("plan_id")
         action = request.query_params.get("action")
 
@@ -97,6 +106,10 @@ class ConfirmDeletionView(APIView):
 
         # --- action == "confirm" ---
         requesting_user = get_user_from_request(request)
+        tenant = get_tenant_from_request(request)
+        active_mongo_client = get_mongo_client_for_tenant(tenant) if tenant else mongo_client
+        tenant_mongo_uri = tenant.mongo_uri if tenant else None
+
         plans_col = mongo_client[settings.MONGO_DB_NAME]["pending_deletion_plans"]
 
         # Load and validate the plan
@@ -115,8 +128,8 @@ class ConfirmDeletionView(APIView):
         terraform_url = plan["terraform_url"]
         cascade_info = plan.get("cascade_info", {})
 
-        ensure_mongo_connection(db_name)
-        current_db = mongo_client[db_name]
+        ensure_mongo_connection(db_name, mongo_uri=tenant_mongo_uri)
+        current_db = active_mongo_client[db_name]
 
         # Load the actual deleted records from _<collection_name> using plan_id tag.
         # These were stored there during phase=plan — no duplication in pending_deletion_plans.
@@ -292,6 +305,10 @@ class ConfirmDeletionView(APIView):
         document. No changes are made to Okta.
         """
         requesting_user = get_user_from_request(request)
+        tenant = get_tenant_from_request(request)
+        active_mongo_client = get_mongo_client_for_tenant(tenant) if tenant else mongo_client
+        tenant_mongo_uri = tenant.mongo_uri if tenant else None
+
         plans_col = mongo_client[settings.MONGO_DB_NAME]["pending_deletion_plans"]
 
         plan, err = load_deletion_plan(plan_id, requesting_user, plans_col)
@@ -303,8 +320,8 @@ class ConfirmDeletionView(APIView):
         collection_name = plan["collection_name"]
         cascade_info = plan.get("cascade_info", {})
 
-        ensure_mongo_connection(db_name)
-        current_db = mongo_client[db_name]
+        ensure_mongo_connection(db_name, mongo_uri=tenant_mongo_uri)
+        current_db = active_mongo_client[db_name]
 
         # Clean up all deletion_pending records staged during the plan phase
         remove_deletion_plan_records(current_db, collection_name, plan_id, cascade_info)

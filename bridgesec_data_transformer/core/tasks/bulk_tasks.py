@@ -119,7 +119,7 @@ def notify_backend_via_rabbitmq(db_name, status='completed', error_details=None)
 
 
 @shared_task(bind=True)
-def process_single_entity_group(self, entity_name, viewset_class_path, db_name, okta_access_token=None, okta_granted_scopes=None, request_id=None):
+def process_single_entity_group(self, entity_name, viewset_class_path, db_name, okta_access_token=None, okta_granted_scopes=None, request_id=None, tenant_id=None):
     """
     Process a single entity group in a Celery worker.
     This task runs in parallel with other entity group tasks.
@@ -142,6 +142,10 @@ def process_single_entity_group(self, entity_name, viewset_class_path, db_name, 
         worker_id = self.request.id  # Celery task ID
         log_worker_assignment(worker_id, entity_name, request_id)
 
+        if request_id:
+            from core.utils.progress_store import mark_entity_running
+            mark_entity_running(request_id, entity_name, worker_id)
+
         logger.info(
             f"[ENTITY: {entity_name}] Starting processing...",
             extra={
@@ -157,7 +161,18 @@ def process_single_entity_group(self, entity_name, viewset_class_path, db_name, 
         from importlib import import_module
 
         # Ensure MongoDB connection for this worker
-        ensure_mongo_connection(db_name)
+        if tenant_id:
+            try:
+                from core.utils.tenant_utils import get_tenant_by_id, ensure_mongo_connection_for_tenant
+                tenant = get_tenant_by_id(tenant_id)
+                if tenant:
+                    ensure_mongo_connection_for_tenant(tenant, db_name)
+                else:
+                    ensure_mongo_connection(db_name)
+            except Exception:
+                ensure_mongo_connection(db_name)
+        else:
+            ensure_mongo_connection(db_name)
 
         # Dynamically import viewset class
         module_path, class_name = viewset_class_path.rsplit('.', 1)
@@ -510,24 +525,37 @@ def run_scheduled_bulk_task():
     """
     Celery Beat scheduled task — runs daily at midnight UTC.
 
-    Obtains an Okta access token via the Client Credentials grant flow
-    using the configured service app private key, then triggers the full
-    parallel bulk fetch (same as the manual POST /api/bulk/ endpoint).
+    When MULTI_TENANCY_ENABLED=True: loops all active Tenant documents and
+    dispatches one run_bulk_entity_task per tenant using that tenant's
+    service app credentials.
 
-    No user session is required — the service app authenticates directly
-    with Okta using a signed JWT assertion.
+    When MULTI_TENANCY_ENABLED=False (default): obtains a single service
+    access token from global settings and runs a single bulk fetch (original
+    single-tenant behaviour).
     """
+    from django.conf import settings as _settings
+
+    multi_tenancy = getattr(_settings, "MULTI_TENANCY_ENABLED", False)
+
+    if multi_tenancy:
+        return _run_scheduled_bulk_task_multi_tenant()
+    else:
+        return _run_scheduled_bulk_task_single_tenant()
+
+
+def _run_scheduled_bulk_task_single_tenant():
+    """Original single-tenant scheduled bulk fetch."""
     from core.utils.service_token import get_service_access_token
 
     logger.info(
-        "Scheduled bulk fetch starting: acquiring service app access token...",
+        "Scheduled bulk fetch starting (single-tenant): acquiring service app access token...",
         extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch'}
     )
 
     try:
         access_token, granted_scopes = get_service_access_token()
         logger.info(
-            f"Service access token obtained. Delegating to run_bulk_entity_task...",
+            "Service access token obtained. Delegating to run_bulk_entity_task...",
             extra={
                 'component': 'celery',
                 'task_name': 'scheduled_bulk_fetch',
@@ -545,13 +573,47 @@ def run_scheduled_bulk_task():
         )
         return {"status": "error", "error": str(e)}
 
-    # Delegate to the existing parallel bulk fetch with the service token.
-    # Called directly (not via .delay()) since we are already inside a Celery task;
-    # the inner group().apply_async() still runs all entity subtasks in parallel.
     return run_bulk_entity_task(
         okta_access_token=access_token,
         okta_granted_scopes=granted_scopes,
     )
+
+
+def _run_scheduled_bulk_task_multi_tenant():
+    """Multi-tenant scheduled bulk fetch: one task per active tenant."""
+    from core.models.tenant import Tenant
+    from core.utils.tenant_service_token import get_service_access_token_for_tenant
+
+    logger.info(
+        "Scheduled bulk fetch starting (multi-tenant)...",
+        extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch'}
+    )
+
+    tenants = list(Tenant.objects.filter(is_active=True))
+    logger.info(f"Found {len(tenants)} active tenant(s)")
+
+    results = []
+    for tenant in tenants:
+        try:
+            access_token, granted_scopes = get_service_access_token_for_tenant(tenant)
+            logger.info(
+                f"Service token obtained for tenant '{tenant.name}'. Dispatching bulk task.",
+                extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch', 'tenant': tenant.name}
+            )
+            run_bulk_entity_task.delay(
+                okta_access_token=access_token,
+                okta_granted_scopes=granted_scopes,
+                tenant_id=str(tenant.id),
+            )
+            results.append({"tenant": tenant.name, "status": "dispatched"})
+        except Exception as e:
+            logger.exception(
+                f"Failed to dispatch bulk fetch for tenant '{tenant.name}': {e}",
+                extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch'}
+            )
+            results.append({"tenant": tenant.name, "status": "error", "error": str(e)})
+
+    return {"status": "dispatched", "tenants": results}
 
 
 @shared_task

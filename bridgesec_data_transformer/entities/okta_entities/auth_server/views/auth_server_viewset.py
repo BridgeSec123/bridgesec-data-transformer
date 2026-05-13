@@ -9,7 +9,7 @@ from entities.okta_entities.auth_server.views.auth_server_base_viewset import (
 )
 
 logger = logging.getLogger(__name__)
-
+    
 class AuthorizationServerViewSet(BaseAuthServerViewSet):
     queryset = AuthorizationServer.objects.all()
     okta_endpoint = "/api/v1/authorizationServers"

@@ -43,6 +43,26 @@ def create_bulk_job(request_id: str, db_name: str, entity_keys: list):
     )
 
 
+def mark_entity_running(request_id: str, entity_name: str, worker_id: str = None):
+    """
+    Mark one entity as actively being processed by a Celery worker.
+    Called at the very start of process_single_entity_group so the SSE stream
+    reflects up to 4 concurrent 'running' entities at any given time.
+    """
+    _col().update_one(
+        {"_id": request_id},
+        {
+            "$set": {
+                f"entities.{entity_name}": {
+                    "status":     "running",
+                    "worker_id":  worker_id,
+                    "started_at": datetime.now(timezone.utc).isoformat(),
+                }
+            }
+        },
+    )
+
+
 def update_entity_done(request_id: str, entity_name: str, record_counts: dict, time_s: float):
     """
     Mark one entity as successfully completed with data.

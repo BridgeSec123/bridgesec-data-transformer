@@ -180,7 +180,7 @@ IDENTITY_PROVIDER_ENTITY_VIEWSETS = {
     "okta_idp_oidc": IdentityProviderOIDCViewSet,
     "okta_idp_saml": IdentityProviderSAMLViewSet,
     "okta_idp_social": IdentityProviderSocialViewSet
- }
+}
 
 DEVICE_ASSURANCE_POLICY_ENTITY_VIEWSETS = {
     "okta_policy_device_assurance_android": DeviceAndroidViewSet,

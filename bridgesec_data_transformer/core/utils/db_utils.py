@@ -31,8 +31,8 @@ def parse_input_date(date_str):
     Parse a user-supplied date string into a datetime object.
 
     Accepts:
-        - DD-MM-YY   (e.g. "09-08-25")
-        - DD-MM-YYYY (e.g. "09-08-2025")
+        - DD-MM-YY   (e.g. "09-08-26")
+        - DD-MM-YYYY (e.g. "09-08-2026")
 
     Returns:
         datetime object on success, None on failure.
@@ -61,25 +61,32 @@ def _format_date_display(date_part):
         return date_part
 
 
-def resolve_db_name(date_str, time_str):
+def resolve_db_name(date_str, time_str, prefix=None):
     """
     Reconstruct a MongoDB database name from date and time.
 
     Args:
         date_str: YYYY-MM-DD  (e.g. "2026-03-10")
         time_str: HH:MM       (e.g. "03:57")
+        prefix:   DB name prefix (defaults to settings.MONGO_DB_NAME)
 
     Returns:
-        "bridgesec_2026-03-10T0357"
+        "<prefix>_2026-03-10T0357"
     """
+    db_prefix = prefix if prefix is not None else settings.MONGO_DB_NAME
     time_compact = time_str.replace(":", "")  # "03:57" → "0357"
-    return f"{settings.MONGO_DB_NAME}_{date_str}T{time_compact}"
+    return f"{db_prefix}_{date_str}T{time_compact}"
 
 
-def list_databases_for_date(mongo_client, date_str, page=1, page_size=20):
+def list_databases_for_date(mongo_client, date_str, page=1, page_size=20, prefix=None):
     """
     Return paginated snapshots for a given date.
+
+    Args:
+        prefix: DB name prefix (defaults to settings.MONGO_DB_NAME)
     """
+    db_prefix = prefix if prefix is not None else settings.MONGO_DB_NAME
+
     parsed = parse_input_date(date_str)
     if parsed is None:
         raise ValueError(
@@ -87,7 +94,7 @@ def list_databases_for_date(mongo_client, date_str, page=1, page_size=20):
         )
 
     iso_date = parsed.strftime("%Y-%m-%d")
-    date_prefix = f"{settings.MONGO_DB_NAME}_{iso_date}"
+    date_prefix = f"{db_prefix}_{iso_date}"
     display_date = _format_date_display(iso_date)
 
     logger.info("Listing databases for date",
@@ -95,7 +102,7 @@ def list_databases_for_date(mongo_client, date_str, page=1, page_size=20):
 
     all_items = []
     for db in sorted(db for db in mongo_client.list_database_names() if db.startswith(date_prefix)):
-        stripped = db[len(f"{settings.MONGO_DB_NAME}_"):]
+        stripped = db[len(f"{db_prefix}_"):]
         if "T" not in stripped:
             continue
         _, time_part = stripped.split("T", 1)
@@ -116,9 +123,12 @@ def list_databases_for_date(mongo_client, date_str, page=1, page_size=20):
     }
 
 
-def get_db_map(mongo_client):
+def get_db_map(mongo_client, prefix=None):
     """
     Return all dates with all their snapshots grouped by date.
+
+    Args:
+        prefix: DB name prefix (defaults to settings.MONGO_DB_NAME)
 
     Returns:
         {
@@ -138,14 +148,15 @@ def get_db_map(mongo_client):
           }
         }
     """
-    prefix = f"{settings.MONGO_DB_NAME}_"
+    db_prefix = prefix if prefix is not None else settings.MONGO_DB_NAME
+    name_prefix = f"{db_prefix}_"
     logger.info("Building full db map", extra={"operation": "get_db_map"})
 
     grouped = {}
     for db in sorted(mongo_client.list_database_names()):
-        if not db.startswith(prefix):
+        if not db.startswith(name_prefix):
             continue
-        stripped = db[len(prefix):]
+        stripped = db[len(name_prefix):]
         if "T" not in stripped:
             continue
         date_part, time_part = stripped.split("T", 1)
@@ -167,12 +178,13 @@ def get_db_map(mongo_client):
 
 
 def get_collection_name(entity_name):
-    """Get collection name for a given entity type."""
+    """Get collection name for a given entity type (case-insensitive match)."""
     logger.info("Extracting collection name for the given entity from mappings",extra={"operation":'Get Collection Name'})
+    entity_name_lower = entity_name.lower()
     for entity_type, sub_entities in RESOURCE_COLLECTION_MAP.items():
         for entry in sub_entities:
             for display_name, collection_name in entry.items():
-                if display_name == entity_name:
+                if display_name.lower() == entity_name_lower:
                     return collection_name
     return None
 

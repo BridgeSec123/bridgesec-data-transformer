@@ -897,6 +897,7 @@ def merge_restored_with_original(original_data, restored_data, id_field):
 
     merged_data = []
     merged_original_ids = set()
+
     # Pass 1: loop through original — merge or keep each record
     for original_record in original_data:
         record_id = str(original_record.get(id_field)) if original_record.get(id_field) else None
@@ -938,6 +939,7 @@ def merge_restored_with_original(original_data, restored_data, id_field):
                 f"Appended created record id={record_id} from restored collection",
                 extra={"operation": "Fetch Merge Restored Data"}
             )
+
     return merged_data
 
 
