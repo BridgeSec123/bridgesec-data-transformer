@@ -21,6 +21,7 @@ OPA_BYPASS_PATHS = (
     "/api/auth/token/",
     "/api/policies/",
     "/api/users/",
+    "/api/roles/",
 )
 
 
@@ -71,6 +72,9 @@ class OPAPermission(BasePermission):
             return True
         if not getattr(request.user, "is_authenticated", False):
             return False
+        # super_admin bypasses OPA at the Django layer — works even when OPA is down
+        if "super_admin" in (getattr(request.user, "roles", None) or []):
+            return True
         return opa_client.query(self._build_base_input(request, view))
 
     def has_object_permission(self, request, view, obj) -> bool:
@@ -80,6 +84,9 @@ class OPAPermission(BasePermission):
             return True
         if not getattr(request.user, "is_authenticated", False):
             return False
+        # super_admin bypasses OPA at the Django layer
+        if "super_admin" in (getattr(request.user, "roles", None) or []):
+            return True
 
         input_data = self._build_base_input(request, view)
         input_data["resource_attributes"] = self._extract_resource_attributes(obj)
@@ -120,10 +127,15 @@ class OPAPermission(BasePermission):
             db_name = None
 
         user = getattr(request, "user", None)
+        # Support both legacy single-role and new multi-role
+        roles = getattr(user, "roles", None) or []
+        if not roles and getattr(user, "role", None):
+            roles = [user.role]
         return {
             "user": {
-                "email": getattr(user, "email", None),
-                "role": getattr(user, "role", None),
+                "email":            getattr(user, "email", None),
+                "roles":            roles,
+                "tenant_id":        str(getattr(user, "tenant_id", "") or ""),
                 "is_authenticated": bool(getattr(user, "is_authenticated", False)),
             },
             "method": request.method,

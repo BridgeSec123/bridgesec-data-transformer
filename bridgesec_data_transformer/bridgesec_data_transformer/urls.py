@@ -10,6 +10,11 @@ from core.views.auth_views import CustomTokenObtainPairView, CustomTokenObtainVi
 from core.views.okta_login_viewset import OktaLoginView
 from core.views.okta_callback_viewset import OktaCallbackView
 from core.views.token_retrieval_view import TokenRetrievalView
+from core.views.tenant_viewset import (
+    TenantListCreateView, TenantDetailView,
+    TenantUserListView, TenantUserDetailView,
+)
+from core.views.chat_viewset import ChatView
 from core.views.log_views import LogListView, LogSummaryView, LogTraceView, LogStreamView
 
 # Your views
@@ -43,6 +48,12 @@ urlpatterns = [
     path("okta/callback/", OktaCallbackView.as_view(), name="okta-callback"),
     path("okta/logout/", OktaLogoutView.as_view(), name="okta-logout"),
     path("api/auth/token/", TokenRetrievalView.as_view(), name="auth-token"),
+    path("api/chat/", ChatView.as_view(), name="chat"),
+    # Multi-tenancy management (super-admin only)
+    path("api/tenants/", TenantListCreateView.as_view(), name="tenant-list-create"),
+    path("api/tenants/<str:tenant_id>/", TenantDetailView.as_view(), name="tenant-detail"),
+    path("api/tenants/<str:tenant_id>/users/", TenantUserListView.as_view(), name="tenant-users"),
+    path("api/tenants/<str:tenant_id>/users/<str:uid>/", TenantUserDetailView.as_view(), name="tenant-user-detail"),
     path("api/logs/",                 LogListView.as_view(),    name="log-list"),
     path("api/logs/summary/",         LogSummaryView.as_view(), name="log-summary"),
     path("api/logs/stream/",          LogStreamView.as_view(),  name="log-stream"),
