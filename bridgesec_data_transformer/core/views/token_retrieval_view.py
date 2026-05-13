@@ -2,6 +2,8 @@ import logging
 import time
 
 from rest_framework import status
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -11,6 +13,10 @@ PENDING_JWT_TTL_SECONDS = 60
 
 
 class TokenRetrievalView(APIView):
+    # Session-based endpoint — must not require a Bearer token (chicken-and-egg)
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [AllowAny]
+
     def get(self, request):
         session = request.session
         pending_jwt = session.get("pending_jwt")

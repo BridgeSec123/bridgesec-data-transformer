@@ -1,12 +1,17 @@
 import requests
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
-from core.models.user import User
 from jose import jwt
 from django.conf import settings
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _get_user_backend():
+    """Always returns the Supabase user backend. MongoDB is snapshot-only."""
+    from core.utils.supabase_user import SupabaseUser
+    return SupabaseUser
 
 
 class CustomJWTAuthentication(BaseAuthentication):
@@ -16,13 +21,23 @@ class CustomJWTAuthentication(BaseAuthentication):
         if not auth_header or not auth_header.startswith('Bearer'):
             return None
 
-        token = auth_header.split(' ')[1]
+        parts = auth_header.split(' ', 1)
+        if len(parts) < 2 or not parts[1].strip():
+            return None
+        token = parts[1].strip()
 
         # First, try to decode as internal JWT token (HS256)
         try:
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
             user_id = payload.get('user_id')
-            user = User.objects.get(id=user_id)
+            UserBackend = _get_user_backend()
+            user = UserBackend.get_by_id(user_id)
+            if not user:
+                raise Exception("User not found")
+            # Attach tenant_id and roles from JWT to the request
+            request._tenant_id = payload.get('tenant_id')
+            if not hasattr(user, 'roles'):
+                user.roles = payload.get('roles', ['user'])
             return (user, None)
         except Exception:
             pass  # Not an internal token, try Okta token
@@ -83,11 +98,11 @@ class CustomJWTAuthentication(BaseAuthentication):
                 logger.warning("No email/sub found in Okta token")
                 return None
 
-            # Find or create user
-            user = User.objects(email=email).first()
+            # Find or create user (Supabase or MongoDB depending on config)
+            UserBackend = _get_user_backend()
+            user = UserBackend.get_by_email(email)
             if not user:
-                user = User(email=email, username=email, role="admin")
-                user.save()
+                user = UserBackend.create_or_update(email=email, username=email, roles=["user"])
                 logger.info(f"Created new user from Okta token: {email}")
 
             # Store Okta access token in session for API calls

@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 
 import requests
-from bson import ObjectId
 from django.conf import settings
 from jose import JWTError, jwt
 
@@ -19,17 +18,17 @@ def get_cached_jwks():
     response = requests.get(jwks_url)
     return response.json()
 
-def generate_jwt_token(user):
+def generate_jwt_token(user, expiry_hours: int = 24):
+    roles = getattr(user, "roles", None) or []
     payload = {
-        "user_id": str(user.id),
-        "email": user.email,
-        "role": user.role,
-        "exp": datetime.utcnow() + timedelta(days=1),
-        "iat": datetime.utcnow()
+        "user_id":   str(user.id),
+        "email":     user.email,
+        "roles":     roles,
+        "tenant_id": str(user.tenant_id) if getattr(user, "tenant_id", None) else None,
+        "exp":       datetime.utcnow() + timedelta(hours=expiry_hours),
+        "iat":       datetime.utcnow(),
     }
-
-    token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
-    return token
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
 
 def get_user_from_request(request):
@@ -110,33 +109,32 @@ def get_user_from_request(request):
                 logger.warning(f"Failed to decode both Okta and custom JWT: {str(jwt_error)}",extra={"operation":"Get User From Request"})
                 return "Unknown"
 
-        # Fetch user from database
+        # Fetch user from the configured backend (Supabase or MongoDB)
         try:
-            from core.models.user import User
+            from core.authentication import _get_user_backend
+            UserBackend = _get_user_backend()
 
             # Try to find user by email first (works for both token types)
             if email:
-                user = User.objects(email=email).first()
+                user = UserBackend.get_by_email(email)
                 if user:
                     user_identifier = user.username or user.email
-                    logger.info(f"Found user by email: {user_identifier}",extra={"operation":"Get User From Request"})
+                    logger.info(f"Found user by email: {user_identifier}", extra={"operation": "Get User From Request"})
                     return str(user_identifier)
 
             # Fallback to user_id for custom JWT tokens
             if user_id:
-                user = User.objects.get(id=ObjectId(user_id))
-                user_identifier = user.username or user.email
-                logger.info(f"Found user by ID: {user_identifier}",extra={"operation":"Get User From Request"})
-                return str(user_identifier)
+                user = UserBackend.get_by_id(str(user_id))
+                if user:
+                    user_identifier = user.username or user.email
+                    logger.info(f"Found user by ID: {user_identifier}", extra={"operation": "Get User From Request"})
+                    return str(user_identifier)
 
-            logger.warning("No email or user_id found in token",extra={"operation":"Get User From Request"})
+            logger.warning("No email or user_id found in token", extra={"operation": "Get User From Request"})
             return "Unknown"
 
-        except User.DoesNotExist:
-            logger.warning(f"User not found in database",extra={"operation":"Get User From Request"})
-            return email or user_id or "Unknown"
         except Exception as db_error:
-            logger.warning(f"Database error fetching user: {str(db_error)}",extra={"operation":"Get User From Request"})
+            logger.warning(f"Database error fetching user: {str(db_error)}", extra={"operation": "Get User From Request"})
             return email or user_id or "Unknown"
 
     except Exception as e:

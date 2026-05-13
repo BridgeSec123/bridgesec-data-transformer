@@ -11,7 +11,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.models.user import User
+from core.authentication import _get_user_backend
 from core.utils.jwt_utils import generate_jwt_token
 
 logger = logging.getLogger(__name__)
@@ -56,12 +56,27 @@ class OktaCallbackView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Normalize OKTA_ISSUER - remove trailing slash if present
-        issuer_base = settings.OKTA_ISSUER.rstrip('/')
+        # --- Multi-tenancy: load tenant from session if set during login ---
+        tenant = None
+        if getattr(settings, "MULTI_TENANCY_ENABLED", False):
+            tenant_id = request.session.get("tenant_id")
+            if tenant_id:
+                from core.utils.tenant_utils import get_tenant_by_id
+                tenant = get_tenant_by_id(tenant_id)
+                if tenant:
+                    logger.info(f"Using tenant '{tenant.name}' for OAuth callback")
+
+        # Resolve issuer and credentials — use tenant's if available
+        if tenant:
+            issuer_base = tenant.okta_issuer.rstrip('/')
+            client_id = tenant.okta_client_id
+            client_secret = tenant.okta_client_secret
+        else:
+            issuer_base = settings.OKTA_ISSUER.rstrip('/')
+            client_id = settings.OKTA_CLIENT_ID
+            client_secret = settings.OKTA_SECRET_KEY
 
         # Build token URL - handle both org and custom auth servers
-        # If issuer already contains /oauth2/{authServerId}, use /v1/token
-        # Otherwise, use /oauth2/v1/token (org auth server)
         if '/oauth2/' in issuer_base:
             # Custom authorization server (e.g., /oauth2/default)
             token_url = f"{issuer_base}/v1/token"
@@ -77,8 +92,8 @@ class OktaCallbackView(APIView):
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": settings.OKTA_REDIRECT_URI,
-            "client_id": settings.OKTA_CLIENT_ID,
-            "client_secret": settings.OKTA_SECRET_KEY,
+            "client_id": client_id,
+            "client_secret": client_secret,
         }
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
@@ -161,10 +176,13 @@ class OktaCallbackView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        user = User.objects(email=email).first()
+        UserBackend = _get_user_backend()
+        user = UserBackend.get_by_email(email)
         if not user:
-            user = User(email=email, username=username, role="admin")
-            user.save()
+            tenant_id_str = str(tenant.id) if tenant else None
+            user = UserBackend.create_or_update(
+                email=email, username=username, roles=["user"], tenant_id=tenant_id_str
+            )
             logger.info(
                 f"New user created: {email}",
                 extra={
@@ -175,6 +193,10 @@ class OktaCallbackView(APIView):
                 }
             )
         else:
+            # Update tenant_id on existing user if it changed
+            if tenant and str(getattr(user, 'tenant_id', None)) != str(tenant.id):
+                user.tenant_id = str(tenant.id)
+                user.save()
             logger.info(
                 f"Existing user logged in: {email}",
                 extra={
@@ -185,6 +207,17 @@ class OktaCallbackView(APIView):
                 }
             )
 
+        # Log login activity (multi-tenancy)
+        if tenant:
+            from core.utils.activity_logger import ActivityLogger
+            ActivityLogger.log(
+                tenant_id=tenant.id,
+                user_email=email,
+                action="login",
+                status="success",
+                ip_address=request.META.get("REMOTE_ADDR"),
+            )
+
         # Generate custom access token for application
         jwt_token = generate_jwt_token(user)
 
@@ -193,10 +226,12 @@ class OktaCallbackView(APIView):
         session["user_id"] = str(user.id)
         session["username"] = user.username
         session["email"] = user.email
-        session["role"] = user.role
+        session["roles"] = getattr(user, "roles", ["user"])
         session["id_token"] = id_token
         session["okta_access_token"] = access_token
         session["okta_granted_scopes"] = granted_scopes
+        if tenant:
+            session["tenant_id"] = str(tenant.id)
         session.set_expiry(3600)
         session.save()
 
