@@ -23,7 +23,7 @@ from pymongo import MongoClient
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
-environ.Env.read_env(os.path.join(BASE_DIR.parent, '.env'))
+environ.Env.read_env(os.path.join(BASE_DIR.parent, '.env'), overwrite=False)
 
 
 OKTA_API_URL = env("OKTA_API_URL")
@@ -35,6 +35,19 @@ OKTA_SECRET_KEY = env("OKTA_SECRET_KEY")
 FRONTEND_REDIRECT_URL = env("FRONTEND_REDIRECT_URL")
 FRONTEND_URL = env("FRONTEND_URL")
 SERVER_URL = env("SERVER_URL")
+BRIDGESEC_API_URL = env("BRIDGESEC_API_URL", default="http://localhost:8007")
+
+# ── Multi-tenancy ────────────────────────────────────────────────────────────
+# Set MULTI_TENANCY_ENABLED=True to activate per-tenant isolation.
+# When False (default) ALL multi-tenant code is bypassed and the app behaves
+# exactly as before (single-tenant).
+MULTI_TENANCY_ENABLED = env.bool("MULTI_TENANCY_ENABLED", default=False)
+
+# Master database — stores Tenant and ActivityLog documents.
+# Defaults to the same Mongo URI / DB as the single-tenant setup so no
+# migration is required on first deploy.
+MASTER_MONGO_URI = env("MASTER_MONGO_URI", default=None)   # None → falls back to MONGO_URI
+MASTER_DB_NAME = env("MASTER_DB_NAME", default="bridgesec_master")
 
 # Service App OAuth 2.0 Client Credentials (for scheduled tasks)
 # Used by Celery Beat to get an access token without a user session.
@@ -42,6 +55,9 @@ SERVER_URL = env("SERVER_URL")
 OKTA_SERVICE_CLIENT_ID = env("OKTA_SERVICE_CLIENT_ID", default=None)
 OKTA_SERVICE_PRIVATE_KEY = env("OKTA_SERVICE_PRIVATE_KEY", default=None)
 OKTA_SERVICE_SCOPES = env("OKTA_SERVICE_SCOPES", default="")
+
+# Anthropic API — used by the AI chat assistant (/api/chat/)
+ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default=None)
 
 # Supabase Configuration (for Terraform state file verification)
 # Add these to your .env file:
@@ -92,6 +108,7 @@ OKTA_SCOPES = " ".join([
     # "okta.resourceSets.read",
     # "okta.captchas.read",
     "okta.schemas.read",
+    "okta.appGrants.manage",
     "okta.userTypes.read",
     "okta.users.manage.self",
     "okta.appGrants.manage",
@@ -173,12 +190,13 @@ SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG", default=False)
-
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 ALLOWED_HOSTS = [
     '.onrender.com',
     '127.0.0.1',
     '31.97.229.6',
-    "localhost"
+    "localhost",
+    "jaggiest-stephania-autonomously.ngrok-free.dev",
 ]
 
 # Application definition
@@ -205,6 +223,7 @@ MIDDLEWARE = [
     'bridgesec_logging.middleware.LoggingMiddleware',  # Centralized logging middleware
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'core.middleware.tenant_middleware.TenantContextMiddleware',  # Attach request._tenant
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -341,7 +360,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://31.97.229.6:3000",
     "http://localhost:3000",
     "http://localhost:5173",
-    "http://127.0.0.1:5173"
+    "http://127.0.0.1:5173",
+    "http://jaggiest-stephania-autonomously.ngrok-free.dev",
+    
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -408,17 +429,24 @@ LOGGING = {
             'formatter': 'verbose',
             'level': 'ERROR',
         },
+        # Ships log records to Elasticsearch so the /api/logs/summary/ and
+        # /api/logs/ endpoints have data to query against (bridgesec-logs-* index).
+        'elasticsearch': {
+            '()': 'core.utils.es_log_handler.ElasticsearchHandler',
+            'es_url': env("ELASTICSEARCH_URL", default="http://localhost:9200"),
+            'level': 'DEBUG',
+        },
     },
 
     'loggers': {
         # Default logger for all modules
         '': {
-            'handlers': ['console', 'file', 'error_file'],
+            'handlers': ['console', 'file', 'error_file', 'elasticsearch'],
             'level': 'INFO',
             'propagate': True,
         },
          "celery": {
-            "handlers": ["console", "celery_file"],
+            "handlers": ["console", "celery_file", "elasticsearch"],
             "level": "INFO",
             "propagate": False,
         },
@@ -432,6 +460,17 @@ LOGGING = {
             "level": "WARNING",  # suppress verbose HTTP logs
             "propagate": False,
         },
+        # Prevent ES client's own logs from being shipped back to ES (infinite loop)
+        "elastic_transport": {
+            "handlers": ["console", "file"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "elasticsearch": {
+            "handlers": ["console", "file"],
+            "level": "WARNING",
+            "propagate": False,
+        },
     },
 }
 
@@ -441,6 +480,10 @@ LOGGING = {
 OPA_URL         = env("OPA_URL", default="http://localhost:8181")
 OPA_ENABLED     = env.bool("OPA_ENABLED", default=True)
 OPA_TIMEOUT_SEC = env.int("OPA_TIMEOUT_SEC", default=2)
+
+# Super Admin — optional comma-separated IP allowlist for /super-admin/login/
+# Leave empty to allow from any IP.
+SUPER_ADMIN_ALLOWED_IPS = env.list("SUPER_ADMIN_ALLOWED_IPS", default=[])
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (

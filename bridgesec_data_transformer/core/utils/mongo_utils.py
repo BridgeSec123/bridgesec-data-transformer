@@ -49,13 +49,16 @@ class ProcessLocalConnectionManager:
 _connection_manager = ProcessLocalConnectionManager()
 
 
-def get_dynamic_db():
+def get_dynamic_db(prefix: str = None):
     """
-    Generate a new database name for each bulk API request.
-    Ensures all entities (users, groups, etc.) are stored in the same DB within a single request.
+    Generate a snapshot DB name for a bulk API request.
+    When multi-tenancy is enabled, pass the tenant's mongo_db_prefix so the
+    snapshot lands in the tenant's namespace (e.g. "acme_okta_2026-05-06T1430").
+    Falls back to the global MONGO_DB_NAME when prefix is None.
     """
     utc_now = datetime.now().strftime("%Y-%m-%dT%H%M")
-    return f"{settings.MONGO_DB_NAME}_{utc_now}"
+    base = prefix if prefix else settings.MONGO_DB_NAME
+    return f"{base}_{utc_now}"
 
 
 def connect_to_mongo():
@@ -78,11 +81,15 @@ def reset_connections_for_process():
     logger.info(f"[PID {os.getpid()}] MongoDB connections reset for worker process")
 
 
-def ensure_mongo_connection(db_name):
+def ensure_mongo_connection(db_name, mongo_uri: str = None):
     """
     Ensure a connection to the given MongoDB database.
     Process-safe: each process maintains its own connection state.
+
+    When multi-tenancy is enabled, pass the tenant's mongo_uri so MongoEngine
+    connects to the correct cluster. Falls back to settings.MONGO_URI when None.
     """
+    uri = mongo_uri if mongo_uri else settings.MONGO_URI
     global _connection_manager
     pid = _connection_manager.process_id
 
@@ -93,17 +100,13 @@ def ensure_mongo_connection(db_name):
             _connection_manager.mark_connected("default")
         except Exception:
             logger.info(f"[PID {pid}] Establishing default MongoDB connection to {db_name}")
-            connect(
-                db=db_name,
-                host=settings.MONGO_URI,
-                alias="default"
-            )
+            connect(db=db_name, host=uri, alias="default")
             _connection_manager.mark_connected("default")
 
     # Ensure specific database connection exists for this process
     if not _connection_manager.is_connected(db_name):
         logger.info(f"[PID {pid}] Connecting to MongoDB database: {db_name}")
-        connect(db=db_name, host=settings.MONGO_URI, alias=db_name)
+        connect(db=db_name, host=uri, alias=db_name)
         _connection_manager.mark_connected(db_name)
 
 
