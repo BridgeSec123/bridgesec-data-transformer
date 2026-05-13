@@ -92,6 +92,7 @@ MODEL_REGISTRY = {
     "App User": AppUser,
     "App Signon Policy Rule":AppPolicySignOnRule,
     "App Shared Credentials":AppSharedCredentials,
+    "App Oauth Api Scope":AppOauthApiScope,
     "App Oauth Role Assignment":AppOAuthRoleAssignment,
     "App Oauth Post Logout Redirect Uri":AppOauthPostRedirectUri,
     "App Oauth Redirect Uri":AppOauthRedirectUri,

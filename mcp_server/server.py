@@ -13,13 +13,17 @@ sys.path.insert(0, os.path.dirname(__file__))
 import client as api  # noqa: E402 — must come after load_dotenv
 
 from mcp.server.fastmcp import FastMCP  # noqa: E402
+from mcp.server.transport_security import TransportSecuritySettings  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 READ_ONLY = os.environ.get("MCP_READ_ONLY", "false").lower() == "true"
 
-mcp = FastMCP("bridgesec-data-transformer")
+mcp = FastMCP(
+    "bridgesec-data-transformer",
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
 
 
 # ─── READ-ONLY TOOLS ──────────────────────────────────────────────────────────
@@ -177,24 +181,8 @@ if not READ_ONLY:
 
 # ─── ENTRY POINT ─────────────────────────────────────────────────────────────
 
-class HostOverrideMiddleware:
-    """Rewrites the Host header to localhost before the MCP transport validates it."""
-    def __init__(self, app):
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        if scope["type"] in ("http", "websocket"):
-            headers = [
-                (b"host", b"localhost") if k == b"host" else (k, v)
-                for k, v in scope.get("headers", [])
-            ]
-            scope["headers"] = headers
-        await self.app(scope, receive, send)
-
-
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("MCP_PORT", 8002))
     app = mcp.streamable_http_app()
-    app = HostOverrideMiddleware(app)
     uvicorn.run(app, host="0.0.0.0", port=port)
