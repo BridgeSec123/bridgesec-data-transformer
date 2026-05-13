@@ -10,6 +10,11 @@ import future.keywords.in
 
 default allow := false
 
+# Super admins bypass all policy checks
+allow if {
+    "super_admin" in input.user.roles
+}
+
 allow if {
     allows
     not denies
@@ -61,11 +66,18 @@ def translate(rule) -> str:
     action = getattr(rule, "action", "*")
 
     if role and role != "*":
-        conditions.append(f'input.user.role == "{role}"')
+        # Support both legacy single-role field and new multi-role array
+        conditions.append(f'"{role}" in input.user.roles')
     if entity and entity != "*":
         conditions.append(f'input.entity == "{entity}"')
     if action and action != "*":
         conditions.append(f'input.action == "{action}"')
+
+    # Tenant-specific rule: only fires for users in the matching tenant.
+    # Global rules (tenant_id=None) have no such condition and apply to all tenants.
+    tenant_id = getattr(rule, "tenant_id", None)
+    if tenant_id:
+        conditions.append(f'input.user.tenant_id == "{tenant_id}"')
 
     # exclude_actions — block specific HTTP actions
     excluded = conds.get("exclude_actions", []) or []

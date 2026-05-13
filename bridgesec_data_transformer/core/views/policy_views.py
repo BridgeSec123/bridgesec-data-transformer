@@ -11,8 +11,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.authentication import CustomJWTAuthentication
-from core.models.policy_models import PolicyRule
-from core.models.user import User
 from core.serializers.policy_serializer import PolicyRuleSerializer
 from core.services import opa_client, opa_sync, rego_builder
 
@@ -22,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class PolicyViewSet(viewsets.ViewSet):
-    """CRUD + resync + dry-run for OPA policies.
+    """CRUD + resync + dry-run for OPA policies (Supabase-backed).
 
     Protected by `IsAuthenticated` only — self-management must not depend on
     OPA having any policies loaded (chicken-and-egg). `/api/policies/` is
@@ -33,68 +31,109 @@ class PolicyViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
     entity_type = "policies"
 
+    def _is_super_admin(self, request) -> bool:
+        return "super_admin" in (getattr(request.user, "roles", None) or [])
+
+    def _caller_tenant_id(self, request):
+        """Return the authenticated user's tenant_id, or None for super_admin."""
+        if self._is_super_admin(request):
+            return None
+        return str(getattr(request.user, "tenant_id", "") or "") or None
+
+    def _get_or_404(self, pk):
+        from core.utils.supabase_policy import SupabasePolicyRule
+        rule = SupabasePolicyRule.get_by_id(pk)
+        if not rule:
+            raise NotFound(f"Policy '{pk}' not found.")
+        return rule
+
+    def _assert_can_modify(self, request, rule):
+        """Raise PermissionDenied if a non-super-admin tries to touch another tenant's rule."""
+        if self._is_super_admin(request):
+            return
+        caller_tid = self._caller_tenant_id(request)
+        if rule.tenant_id and rule.tenant_id != caller_tid:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You can only modify policies that belong to your tenant.")
+
     # ------------------------------------------------------------------
     # CRUD
     # ------------------------------------------------------------------
     @swagger_auto_schema(tags=_OPA_TAG)
     def list(self, request):
-        rules = PolicyRule.objects.all()
-        data = PolicyRuleSerializer(rules, many=True, context={"request": request}).data
-        return Response(data)
+        from core.utils.supabase_policy import SupabasePolicyRule
+        role_filter = request.query_params.get("role")
+        try:
+            page      = max(1, int(request.query_params.get("page", 1)))
+            page_size = min(200, max(1, int(request.query_params.get("page_size", 50))))
+        except ValueError:
+            page, page_size = 1, 50
+        # Non-super-admin callers see global + their own tenant's policies only
+        tenant_id = self._caller_tenant_id(request)
+        rules, total = SupabasePolicyRule.list_all(
+            role=role_filter, page=page, page_size=page_size, tenant_id=tenant_id
+        )
+        data = [PolicyRuleSerializer(r, context={"request": request}).to_representation(r) for r in rules]
+        return Response({"total": total, "page": page, "page_size": page_size, "results": data})
 
     @swagger_auto_schema(tags=_OPA_TAG)
     def create(self, request):
         ser = PolicyRuleSerializer(data=request.data, context={"request": request})
         ser.is_valid(raise_exception=True)
-        rule = ser.save()
+        # Stamp tenant_id automatically: super_admin → None (global), everyone else → their tenant
+        extra = {"tenant_id": self._caller_tenant_id(request)}
+        rule = ser.save(**extra)
         try:
-            opa_client.push_policy(rule.policy_id, rule.rego_source)
+            opa_client.push_policy(str(rule.id), rule.rego_source)
         except Exception as e:
-            rule.delete()
-            logger.exception("Failed to push new policy to OPA; rolled back Mongo insert")
+            from core.utils.supabase_policy import SupabasePolicyRule
+            SupabasePolicyRule.delete(str(rule.id))
+            logger.exception("Failed to push new policy to OPA; rolled back Supabase insert")
             return Response(
                 {"error": "Failed to push policy to OPA.", "detail": str(e)},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
         return Response(
-            PolicyRuleSerializer(rule, context={"request": request}).data,
+            PolicyRuleSerializer(rule, context={"request": request}).to_representation(rule),
             status=status.HTTP_201_CREATED,
         )
 
     @swagger_auto_schema(tags=_OPA_TAG)
     def retrieve(self, request, pk=None):
         rule = self._get_or_404(pk)
-        return Response(PolicyRuleSerializer(rule, context={"request": request}).data)
+        return Response(PolicyRuleSerializer(rule, context={"request": request}).to_representation(rule))
 
     @swagger_auto_schema(tags=_OPA_TAG)
     def update(self, request, pk=None):
         rule = self._get_or_404(pk)
+        self._assert_can_modify(request, rule)
         ser = PolicyRuleSerializer(rule, data=request.data, context={"request": request})
         ser.is_valid(raise_exception=True)
         rule = ser.save()
-        opa_client.push_policy(rule.policy_id, rule.rego_source)
-        return Response(PolicyRuleSerializer(rule, context={"request": request}).data)
+        opa_client.push_policy(str(rule.id), rule.rego_source)
+        return Response(PolicyRuleSerializer(rule, context={"request": request}).to_representation(rule))
 
     @swagger_auto_schema(tags=_OPA_TAG)
     def partial_update(self, request, pk=None):
         rule = self._get_or_404(pk)
-        ser = PolicyRuleSerializer(
-            rule, data=request.data, partial=True, context={"request": request}
-        )
+        self._assert_can_modify(request, rule)
+        ser = PolicyRuleSerializer(rule, data=request.data, partial=True, context={"request": request})
         ser.is_valid(raise_exception=True)
         rule = ser.save()
-        opa_client.push_policy(rule.policy_id, rule.rego_source)
-        return Response(PolicyRuleSerializer(rule, context={"request": request}).data)
+        opa_client.push_policy(str(rule.id), rule.rego_source)
+        return Response(PolicyRuleSerializer(rule, context={"request": request}).to_representation(rule))
 
     @swagger_auto_schema(tags=_OPA_TAG)
     def destroy(self, request, pk=None):
         rule = self._get_or_404(pk)
+        self._assert_can_modify(request, rule)
         try:
-            opa_client.delete_policy(rule.policy_id)
+            opa_client.delete_policy(str(rule.id))
         except Exception as e:
-            logger.warning("Failed to delete policy from OPA; deleting Mongo record anyway",
-                           extra={"policy_id": rule.policy_id, "error": str(e)})
-        rule.delete()
+            logger.warning("Failed to delete policy from OPA; deleting Supabase record anyway",
+                           extra={"policy_id": str(rule.id), "error": str(e)})
+        from core.utils.supabase_policy import SupabasePolicyRule
+        SupabasePolicyRule.delete(str(rule.id))
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     # ------------------------------------------------------------------
@@ -113,12 +152,8 @@ class PolicyViewSet(viewsets.ViewSet):
     @swagger_auto_schema(tags=_OPA_TAG)
     @action(detail=False, methods=["post"], url_path="test")
     def test(self, request):
-        """Dry-run: translate a candidate rule + evaluate against provided input.
-
-        Does NOT persist to Mongo. Pushes a temporary policy to OPA under
-        `__dry_run__`, queries, then cleans up.
-        """
-        rule_data = request.data.get("rule") or {}
+        """Dry-run: translate a candidate rule + evaluate against provided input."""
+        rule_data   = request.data.get("rule") or {}
         sample_input = request.data.get("input") or {}
 
         ser = PolicyRuleSerializer(data=rule_data, context={"request": request})
@@ -145,23 +180,9 @@ class PolicyViewSet(viewsets.ViewSet):
             "persisted": False,
         })
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-    def _get_or_404(self, pk):
-        rule = PolicyRule.objects.filter(policy_id=pk).first()
-        if not rule:
-            raise NotFound(f"Policy '{pk}' not found.")
-        return rule
-
 
 class UserRoleUpdateView(APIView):
-    """PATCH /api/users/<id>/role/ — admin-only role update.
-
-    Enforcement: the `/api/users/` path is in OPA_BYPASS_PATHS at the path
-    level, so OPAPermission short-circuits. We therefore enforce admin-only
-    access manually here (request.user.role == "admin").
-    """
+    """PATCH /api/users/<id>/role/ — legacy single-role update (deprecated in favour of /roles/ endpoints)."""
 
     authentication_classes = [CustomJWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -170,25 +191,29 @@ class UserRoleUpdateView(APIView):
 
     @swagger_auto_schema(tags=_OPA_TAG)
     def patch(self, request, pk=None):
-        if getattr(request.user, "role", None) != "admin":
+        if "super_admin" not in (getattr(request.user, "roles", None) or []):
             return Response(
-                {"detail": "You do not have permission to perform this action."},
+                {"detail": "Super-admin access required."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         new_role = request.data.get("role")
-        if new_role not in User.ROLE_CHOICES:
-            raise ValidationError({"role": f"Must be one of {User.ROLE_CHOICES}."})
+        if not new_role:
+            raise ValidationError({"role": "This field is required."})
 
-        user = User.objects(id=pk).first()
+        from core.authentication import _get_user_backend
+        UserBackend = _get_user_backend()
+        user = UserBackend.get_by_id(pk)
         if not user:
             raise NotFound(f"User '{pk}' not found.")
 
-        user.role = new_role
-        user.save()
+        current_roles = list(user.roles or ["user"])
+        if new_role not in current_roles:
+            current_roles.append(new_role)
+        UserBackend.update_roles(str(user.id), current_roles)
+        user.roles = current_roles
         return Response({
-            "id": str(user.id),
-            "email": user.email,
-            "username": user.username,
-            "role": user.role,
+            "id":     str(user.id),
+            "email":  user.email,
+            "roles":  user.roles,
         })

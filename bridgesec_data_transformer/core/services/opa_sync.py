@@ -1,19 +1,17 @@
 import logging
 
-from core.models.policy_models import PolicyRule
 from core.services import opa_client, rego_builder
 
 logger = logging.getLogger(__name__)
 
 
 def sync_from_mongo() -> dict:
-    """Push all PolicyRule docs from Mongo to OPA. Idempotent.
+    """Push all PolicyRule rows from Supabase to OPA. Idempotent.
 
     - Always (re)pushes the base aggregation policy under id "base".
-    - Pushes each PolicyRule's rego_source under its policy_id.
-    - Removes orphaned policies (present in OPA but not in Mongo).
+    - Pushes each rule's rego_source under its id (UUID).
+    - Removes orphaned policies (present in OPA but not in Supabase).
     """
-    # Snapshot current OPA state. If OPA is unreachable, bail out gracefully.
     try:
         current_ids = set(opa_client.list_policies())
     except Exception as e:
@@ -23,20 +21,19 @@ def sync_from_mongo() -> dict:
         )
         return {"synced": 0, "removed_orphans": 0, "skipped": True}
 
-    # Always push base policy
     opa_client.push_policy("base", rego_builder.BASE_REGO)
 
-    # Push every policy currently stored in Mongo
+    from core.utils.supabase_policy import SupabasePolicyRule
     pushed = []
-    mongo_ids = {"base"}
-    for rule in PolicyRule.objects.all():
+    supabase_ids = {"base"}
+    for raw in SupabasePolicyRule.list_all_raw():
+        rule = SupabasePolicyRule(raw)
         rego_text = rule.rego_source or rego_builder.translate(rule)
-        opa_client.push_policy(rule.policy_id, rego_text)
-        pushed.append(rule.policy_id)
-        mongo_ids.add(rule.policy_id)
+        opa_client.push_policy(str(rule.id), rego_text)
+        pushed.append(str(rule.id))
+        supabase_ids.add(str(rule.id))
 
-    # Remove orphans
-    orphans = current_ids - mongo_ids
+    orphans = current_ids - supabase_ids
     for pid in orphans:
         try:
             opa_client.delete_policy(pid)
@@ -48,10 +45,6 @@ def sync_from_mongo() -> dict:
 
     logger.info(
         "OPA sync complete",
-        extra={
-            "component": "opa",
-            "synced": len(pushed),
-            "removed_orphans": len(orphans),
-        },
+        extra={"component": "opa", "synced": len(pushed), "removed_orphans": len(orphans)},
     )
     return {"synced": len(pushed), "removed_orphans": len(orphans), "skipped": False}
