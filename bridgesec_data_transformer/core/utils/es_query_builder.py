@@ -24,15 +24,15 @@ def build_log_query(
     must_clauses = []
     filter_clauses = []
 
-    # --- Keyword term filters (exact match on keyword sub-fields) ---
+    # --- Keyword term filters (fields are mapped as pure keyword, no .keyword sub-field) ---
     if level:
-        filter_clauses.append({"term": {"levelname.keyword": level}})
+        filter_clauses.append({"term": {"levelname": level}})
     if component:
-        filter_clauses.append({"term": {"component.keyword": component}})
+        filter_clauses.append({"term": {"component": component}})
     if entity_type:
-        filter_clauses.append({"term": {"entity_type.keyword": entity_type}})
+        filter_clauses.append({"term": {"entity_type": entity_type}})
     if operation:
-        filter_clauses.append({"term": {"operation.keyword": operation}})
+        filter_clauses.append({"term": {"operation": operation}})
 
     # --- Date range filter ---
     range_clause = {}
@@ -91,13 +91,13 @@ def build_summary_query() -> dict:
         "aggs": {
             "by_level": {
                 "terms": {
-                    "field": "levelname.keyword",
+                    "field": "levelname",
                     "size": 10,
                 }
             },
             "by_component": {
                 "terms": {
-                    "field": "component.keyword",
+                    "field": "component",
                     "size": 20,
                 }
             },
@@ -108,7 +108,7 @@ def build_summary_query() -> dict:
                 "aggs": {
                     "levels": {
                         "terms": {
-                            "field": "levelname.keyword",
+                            "field": "levelname",
                             "size": 10,
                         }
                     }
@@ -118,7 +118,7 @@ def build_summary_query() -> dict:
                 "filter": {
                     "bool": {
                         "must": [
-                            {"terms": {"levelname.keyword": ["ERROR", "CRITICAL"]}},
+                            {"terms": {"levelname": ["ERROR", "CRITICAL"]}},
                             {"range": {"@timestamp": {"gte": "now-1h"}}}
                         ]
                     }
@@ -140,7 +140,7 @@ def build_request_trace_query(request_id: str) -> dict:
     """
     return {
         "query": {
-            "term": {"request_id.keyword": request_id}
+            "term": {"request_id": request_id}
         },
         "sort": [{"@timestamp": {"order": "asc"}}],
         "size": 1000,  # A single request produces at most a few hundred log lines
@@ -184,15 +184,15 @@ def build_live_log_query(
     filter_clauses = [{"range": {"@timestamp": {"gt": last_timestamp}}}]
     must_clauses = []
 
-    # Keyword filters use .keyword sub-fields for exact matching
+    # Keyword filters — fields are mapped as pure keyword type in this index
     if level:
-        filter_clauses.append({"term": {"levelname.keyword": level}})
+        filter_clauses.append({"term": {"levelname": level}})
     if component:
-        filter_clauses.append({"term": {"component.keyword": component}})
+        filter_clauses.append({"term": {"component": component}})
     if entity_type:
-        filter_clauses.append({"term": {"entity_type.keyword": entity_type}})
+        filter_clauses.append({"term": {"entity_type": entity_type}})
     if operation:
-        filter_clauses.append({"term": {"operation.keyword": operation}})
+        filter_clauses.append({"term": {"operation": operation}})
 
     # Full-text search on message and exception info
     if search:
