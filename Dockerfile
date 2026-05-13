@@ -1,25 +1,27 @@
 # Dockerfile
-
 FROM python:3.10-slim
 
-# Install system dependencies
+# System dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
+    curl \
  && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
-# Install Python dependencies
+# Install Python dependencies first (layer cache)
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Copy the project files
+# Copy project files
 COPY . .
 
-# Install bridgesec_logging package
+# Install the local bridgesec_logging package
 RUN pip install -e .
 
-# Expose port for Django (Gunicorn)
+# Copy and prepare the entrypoint (web service only)
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 EXPOSE 8000

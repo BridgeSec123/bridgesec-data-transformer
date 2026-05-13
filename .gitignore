@@ -11,6 +11,17 @@ docs/
 venv
 ven
 staticfiles
+*.md
+*.sh
+bridgesec_logging.egg-info/
+bridgesec_data_transformer/core/decorators/
+bridgesec_data_transformer/core/middleware/
+deploy-siem.bat
+*.backup
+test_celery_logging.py
+celerybeat-schedule
 private_key.pem
 *.md
 *.txt
+.claude/
+mcp_server/server_test.log
