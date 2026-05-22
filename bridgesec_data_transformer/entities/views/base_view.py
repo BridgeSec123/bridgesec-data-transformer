@@ -188,6 +188,12 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
         
         logger.info(f"Storing {self.entity_type} data in MongoDB database: {db_name}")
 
+        # Skip collections explicitly disabled by the tenant's entity config
+        disabled = getattr(self, "_disabled_collection_names", set())
+        if self.entity_type in disabled:
+            logger.info(f"Skipping disabled collection: {self.entity_type}")
+            return db_name
+
         if not extracted_data:
             logger.warning("No data found to store.")
             return db_name  # No data to insert

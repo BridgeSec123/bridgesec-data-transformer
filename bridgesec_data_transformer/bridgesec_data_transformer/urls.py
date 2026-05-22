@@ -16,6 +16,8 @@ from core.views.tenant_viewset import (
 )
 from core.views.chat_viewset import ChatView
 from core.views.log_views import LogListView, LogSummaryView, LogTraceView, LogStreamView
+from core.views.entity_config_viewset import EntityConfigListView, EntityConfigDetailView, EntityConfigCollectionView
+from core.views.scheduler_config_viewset import SchedulerConfigView
 
 # Your views
 # from core.views.user_views import UserCreateView
@@ -58,6 +60,12 @@ urlpatterns = [
     path("api/logs/summary/",         LogSummaryView.as_view(), name="log-summary"),
     path("api/logs/stream/",          LogStreamView.as_view(),  name="log-stream"),
     path("api/logs/<str:request_id>/", LogTraceView.as_view(), name="log-trace"),
+    # Entity backup configuration (per-tenant enable/disable)
+    path("api/entity-config/", EntityConfigListView.as_view(), name="entity-config-list"),
+    path("api/entity-config/<str:config_name>/", EntityConfigDetailView.as_view(), name="entity-config-detail"),
+    path("api/entity-config/<str:entity_name>/collections/<str:collection_name>/", EntityConfigCollectionView.as_view(), name="entity-config-collection"),
+    # Scheduler configuration (schedule time + scopes display)
+    path("api/scheduler-config/", SchedulerConfigView.as_view(), name="scheduler-config"),
 ]
     # path("user/", UserCreateView.as_view({"post": "post"}), name="create-user"),
     # path('okta_user/', OktaLoginViewSet.as_view({"post": "create"}), name='okta-login'),

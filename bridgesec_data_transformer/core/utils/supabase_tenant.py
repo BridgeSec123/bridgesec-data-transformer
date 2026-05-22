@@ -36,6 +36,11 @@ class SupabaseTenant:
         self.service_scopes       = row.get("service_scopes")
         self.is_active            = row.get("is_active", True)
         self.created_at           = row.get("created_at")
+        # Scheduler config (migration 005)
+        self.scheduler_enabled    = row.get("scheduler_enabled", True)
+        self.scheduler_hour       = row.get("scheduler_hour", 0)
+        self.scheduler_minute     = row.get("scheduler_minute", 0)
+        self.scheduler_timezone   = row.get("scheduler_timezone", "UTC")
         self._row                 = row
 
     # ------------------------------------------------------------------ #
