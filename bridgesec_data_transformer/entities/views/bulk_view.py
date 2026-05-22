@@ -177,6 +177,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             okta_granted_scopes=okta_granted_scopes,
             request_id=request_id,
             db_name=db_name,
+            tenant_id=str(tenant.id) if tenant else None,
         )
 
         logger.info(

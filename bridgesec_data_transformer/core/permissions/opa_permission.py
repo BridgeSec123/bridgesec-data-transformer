@@ -22,6 +22,8 @@ OPA_BYPASS_PATHS = (
     "/api/policies/",
     "/api/users/",
     "/api/roles/",
+    "/api/entity-config/",   # has its own EntityConfigPermission
+    "/api/scheduler-config/",  # has its own inline permission check
 )
 
 

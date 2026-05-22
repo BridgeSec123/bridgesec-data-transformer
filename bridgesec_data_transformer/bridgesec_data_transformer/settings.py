@@ -544,7 +544,15 @@ from celery.schedules import crontab
 CELERY_BEAT_SCHEDULE = {
     'scheduled-bulk-fetch': {
         'task': 'core.tasks.bulk_tasks.run_scheduled_bulk_task',
-        'schedule': crontab(hour=0, minute=0),  # every night at 12:00 AM (midnight)
+        # Fires every 15 minutes; the task converts to tenant timezone and checks
+        # both hour and minute, so :00/:15/:30/:45 values are all supported.
+        'schedule': crontab(minute='0,15,30,45'),
     },
 }
+
+# Single-tenant scheduler defaults (overridden per-tenant via Supabase in multi-tenant mode)
+SCHEDULER_ENABLED  = os.environ.get("SCHEDULER_ENABLED", "true").lower() == "true"
+SCHEDULER_HOUR     = int(os.environ.get("SCHEDULER_HOUR", "0"))
+SCHEDULER_MINUTE   = int(os.environ.get("SCHEDULER_MINUTE", "0"))
+SCHEDULER_TIMEZONE = os.environ.get("SCHEDULER_TIMEZONE", "UTC")
 
