@@ -23,55 +23,41 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# Supabase client (lazy loaded)
-_supabase_client = None
-
-
-def get_supabase_client():
+def get_supabase_client(tenant=None):
     """
-    Get or create Supabase client.
+    Get a Supabase client for Terraform state reads.
+
+    Delegates to the canonical helpers in core.utils.supabase_client so client
+    pooling and credential resolution live in one place. A tenant's own Supabase
+    credentials (derived from the tenants table) are used when present, and only
+    when they are null/empty does it fall back to the master client built from
+    the .env-backed settings (single-tenant mode).
+
+    Args:
+        tenant: Optional tenant object carrying supabase_url / supabase_key.
 
     Returns:
         Supabase client instance
-
-    Raises:
-        ImportError: If supabase-py not installed
-        ValueError: If Supabase configuration missing
     """
-    global _supabase_client
+    from core.utils.supabase_client import (
+        get_supabase_client as get_master_supabase_client,
+        get_supabase_client_for_tenant,
+    )
 
-    if _supabase_client is not None:
-        return _supabase_client
-
-    try:
-        from supabase import create_client, Client
-    except ImportError:
-        raise ImportError(
-            "supabase-py package not installed. "
-            "Install with: pip install supabase"
-        )
-
-    # Get configuration from settings
-    supabase_url = getattr(settings, 'SUPABASE_URL', None)
-    supabase_key = getattr(settings, 'SUPABASE_KEY', None)
-
-    if not supabase_url or not supabase_key:
-        raise ValueError(
-            "Supabase configuration missing. Add SUPABASE_URL and SUPABASE_KEY to settings.py"
-        )
-
-    _supabase_client = create_client(supabase_url, supabase_key)
-    logger.info("Supabase client initialized")
-
-    return _supabase_client
+    if tenant is not None:
+        return get_supabase_client_for_tenant(tenant)
+    return get_master_supabase_client()
 
 
-def get_state_file_from_supabase(deployment_name: str) -> Optional[Dict[str, Any]]:
+def get_state_file_from_supabase(deployment_name: str, tenant=None) -> Optional[Dict[str, Any]]:
     """
     Fetch Terraform state file from Supabase storage.
 
     Args:
         deployment_name: Deployment name (e.g., "app-modules", "policies")
+        tenant: Optional tenant object. When provided, its Supabase client and
+            bucket (supabase_bucket_name) are used so the read targets the
+            tenant's own project/bucket; falls back to .env settings when null.
 
     Returns:
         Parsed state file JSON or None if not found
@@ -84,8 +70,12 @@ def get_state_file_from_supabase(deployment_name: str) -> Optional[Dict[str, Any
         "1.5.0"
     """
     try:
-        client = get_supabase_client()
-        bucket_name = getattr(settings, 'SUPABASE_BUCKET', 'terraform-states')
+        client = get_supabase_client(tenant)
+        # Tenant bucket first; fall back to .env (settings) only when null/empty.
+        bucket_name = (
+            getattr(tenant, 'supabase_bucket_name', None)
+            or getattr(settings, 'SUPABASE_BUCKET', 'terraform-states')
+        )
 
         # Build file path: deployments/{deployment_name}/terraform.tfstate
         file_path = f"deployments/{deployment_name}/terraform.tfstate"
