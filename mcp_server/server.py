@@ -7,12 +7,12 @@ from dotenv import load_dotenv
 # Load .env from repo root (one level up from mcp_server/)
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-# Ensure sibling modules (auth, client) are importable
+# Ensure sibling modules (client) are importable
 sys.path.insert(0, os.path.dirname(__file__))
 
 import client as api  # noqa: E402 — must come after load_dotenv
 
-from mcp.server.fastmcp import FastMCP  # noqa: E402
+from mcp.server.fastmcp import Context, FastMCP  # noqa: E402
 from mcp.server.transport_security import TransportSecuritySettings  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
@@ -26,10 +26,30 @@ mcp = FastMCP(
 )
 
 
+def _caller_token(ctx: Context) -> str:
+    """
+    Extract the bearer token from the HTTP request that invoked this tool.
+
+    The calling application forwards the logged-in user's token to the MCP
+    server; we read it off the incoming request and reuse it verbatim for the
+    downstream Django API call. Django then authenticates as that user and
+    resolves their tenant from the token's `tenant_id` claim — no service-app
+    identity is involved.
+    """
+    request = getattr(ctx.request_context, "request", None)
+    auth = request.headers.get("authorization") if request is not None else None
+    if not auth or not auth.lower().startswith("bearer "):
+        raise ValueError(
+            "Missing or invalid Authorization header. The MCP server requires the "
+            "caller to forward the user's bearer token."
+        )
+    return auth.split(" ", 1)[1].strip()
+
+
 # ─── READ-ONLY TOOLS ──────────────────────────────────────────────────────────
 
 @mcp.tool()
-def list_snapshots(date: str = None) -> dict:
+def list_snapshots(ctx: Context, date: str = None) -> dict:
     """
     List all available Okta snapshot databases grouped by date.
 
@@ -39,22 +59,22 @@ def list_snapshots(date: str = None) -> dict:
     Use the db_name values returned here as input to get_entity_data, restore_entity, etc.
     """
     params = {"date": date} if date else {}
-    return api.get("/db-map/", params=params)
+    return api.get("/db-map/", _caller_token(ctx), params=params)
 
 
 @mcp.tool()
-def list_entity_types() -> dict:
+def list_entity_types(ctx: Context) -> dict:
     """
     List all supported Okta entity types.
 
     Returns names like: users, groups, apps_oauth, policy_mfa, auth_server, etc.
     Use these names as the entity_name argument in other tools.
     """
-    return api.get("/resources/")
+    return api.get("/resources/", _caller_token(ctx))
 
 
 @mcp.tool()
-def get_entity_data(db_name: str, entity_name: str, page: int = 1, page_size: int = 20) -> dict:
+def get_entity_data(ctx: Context, db_name: str, entity_name: str, page: int = 1, page_size: int = 20) -> dict:
     """
     Fetch records for a specific Okta entity type from a snapshot database.
 
@@ -62,7 +82,7 @@ def get_entity_data(db_name: str, entity_name: str, page: int = 1, page_size: in
     entity_name: entity type e.g. users, groups, policy_mfa — get this from list_entity_types.
     page / page_size: paginate through large result sets.
     """
-    return api.get("/data/", params={
+    return api.get("/data/", _caller_token(ctx), params={
         "db_name": db_name,
         "entity_name": entity_name,
         "page": page,
@@ -71,25 +91,25 @@ def get_entity_data(db_name: str, entity_name: str, page: int = 1, page_size: in
 
 
 @mcp.tool()
-def get_entity_schema(entity_name: str) -> dict:
+def get_entity_schema(ctx: Context, entity_name: str) -> dict:
     """
     Get the field schema and metadata for an Okta entity type.
 
     Returns field names, types, and which fields are non-editable.
     Call this before restore_entity to understand what can be changed.
     """
-    return api.get(f"/entity-schema/{entity_name}/")
+    return api.get(f"/entity-schema/{entity_name}/", _caller_token(ctx))
 
 
 @mcp.tool()
-def diff_snapshots(entity_name: str, db1: str, db2: str) -> dict:
+def diff_snapshots(ctx: Context, entity_name: str, db1: str, db2: str) -> dict:
     """
     Compare a specific Okta entity type between two snapshot databases.
 
     Returns records that were added, removed, or changed between db1 and db2.
     Both db1 and db2 must be full snapshot DB names from list_snapshots.
     """
-    return api.get(f"/diff-collections/{entity_name}/", params={"db1": db1, "db2": db2})
+    return api.get(f"/diff-collections/{entity_name}/", _caller_token(ctx), params={"db1": db1, "db2": db2})
 
 
 # ─── WRITE TOOLS (disabled when MCP_READ_ONLY=true) ──────────────────────────
@@ -97,17 +117,17 @@ def diff_snapshots(entity_name: str, db1: str, db2: str) -> dict:
 if not READ_ONLY:
 
     @mcp.tool()
-    def trigger_bulk_fetch() -> dict:
+    def trigger_bulk_fetch(ctx: Context) -> dict:
         """
         Trigger a new Okta snapshot. Runs as a background Celery task.
 
         The new snapshot will appear in list_snapshots once complete (typically a few minutes).
         Returns the Celery task ID for tracking.
         """
-        return api.post("/api/bulk/")
+        return api.post("/api/bulk/", _caller_token(ctx))
 
     @mcp.tool()
-    def restore_entity(db_name: str, entity_name: str, records: list, source_db: str = None) -> dict:
+    def restore_entity(ctx: Context, db_name: str, entity_name: str, records: list, source_db: str = None) -> dict:
         """
         Restore or modify Okta entity records in a snapshot database.
 
@@ -123,10 +143,10 @@ if not READ_ONLY:
                    while writing to db_name. Useful when restoring from a historical snapshot.
         """
         params = {"source_db": source_db} if source_db else {}
-        return api.post(f"/restore/{db_name}/{entity_name}/", body=records, params=params)
+        return api.post(f"/restore/{db_name}/{entity_name}/", _caller_token(ctx), body=records, params=params)
 
     @mcp.tool()
-    def create_entity(db_name: str, entity_name: str, all_records: list) -> dict:
+    def create_entity(ctx: Context, db_name: str, entity_name: str, all_records: list) -> dict:
         """
         Create a new Okta entity of a given type.
 
@@ -139,10 +159,10 @@ if not READ_ONLY:
           2. Build the new record dict without an id/profile_id/app_id field.
           3. Append it to the existing list and pass the full list as all_records.
         """
-        return api.post(f"/restore/{db_name}/{entity_name}/", body=all_records)
+        return api.post(f"/restore/{db_name}/{entity_name}/", _caller_token(ctx), body=all_records)
 
     @mcp.tool()
-    def plan_deletion(db_name: str, entity_name: str, records_to_delete: list) -> dict:
+    def plan_deletion(ctx: Context, db_name: str, entity_name: str, records_to_delete: list) -> dict:
         """
         Stage a deletion plan for user review. Nothing is deleted yet.
 
@@ -154,12 +174,13 @@ if not READ_ONLY:
         """
         return api.post(
             f"/restore/{db_name}/{entity_name}/",
+            _caller_token(ctx),
             body=records_to_delete,
             params={"operation_type": "delete", "phase": "plan"},
         )
 
     @mcp.tool()
-    def confirm_deletion(plan_id: str) -> dict:
+    def confirm_deletion(ctx: Context, plan_id: str) -> dict:
         """
         IRREVERSIBLE. Execute a staged deletion plan via Terraform.
 
@@ -167,16 +188,16 @@ if not READ_ONLY:
         summary returned by plan_deletion. The plan_id comes from that response.
         Once confirmed, the resources are permanently deleted from Okta.
         """
-        return api.post("/confirm-delete/", params={"plan_id": plan_id, "action": "confirm"})
+        return api.post("/confirm-delete/", _caller_token(ctx), params={"plan_id": plan_id, "action": "confirm"})
 
     @mcp.tool()
-    def cancel_deletion(plan_id: str) -> dict:
+    def cancel_deletion(ctx: Context, plan_id: str) -> dict:
         """
         Cancel a pending deletion plan. No changes are made to Okta.
 
         Removes all staged records from MongoDB and invalidates the plan_id.
         """
-        return api.post("/confirm-delete/", params={"plan_id": plan_id, "action": "deny"})
+        return api.post("/confirm-delete/", _caller_token(ctx), params={"plan_id": plan_id, "action": "deny"})
 
 
 # ─── ENTRY POINT ─────────────────────────────────────────────────────────────
