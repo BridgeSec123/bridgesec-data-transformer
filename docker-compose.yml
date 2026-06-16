@@ -41,6 +41,7 @@ services:
       - PYTHONUNBUFFERED=1
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672/
       - REDIS_URL=redis://redis:6379/0
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
     ports:
       - "8007:8000"
     volumes:

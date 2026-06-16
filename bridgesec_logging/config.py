@@ -53,6 +53,23 @@ class ContextFilter(logging.Filter):
         return True
 
 
+class TenantContextFilter(logging.Filter):
+    """
+    Injects the current request's tenant_id into every ES log record.
+    Reads the SupabaseTenant object from the ContextVar set by CustomJWTAuthentication.
+    Attach only to the 'elasticsearch' handler to avoid redundant stamps on console/file.
+    """
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not getattr(record, "tenant_id", None):
+            try:
+                from core.utils.tenant_utils import get_current_tenant
+                tenant = get_current_tenant()
+                record.tenant_id = str(tenant.id) if tenant else "unknown"
+            except Exception:
+                record.tenant_id = "unknown"
+        return True
+
+
 def setup_logging(
     app_name='bridgesec',
     log_dir=None,
@@ -62,8 +79,6 @@ def setup_logging(
     enable_console=True,
     enable_file=True,
     enable_loki=True,
-    max_bytes=10485760,  # 10MB
-    backup_count=5,
 ):
     """
     Configure logging for the application.
@@ -77,8 +92,6 @@ def setup_logging(
         enable_console: Enable console logging
         enable_file: Enable file logging
         enable_loki: Enable Loki integration
-        max_bytes: Maximum bytes per log file before rotation
-        backup_count: Number of backup log files to keep
 
     Usage:
         from bridgesec_logging import setup_logging
@@ -124,11 +137,14 @@ def setup_logging(
             'context_filter': {
                 '()': lambda: context_filter,
             },
+            'tenant_context': {
+                '()': TenantContextFilter,
+            },
         },
         'formatters': {
             'json': {
                 '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
-                'format': '%(asctime)s %(levelname)s %(name)s %(message)s %(request_id)s %(user)s %(component)s %(entity_type)s %(operation)s %(duration_ms)s %(resource_count)s %(hostname)s %(environment)s',
+                'format': '%(asctime)s %(levelname)s %(name)s %(message)s %(request_id)s %(user)s %(component)s %(entity_type)s %(operation)s %(duration_ms)s %(resource_count)s %(hostname)s %(environment)s %(tenant_id)s',
                 'datefmt': '%Y-%m-%dT%H:%M:%S',
             },
             'detailed': {
@@ -188,24 +204,20 @@ def setup_logging(
     # Add file handlers if enabled
     if enable_file:
         LOGGING_CONFIG['handlers']['file'] = {
-            'class': 'logging.handlers.RotatingFileHandler',
+            'class': 'logging.FileHandler',
             'level': log_level,
             'formatter': 'json',
-            'filters': ['context_filter'],
+            'filters': ['context_filter', 'tenant_context'],
             'filename': str(log_dir / f'{app_name}.log'),
-            'maxBytes': max_bytes,
-            'backupCount': backup_count,
         }
 
         # Add celery-specific log file
         LOGGING_CONFIG['handlers']['celery_file'] = {
-            'class': 'logging.handlers.RotatingFileHandler',
+            'class': 'logging.FileHandler',
             'level': log_level,
             'formatter': 'json',
-            'filters': ['context_filter'],
+            'filters': ['context_filter', 'tenant_context'],
             'filename': str(log_dir / f'{app_name}_celery.log'),
-            'maxBytes': max_bytes,
-            'backupCount': backup_count,
         }
 
         # Assign file handlers to loggers

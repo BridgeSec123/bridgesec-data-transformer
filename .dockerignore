@@ -1,0 +1,43 @@
+# Python environments
+.venv/
+venv/
+ven/
+
+# Bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build artifacts
+*.egg-info/
+*.egg
+
+# Git
+.git/
+.gitignore
+
+# Secrets & env
+.env
+*.pem
+*.key
+*.backup
+
+# Runtime dirs (mounted as volumes in docker-compose)
+output/
+logs/
+staticfiles/
+celerybeat-schedule
+celerybeat-schedule.db
+
+# Dev tooling
+.vscode/
+.claude/
+scratch/
+docs/
+test_celery_logging.py
+deploy-siem.bat
+
+# OS
+.DS_Store
+Thumbs.db

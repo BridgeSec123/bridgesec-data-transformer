@@ -28,6 +28,13 @@ class LoggingMiddleware(MiddlewareMixin):
         """
         Process incoming request - generate request_id and log details.
         """
+        # Reset tenant context — authentication hasn't run yet at this point
+        try:
+            from core.utils.tenant_utils import set_current_tenant
+            set_current_tenant(None)
+        except Exception:
+            pass
+
         # Generate unique request ID
         request.request_id = str(uuid.uuid4())
         request.start_time = time.time()
@@ -48,6 +55,7 @@ class LoggingMiddleware(MiddlewareMixin):
                 'path': request.path,
                 'query_params': dict(request.GET),
                 'remote_addr': self._get_client_ip(request),
+                'tenant_id': 'unknown',
             }
         )
 
@@ -77,6 +85,7 @@ class LoggingMiddleware(MiddlewareMixin):
             log_level = logging.INFO
 
         # Log response
+        _tenant = getattr(request, '_tenant', None)
         logger.log(
             log_level,
             f"Request completed: {request.method} {request.path} - {response.status_code} ({duration_ms}ms)",
@@ -88,6 +97,7 @@ class LoggingMiddleware(MiddlewareMixin):
                 'path': request.path,
                 'status_code': response.status_code,
                 'duration_ms': duration_ms,
+                'tenant_id': str(_tenant.id) if _tenant else 'unknown',
             }
         )
 
@@ -105,6 +115,7 @@ class LoggingMiddleware(MiddlewareMixin):
         if hasattr(request, 'user') and request.user.is_authenticated:
             user = getattr(request.user, 'username', str(request.user))
 
+        _tenant = getattr(request, '_tenant', None)
         logger.exception(
             f"Request exception: {request.method} {request.path} - {str(exception)}",
             extra={
@@ -114,6 +125,7 @@ class LoggingMiddleware(MiddlewareMixin):
                 'method': request.method,
                 'path': request.path,
                 'exception_type': type(exception).__name__,
+                'tenant_id': str(_tenant.id) if _tenant else 'unknown',
             }
         )
 
