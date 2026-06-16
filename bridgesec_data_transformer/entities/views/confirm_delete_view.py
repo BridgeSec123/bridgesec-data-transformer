@@ -38,7 +38,9 @@ from core.permissions.opa_permission import OPAPermission
 
 logger = logging.getLogger(__name__)
 
-mongo_client = settings.MONGO_CLIENT
+def _get_system_client():
+    from core.utils.mongo_utils import get_system_mongo_client
+    return get_system_mongo_client()
 
 
 class ConfirmDeletionView(APIView):
@@ -107,10 +109,11 @@ class ConfirmDeletionView(APIView):
         # --- action == "confirm" ---
         requesting_user = get_user_from_request(request)
         tenant = get_tenant_from_request(request)
-        active_mongo_client = get_mongo_client_for_tenant(tenant) if tenant else mongo_client
+        active_mongo_client = get_mongo_client_for_tenant(tenant) if tenant else _get_system_client()
         tenant_mongo_uri = tenant.mongo_uri if tenant else None
+        _db_prefix = tenant.mongo_db_prefix if tenant else settings.MONGO_DB_NAME
 
-        plans_col = mongo_client[settings.MONGO_DB_NAME]["pending_deletion_plans"]
+        plans_col = active_mongo_client[_db_prefix]["pending_deletion_plans"]
 
         # Load and validate the plan
         plan, err = load_deletion_plan(plan_id, requesting_user, plans_col)
@@ -167,10 +170,26 @@ class ConfirmDeletionView(APIView):
             extra={"operation": "Confirm Deletion"},
         )
 
+        okta_org_name = None
+        okta_base_url = None
+        if tenant and tenant.okta_domain:
+            domain_clean = tenant.okta_domain.replace("https://", "").replace("http://", "").rstrip("/")
+            parts = domain_clean.split(".", 1)
+            okta_org_name = parts[0]
+            okta_base_url = parts[1] if len(parts) > 1 else "okta.com"
+
         tf_response = requests.post(
             terraform_url,
             params=terraform_params,
-            json={"data": modified_data},
+            json={
+                "data":          modified_data,
+                "tenant_id":     str(tenant.id) if tenant else None,
+                "okta_org_name": okta_org_name,
+                "okta_base_url": okta_base_url,
+                "bucket_name":   tenant.supabase_bucket_name if tenant else None,
+                "supabase_url":  tenant.supabase_url if tenant else None,
+                "supabase_key":  tenant.supabase_key if tenant else None,
+            },
             headers=tf_headers,
         )
 
@@ -218,6 +237,7 @@ class ConfirmDeletionView(APIView):
                         entity_record=doc,
                         deletion_results=tf_data,
                         access_token=okta_access_token,
+                        tenant=tenant,
                     )
                     verification_results.append(verification)
                 except Exception as exc:
@@ -306,10 +326,11 @@ class ConfirmDeletionView(APIView):
         """
         requesting_user = get_user_from_request(request)
         tenant = get_tenant_from_request(request)
-        active_mongo_client = get_mongo_client_for_tenant(tenant) if tenant else mongo_client
+        active_mongo_client = get_mongo_client_for_tenant(tenant) if tenant else _get_system_client()
         tenant_mongo_uri = tenant.mongo_uri if tenant else None
+        _db_prefix = tenant.mongo_db_prefix if tenant else settings.MONGO_DB_NAME
 
-        plans_col = mongo_client[settings.MONGO_DB_NAME]["pending_deletion_plans"]
+        plans_col = active_mongo_client[_db_prefix]["pending_deletion_plans"]
 
         plan, err = load_deletion_plan(plan_id, requesting_user, plans_col)
         if err:

@@ -21,7 +21,7 @@ class AppsGroupAssignmentViewSet(BaseAppViewSet):
         """
         Fetch group assignments for a specific app from Okta.
         """
-        base_url = settings.OKTA_API_URL
+        base_url = self.okta_base_url
         headers = get_okta_headers(request)
 
         groups_url = f"{base_url}/api/v1/apps/{app_id}/groups"
@@ -56,7 +56,7 @@ class AppsGroupAssignmentViewSet(BaseAppViewSet):
         app_id = app.get("app_id")
         app_label = app.get("label", app_id)  # Use label if available, otherwise app_id
 
-        base_url = settings.OKTA_API_URL
+        base_url = self.okta_base_url
         headers = get_okta_headers(request)
 
         formatted_data = []

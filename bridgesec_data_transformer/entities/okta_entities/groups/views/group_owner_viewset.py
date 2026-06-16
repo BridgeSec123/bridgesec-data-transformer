@@ -2,6 +2,7 @@ import logging
 
 import requests
 from core.utils.okta_helpers import get_okta_headers
+from core.utils.rate_limit import handle_rate_limit
 from django.conf import settings
 from entities.okta_entities.groups.group_models import GroupOwner
 from entities.okta_entities.groups.group_serializers import GroupOwnerSerializer
@@ -30,17 +31,20 @@ class GroupOwnerViewSet(BaseGroupViewSet):
             logger.error("Group ID is required to fetch owners.")
             return []
 
-        url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(group_id=group_id)}"
+        url = f"{self.okta_base_url}/{self.okta_endpoint.format(group_id=group_id)}"
         headers = get_okta_headers(request)
 
         logger.info(f"Fetching data from Okta API: {url}")
 
-        response = requests.get(url, headers=headers)
+        while True:
+            response = requests.get(url, headers=headers)
 
-        if response.status_code == 200:
-            logger.info(f"Successfully fetched owners for group {group_id}")
-            return response.json()
-        else:
+            if handle_rate_limit(response):
+                continue
+
+            if response.status_code == 200:
+                logger.info(f"Successfully fetched owners for group {group_id}")
+                return response.json()
             logger.error(
                 f"Failed to fetch group owners. Status Code: {response.status_code}, Response: {response.text}"
             )

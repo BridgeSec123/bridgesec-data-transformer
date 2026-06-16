@@ -24,7 +24,7 @@ class PolicyRuleIDPDiscoveryViewSet(BasePolicyViewSet):
         """
         Fetch IDP_DISCOVERY policies and their rules, attaching policy_id to each rule.
         """
-        discovery_url = f"{settings.OKTA_API_URL}/api/v1/policies"
+        discovery_url = f"{self.okta_base_url}/api/v1/policies"
         headers = get_okta_headers(request)
         params = {"type": "IDP_DISCOVERY"}
 
@@ -51,7 +51,7 @@ class PolicyRuleIDPDiscoveryViewSet(BasePolicyViewSet):
                 logger.warning("Policy without ID found. Skipping.")
                 continue
 
-            rules_url = f"{settings.OKTA_API_URL}/api/v1/policies/{policy_id}/rules"
+            rules_url = f"{self.okta_base_url}/api/v1/policies/{policy_id}/rules"
             rule_response = requests.get(rules_url, headers=headers)
 
             if handle_rate_limit(rule_response):

@@ -25,6 +25,7 @@ class BaseDeviceAssurancePolicyViewSet(BaseEntityViewSet):
         for entity_name, viewset_class in DEVICE_ASSURANCE_POLICY_ENTITY_VIEWSETS.items():
             logger.info(f"Processing entity: {entity_name}")
             viewset_instance = viewset_class()
+            viewset_instance.request = request
             extracted_data[entity_name] = []
             # Fetch full Okta response and extract based on type inside extract_data
             okta_response, _, _ = viewset_instance.fetch_from_okta(request=request)
@@ -34,6 +35,7 @@ class BaseDeviceAssurancePolicyViewSet(BaseEntityViewSet):
 
         for entity_name, data in extracted_data.items():
             viewset_instance = DEVICE_ASSURANCE_POLICY_ENTITY_VIEWSETS[entity_name]()
+            viewset_instance.request = request
             viewset_instance.store_data(data, db_name)
 
         return extracted_data

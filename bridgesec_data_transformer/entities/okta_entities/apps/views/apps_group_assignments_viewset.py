@@ -21,7 +21,7 @@ class AppGroupAssignmentsViewSet(BaseAppViewSet):
         """
         Fetch group assignments for a specific app from Okta.
         """
-        base_url = settings.OKTA_API_URL
+        base_url = self.okta_base_url
         headers = get_okta_headers(request)
         
         # API call to get groups for this app

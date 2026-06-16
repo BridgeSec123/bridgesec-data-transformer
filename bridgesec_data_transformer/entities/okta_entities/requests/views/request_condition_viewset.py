@@ -21,7 +21,7 @@ class RequestConditionViewSet(BaseEntityViewSet):
     def fetch_and_store_data(self, db_name, request=None):
         try:
             headers = get_okta_headers(request)
-            resources_url = f"{settings.OKTA_API_URL}{self.resources_endpoint}"
+            resources_url = f"{self.okta_base_url}{self.resources_endpoint}"
 
             res = http_requests.get(resources_url, headers=headers)
             if res.status_code != 200:
@@ -38,7 +38,7 @@ class RequestConditionViewSet(BaseEntityViewSet):
                     continue
 
                 conditions_url = (
-                    f"{settings.OKTA_API_URL}/governance/api/v2/resources/"
+                    f"{self.okta_base_url}/governance/api/v2/resources/"
                     f"{resource_id}/access-request-settings/conditions"
                 )
                 cond_res = http_requests.get(conditions_url, headers=headers)

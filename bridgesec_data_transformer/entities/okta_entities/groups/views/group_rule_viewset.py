@@ -32,7 +32,7 @@ class GroupRuleViewSet(BaseGroupViewSet):
 
         for group_id in group_ids:
             try:
-                group_url = f"{settings.OKTA_API_URL}/api/v1/groups/{group_id}"
+                group_url = f"{self.okta_base_url}/api/v1/groups/{group_id}"
                 response = requests.get(group_url, headers=headers)
                 if response.status_code == 200:
                     group_data = response.json()

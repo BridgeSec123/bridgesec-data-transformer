@@ -11,7 +11,6 @@ from entities.views.base_view import BaseEntityViewSet
 logger = logging.getLogger(__name__)
 
 class InlineHookEntityViewSet(BaseEntityViewSet):
-    queryset = InlineHook.objects.all()
     okta_endpoint = "/api/v1/inlineHooks"
     entity_type = "inline_hooks"
     serializer_class = InlineHookSerializer

@@ -2,6 +2,7 @@ import logging
 
 import requests
 from core.utils.okta_helpers import get_okta_headers
+from core.utils.rate_limit import handle_rate_limit
 from django.conf import settings
 
 from entities.okta_entities.auth_server.auth_server_models import (
@@ -17,7 +18,6 @@ from entities.okta_entities.auth_server.views.auth_server_base_viewset import (
 logger = logging.getLogger(__name__)
 
 class AuthorizationServerPolicyViewSet(BaseAuthServerViewSet):
-    queryset = AuthorizationServerPolicy.objects.all()
     okta_endpoint = "/api/v1/authorizationServers/{auth_server_id}/policies"
     entity_type = "auth_server_policy"
     serializer_class = AuthorizationServerPolicySerializer
@@ -31,17 +31,20 @@ class AuthorizationServerPolicyViewSet(BaseAuthServerViewSet):
             logger.error("Auth Server ID is required to fetch policies.")
             return []
 
-        url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(auth_server_id=auth_server_id)}"
+        url = f"{self.okta_base_url}/{self.okta_endpoint.format(auth_server_id=auth_server_id)}"
         headers = get_okta_headers(request)
 
         logger.info(f"Fetching data from Okta API: {url}")
-        
-        response = requests.get(url, headers=headers)
 
-        if response.status_code == 200:
-            logger.info(f"Successfully fetched policies for Authorization Server ID: {auth_server_id}.")
-            return response.json()
-        else:
+        while True:
+            response = requests.get(url, headers=headers)
+
+            if handle_rate_limit(response):
+                continue
+
+            if response.status_code == 200:
+                logger.info(f"Successfully fetched policies for Authorization Server ID: {auth_server_id}.")
+                return response.json()
             logger.error(f"Failed to fetch policies for Authorization Server ID: {auth_server_id}. Status Code: {response.status_code}, Response: {response.text}")
             return []
 

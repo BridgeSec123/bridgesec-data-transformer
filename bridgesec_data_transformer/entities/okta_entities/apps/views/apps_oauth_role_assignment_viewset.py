@@ -24,7 +24,7 @@ class AppOauthRoleAssignmentViewSet(BaseAppViewSet):
             logger.error("Okta endpoint not defined")
             return {"error": "Okta endpoint not defined"}, 500
 
-        okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(client_id=client_id)}"
+        okta_url = f"{self.okta_base_url}/{self.okta_endpoint.format(client_id=client_id)}"
         headers = get_okta_headers(request)
         
         logger.info(f"Fetching data from Okta endpoint: {self.okta_endpoint}")

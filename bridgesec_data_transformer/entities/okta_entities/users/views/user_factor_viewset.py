@@ -35,7 +35,7 @@ class UserFactorViewSet(BaseUserViewSet):
             logger.error("Okta endpoint not defined")
             return {"error": "Okta endpoint not defined"}, 500
 
-        okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(user_id=user_id)}"
+        okta_url = f"{self.okta_base_url}/{self.okta_endpoint.format(user_id=user_id)}"
         headers = get_okta_headers(request)
         
         logger.info(f"Fetching data from Okta endpoint: {self.okta_endpoint}")

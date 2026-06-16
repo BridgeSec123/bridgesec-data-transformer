@@ -2,6 +2,7 @@ import logging
 
 import requests
 from core.utils.okta_helpers import get_okta_headers
+from core.utils.rate_limit import handle_rate_limit
 from django.conf import settings
 
 from entities.okta_entities.auth_server.auth_server_models import (
@@ -27,24 +28,28 @@ class AuthorizationServerPolicyRuleViewSet(BaseAuthServerViewSet):
             logger.error("Both Auth Server ID and Policy ID are required to fetch policy rules.")
             return []
 
-        url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(auth_server_id=auth_server_id, policy_id=policy_id)}"
+        url = f"{self.okta_base_url}/{self.okta_endpoint.format(auth_server_id=auth_server_id, policy_id=policy_id)}"
         headers = get_okta_headers(request)
 
         logger.info(f"Fetching policy rules from Okta API: {url}")
-        response = requests.get(url, headers=headers)
 
-        content = response.text.strip()
-        if response.status_code == 200:
-            if content:
-                try:
-                    return response.json()
-                except Exception as e:
-                    logger.error(f"Failed to decode JSON response: {e}")
+        while True:
+            response = requests.get(url, headers=headers)
+
+            if handle_rate_limit(response):
+                continue
+
+            content = response.text.strip()
+            if response.status_code == 200:
+                if content:
+                    try:
+                        return response.json()
+                    except Exception as e:
+                        logger.error(f"Failed to decode JSON response: {e}")
+                        return []
+                else:
+                    logger.warning(f"Empty response received for {auth_server_id}/{policy_id}")
                     return []
-            else:
-                logger.warning(f"Empty response received for {auth_server_id}/{policy_id}")
-                return []
-        else:
             logger.error(f"Failed to fetch policy rules for auth server. Status: {response.status_code}, Response: {content}")
             return []
 

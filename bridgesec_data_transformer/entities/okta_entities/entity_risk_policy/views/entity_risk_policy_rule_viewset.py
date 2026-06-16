@@ -24,7 +24,7 @@ class EntityRiskPolicyRuleViewSet(BaseEntityViewSet):
             logger.error("policy_id is required to fetch entity risk policy rules.")
             return []
 
-        okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(policy_id=policy_id)}"
+        okta_url = f"{self.okta_base_url}/{self.okta_endpoint.format(policy_id=policy_id)}"
         headers = get_okta_headers(request)
 
         while True:

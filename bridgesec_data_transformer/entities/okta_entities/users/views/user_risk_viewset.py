@@ -23,7 +23,7 @@ class UserRiskViewSet(BaseUserViewSet):
             logger.error("user_id is required to fetch user risk.")
             return {}
 
-        okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(user_id=user_id)}"
+        okta_url = f"{self.okta_base_url}/{self.okta_endpoint.format(user_id=user_id)}"
         headers = get_okta_headers(request)
 
         while True:

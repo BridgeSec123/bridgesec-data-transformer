@@ -3,6 +3,7 @@ import logging
 import requests
 from django.conf import settings
 from core.utils.okta_helpers import get_okta_headers
+from core.utils.rate_limit import handle_rate_limit
 
 from entities.okta_entities.apps.apps_models import AppToken
 from entities.okta_entities.apps.apps_serializers import AppTokenSerializer
@@ -22,17 +23,22 @@ class AppTokenViewSet(BaseAppViewSet):
             logger.error("app_id is required to fetch app tokens")
             return [], 400, {}
 
-        url = f"{settings.OKTA_API_URL}{self.okta_endpoint.format(app_id=app_id)}"
+        url = f"{self.okta_base_url}{self.okta_endpoint.format(app_id=app_id)}"
         headers = get_okta_headers(request)
-        response = requests.get(url, headers=headers)
 
-        if response.status_code == 200:
-            return response.json() if response.text.strip() else [], 200, {}
-        logger.error(
-            "Failed to fetch tokens for app %s: %s %s",
-            app_id, response.status_code, response.text,
-        )
-        return [], response.status_code, {}
+        while True:
+            response = requests.get(url, headers=headers)
+
+            if handle_rate_limit(response):
+                continue
+
+            if response.status_code == 200:
+                return response.json() if response.text.strip() else [], 200, {}
+            logger.error(
+                "Failed to fetch tokens for app %s: %s %s",
+                app_id, response.status_code, response.text,
+            )
+            return [], response.status_code, {}
 
     def extract_data(self, okta_data, parent_record=None):
         items = okta_data if isinstance(okta_data, list) else []

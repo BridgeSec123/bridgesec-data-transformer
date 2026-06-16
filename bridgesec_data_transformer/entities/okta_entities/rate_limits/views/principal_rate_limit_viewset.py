@@ -32,7 +32,7 @@ class PrincipalRateLimitViewSet(BaseEntityViewSet):
             # Build the query parameter for filtering
             filter_param = f'principalType eq "{principal_type}"'
             endpoint_with_filter = f"{self.okta_endpoint}?filter={filter_param}"
-            okta_url = f"{settings.OKTA_API_URL}/{endpoint_with_filter}"
+            okta_url = f"{self.okta_base_url}/{endpoint_with_filter}"
 
             logger.info(f"Fetching Principal Rate Limits for type: {principal_type} from {endpoint_with_filter}")
 

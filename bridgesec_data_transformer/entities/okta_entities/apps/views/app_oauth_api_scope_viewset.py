@@ -27,7 +27,7 @@ class AppOauthApiScopeViewSet(BaseAppViewSet):
             logger.error("Okta endpoint not defined")
             return {"error": "Okta endpoint not defined"}, 500
 
-        base_url = settings.OKTA_API_URL
+        base_url = self.okta_base_url
         headers = get_okta_headers(request)
 
         okta_url = f"{base_url}/{self.okta_endpoint.format(app_id=app_id)}"

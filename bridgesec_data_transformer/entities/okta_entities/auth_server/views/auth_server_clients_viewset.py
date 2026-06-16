@@ -18,7 +18,7 @@ class AuthorizationServerClientsViewSet(BaseAuthServerViewSet):
     model = AuthorizationServerClient
 
     def fetch_clients(self, auth_server_id, request=None):
-        url = f"{settings.OKTA_API_URL}/api/v1/authorizationServers/{auth_server_id}/clients"
+        url = f"{self.okta_base_url}/api/v1/authorizationServers/{auth_server_id}/clients"
         headers = get_okta_headers(request)
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
@@ -27,7 +27,7 @@ class AuthorizationServerClientsViewSet(BaseAuthServerViewSet):
         return []
 
     def fetch_tokens(self, auth_server_id, client_id, request=None):
-        url = f"{settings.OKTA_API_URL}/api/v1/authorizationServers/{auth_server_id}/clients/{client_id}/tokens"
+        url = f"{self.okta_base_url}/api/v1/authorizationServers/{auth_server_id}/clients/{client_id}/tokens"
         headers = get_okta_headers(request)
         response = requests.get(url, headers=headers)
         if response.status_code == 200:

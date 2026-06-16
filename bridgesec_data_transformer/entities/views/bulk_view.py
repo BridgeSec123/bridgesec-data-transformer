@@ -11,17 +11,20 @@ import requests
 from core.authentication import CustomJWTAuthentication
 from core.tasks.bulk_tasks import run_bulk_entity_task
 from core.utils.progress_store import create_bulk_job
-from core.utils.collection_mapping import (ENTITY_ID_MAPPING,
-                                           NON_EDITABLE_FIELDS,
-                                           RESOURCE_COLLECTION_MAP)
-from core.utils.db_utils import (ENTITIES_WITH_BUILDERS, extract_time,
+from core.utils.db_utils import (extract_time,
                                  get_collection_diff, get_collection_name,
                                  get_db_map, get_latest_db, list_databases_for_date,
                                  parse_input_date, resolve_db_name)
+from core.utils.mapping_provider import (
+    get_entities_with_builders,
+    get_entity_id_mapping,
+    get_nested_field_collections,
+    get_non_editable_fields,
+    get_resource_collection_map,
+)
 from core.utils.jwt_utils import get_user_from_request
-from core.utils.model_registry import MODEL_REGISTRY
+from core.utils.mapping_provider import get_model_registry
 from core.utils.mongo_utils import ensure_mongo_connection, get_dynamic_db
-from core.utils.nested_mapping import NESTED_FIELD_COLLECTIONS
 from core.utils.okta_helpers import get_okta_headers
 from core.utils.module_mapping import get_terraform_api_for_entity
 from core.utils.restore_utils import (extract_terraform_target_params,
@@ -35,11 +38,11 @@ from core.utils.restore_utils import (extract_terraform_target_params,
                                       handle_nested_deletion,
                                       validate_deletion_safety,
                                       update_created_records_with_ids,
-                                      delete_latest_record,
+                                      rollback_staged_restore,
                                       create_deletion_plan)
 from core.utils.verification import verify_deletion_complete
 from core.utils.schema_extractor import get_ui_backend_mapping
-from core.utils.serializer_registry import SERIALIZER_REGISTRY
+from core.utils.mapping_provider import get_serializer_registry
 from django.conf import settings
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -59,7 +62,6 @@ from bridgesec_logging import log_restore_operation, log_terraform_api_call, Log
 
 logger = logging.getLogger(__name__)
 
-mongo_client = settings.MONGO_CLIENT
 server_url = settings.SERVER_URL
 
 
@@ -80,11 +82,12 @@ def _is_super_admin(request) -> bool:
 
 
 def _get_mongo_client(tenant):
-    """Return the appropriate MongoClient for the tenant (or global default)."""
+    """Return the appropriate MongoClient for the tenant (or system default)."""
     if tenant:
         from core.utils.tenant_utils import get_mongo_client_for_tenant
         return get_mongo_client_for_tenant(tenant)
-    return mongo_client
+    from core.utils.mongo_utils import get_system_mongo_client
+    return get_system_mongo_client()
 
 
 class BulkEntityViewSet(viewsets.ViewSet):
@@ -124,6 +127,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
         # Get Okta access token and granted scopes from session to pass to background task
         okta_access_token = None
         okta_granted_scopes = []
+        using_service_token = False
         if hasattr(request, 'session'):
             okta_access_token = request.session.get('okta_access_token')
             okta_granted_scopes = request.session.get('okta_granted_scopes', [])
@@ -131,18 +135,37 @@ class BulkEntityViewSet(viewsets.ViewSet):
         # Resolve tenant early so we can use the tenant's Okta domain for token validation.
         tenant = _get_tenant(request)
 
-        # If an OAuth token is present in the session, validate it before dispatching.
-        # Use the tenant's own Okta domain when configured — falls back to the global URL.
-        # A 401 here means the session is expired — reject immediately so the user
-        # knows to re-login rather than silently falling back to SSWS and producing
-        # incomplete data.
-        if okta_access_token:
-            okta_base = (tenant.okta_domain if tenant and tenant.okta_domain else None) or settings.OKTA_API_URL
-            okta_base = okta_base.rstrip("/")
+        # In multi-tenant mode, when no user Okta session token is present (e.g. the
+        # frontend authenticates via JWT header rather than a session cookie), fall back
+        # to the tenant's service-app token so manual bulk tasks work the same way
+        # as scheduled ones.
+        from django.conf import settings as _settings
+        if not okta_access_token and getattr(_settings, 'MULTI_TENANCY_ENABLED', False) and tenant:
             try:
-                validation_url = f"{okta_base}/api/v1/users/me"
+                from core.utils.tenant_service_token import get_service_access_token_for_tenant
+                okta_access_token, okta_granted_scopes = get_service_access_token_for_tenant(tenant)
+                using_service_token = True
+                logger.info(
+                    f"No user session token — using service app token for manual bulk task "
+                    f"(tenant: {tenant.name})",
+                    extra={'component': 'api', 'request_id': request_id},
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Could not obtain service app token for tenant '{tenant.name}': {e}",
+                    extra={'component': 'api', 'request_id': request_id},
+                )
+
+        # Validate the user's Okta token before dispatching to catch expired sessions early.
+        # Skipped for service-app tokens (freshly obtained above, no user context endpoint).
+        if okta_access_token and not using_service_token:
+            domain = tenant.okta_domain if tenant and tenant.okta_domain else ''
+            domain = domain.rstrip('/')
+            if not domain.startswith('http'):
+                domain = f"https://{domain}"
+            try:
                 validation_resp = requests.get(
-                    validation_url,
+                    f"{domain}/api/v1/users/me",
                     headers={"Authorization": f"Bearer {okta_access_token}"},
                     timeout=10,
                 )
@@ -170,7 +193,13 @@ class BulkEntityViewSet(viewsets.ViewSet):
         # SSE stream — avoids "Job not found" race condition.
         db_prefix = tenant.mongo_db_prefix if tenant else None
         db_name = get_dynamic_db(prefix=db_prefix)
-        create_bulk_job(request_id, db_name, list(ENTITY_VIEWSETS.keys()))
+
+        # Use the same enabled-entity filter the task will use so that `total`
+        # in the job doc matches exactly how many entity tasks will actually run.
+        from core.utils.entity_config import get_enabled_entities_for_tenant
+        _enabled = get_enabled_entities_for_tenant(str(tenant.id) if tenant else None)
+        tracked_keys = [k for k in ENTITY_VIEWSETS if k in _enabled]
+        create_bulk_job(request_id, db_name, tracked_keys, mongo_uri=getattr(request, "_mongo_uri", None))
 
         run_bulk_entity_task.delay(
             okta_access_token=okta_access_token,
@@ -212,16 +241,19 @@ class BulkEntityViewSet(viewsets.ViewSet):
         try:
             datetime.strptime(date_str, "%Y-%m-%d")
 
-            tenant = _get_tenant(request)
+            tenant = _resolve_tenant(request)
             active_mongo_client = _get_mongo_client(tenant)
-            latest_db = get_latest_db(active_mongo_client, date_str)
+            db_prefix = tenant.mongo_db_prefix if tenant else None
+            tenant_uri = tenant.mongo_uri if tenant else None
+            latest_db = get_latest_db(active_mongo_client, date_str, prefix=db_prefix)
             if not latest_db:
                 return Response(
                     {"error": f"No database found for date {date_str}"},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            ensure_mongo_connection(latest_db)  # needed since using .objects()
+            # Pass tenant's mongo_uri so MongoEngine connects to the right cluster.
+            ensure_mongo_connection(latest_db, mongo_uri=tenant_uri)
 
             model_class = ENTITY_VIEWSETS.get(entity_type)
             if not model_class:
@@ -234,6 +266,18 @@ class BulkEntityViewSet(viewsets.ViewSet):
             data = list(
                 viewset_instance.model.objects.using(latest_db).all().as_pymongo()
             )
+
+            # Also fetch from the underscore-prefixed collection where
+            # create/restore operations store records via _store_collection_simple.
+            # e.g. created records land in "_okta_group", not "okta_group".
+            model = getattr(viewset_instance, 'model', None)
+            if model:
+                collection_name = model._meta.get("collection", "")
+                if collection_name:
+                    db_obj = active_mongo_client[latest_db]
+                    created_records = list(db_obj[f"_{collection_name}"].find())
+                    data.extend(created_records)
+
             for record in data:
                 record.pop("_id", None)
 
@@ -261,12 +305,11 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
         for tenant in tenants:
             try:
-                # Fall back to global settings if tenant has no dedicated MongoDB config
-                if tenant.mongo_uri:
-                    client = get_mongo_client_for_tenant(tenant)
-                else:
-                    client = settings.MONGO_CLIENT
-                db_prefix = tenant.mongo_db_prefix or settings.MONGO_DB_NAME
+                if not tenant.mongo_uri:
+                    logger.warning(f"Tenant '{tenant.name}' has no mongo_uri configured — skipping")
+                    continue
+                client = get_mongo_client_for_tenant(tenant)
+                db_prefix = tenant.mongo_db_prefix
 
                 if date_param and time_param:
                     parsed = parse_input_date(date_param)
@@ -352,8 +395,12 @@ class BulkEntityViewSet(viewsets.ViewSet):
         date_param = request.query_params.get("date")
         time_param = request.query_params.get("time")
 
-        # Super admin without ?tenant_id → aggregate across all tenants
-        if _is_super_admin(request) and not request.query_params.get("tenant_id"):
+        # Cross-tenant aggregated view only for super_admin who has NO JWT tenant scope
+        # AND no explicit ?tenant_id= override. After a tenant switch the JWT carries a
+        # concrete tenant_id (request._tenant_id is set by CustomJWTAuthentication), so
+        # the super_admin is scoped to that tenant and should see only its snapshots.
+        jwt_tenant_id = getattr(request, '_tenant_id', None)
+        if _is_super_admin(request) and not request.query_params.get("tenant_id") and not jwt_tenant_id:
             return self._super_admin_db_map(request, date_param, time_param)
 
         # Regular user or super admin scoped to a specific tenant
@@ -470,7 +517,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             if entity_type:
                 logger.info("Entities found",extra={"operation":"FETCH-ENTITIES"})
                 entity_type = entity_type.title()
-                sub_entities = RESOURCE_COLLECTION_MAP.get(entity_type)
+                sub_entities = get_resource_collection_map().get(entity_type)
                 if not sub_entities:
                     logger.info("Sub entities not found",extra={"operation":"FETCH-ENTITIES"})
                     return Response(
@@ -482,7 +529,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
             logger.info("Entities Not found",extra={"operation":"FETCH-ENTITIES"})
             return Response(
-                {"data": sorted(RESOURCE_COLLECTION_MAP.keys())},
+                {"data": sorted(get_resource_collection_map().keys())},
                 status=status.HTTP_200_OK,
             )
 
@@ -567,6 +614,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             )
 
         active_mongo_client = _get_mongo_client(tenant)
+        db_prefix = tenant.mongo_db_prefix if tenant else settings.MONGO_DB_NAME
 
         try:
             if db_name not in active_mongo_client.list_database_names():
@@ -585,7 +633,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             logger.info(f"Using snapshot db: {db_name}", extra={"operation": 'FETCH-CURRENT-DATA'})
 
             iso_date = db_name.split("_", 1)[1].split("T")[0]
-            service = EntityDataService()
+            service = EntityDataService(mongo_client=active_mongo_client, db_prefix=db_prefix)
 
             # ── ALL-ENTITIES MODE (no entity_name) ──────────────────────────
             if not entity_name:
@@ -593,7 +641,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
                 all_entity_names = [
                     display_name
-                    for entries in RESOURCE_COLLECTION_MAP.values()
+                    for entries in get_resource_collection_map().values()
                     for entry in entries
                     for display_name in entry.keys()
                     if display_name != "non_editable_field"
@@ -612,7 +660,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 original_data = service.fetch(iso_date, current_entity, db_name=db_name)
 
                 collection_name = get_collection_name(current_entity)
-                id_field = ENTITY_ID_MAPPING.get(current_entity)
+                id_field = get_entity_id_mapping().get(current_entity)
                 if collection_name and id_field:
                     db = active_mongo_client[db_name]
                     original_data = fetch_and_merge_restored_data(
@@ -652,7 +700,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                         "total_records": total_records,
                         "next_data_page": data_page + 1 if data_page < data_total_pages else None,
                         "prev_data_page": data_page - 1 if data_page > 1 else None,
-                        "non_editable_fields": NON_EDITABLE_FIELDS.get(current_entity, []),
+                        "non_editable_fields": get_non_editable_fields().get(current_entity, []),
                         "data": original_data[start:end],
                     },
                     status=status.HTTP_200_OK,
@@ -666,7 +714,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             logger.info(f"Fetched {len(original_data)} records for {entity_name}", extra={"operation": "FETCH-CURRENT-DATA"})
 
             collection_name = get_collection_name(entity_name)
-            id_field = ENTITY_ID_MAPPING.get(entity_name)
+            id_field = get_entity_id_mapping().get(entity_name)
             if collection_name and id_field:
                 db = active_mongo_client[db_name]
                 original_data = fetch_and_merge_restored_data(
@@ -725,7 +773,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     "total_records": total_records,
                     "next_page": page + 1 if page < total_pages else None,
                     "prev_page": page - 1 if page > 1 else None,
-                    "non_editable_fields": NON_EDITABLE_FIELDS.get(entity_name, []),
+                    "non_editable_fields": get_non_editable_fields().get(entity_name, []),
                     "data": original_data[start:end],
                 },
                 status=status.HTTP_200_OK,
@@ -807,6 +855,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
         # Resolve tenant-specific mongo client and terraform config
         tenant = _get_tenant(request)
         active_mongo_client = _get_mongo_client(tenant)
+        db_prefix = tenant.mongo_db_prefix if tenant else settings.MONGO_DB_NAME
         active_server_url = tenant.terraform_server_url if tenant else server_url
 
         try:
@@ -815,6 +864,16 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 return Response(
                     {"error": f"Snapshot '{db_name}' not found"},
                     status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # Security: verify snapshot belongs to this tenant's namespace. On a shared
+            # cluster list_database_names() returns every tenant's DBs, so the prefix
+            # check is what scopes the operation to the caller. (Super admin is already
+            # blocked from restore/create/delete above.)
+            if tenant and not db_name.startswith(tenant.mongo_db_prefix + "_"):
+                return Response(
+                    {"error": "Access denied: snapshot does not belong to your tenant"},
+                    status=status.HTTP_403_FORBIDDEN,
                 )
 
             # Get operation_type from query parameters
@@ -831,6 +890,12 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 return Response(
                     {"error": f"Source DB '{srcdb}' not found"},
                     status=status.HTTP_404_NOT_FOUND,
+                )
+            # Security: source snapshot must also belong to this tenant's namespace.
+            if srcdb and tenant and not srcdb.startswith(tenant.mongo_db_prefix + "_"):
+                return Response(
+                    {"error": "Access denied: source snapshot does not belong to your tenant"},
+                    status=status.HTTP_403_FORBIDDEN,
                 )
             source_db = srcdb if srcdb else db_name
 
@@ -874,7 +939,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             current_db = active_mongo_client[db_name]
 
             # Get ID field for this entity
-            id_field = ENTITY_ID_MAPPING.get(entity_name)
+            id_field = get_entity_id_mapping().get(entity_name)
             if not id_field:
                 return Response(
                     {"error": f"Entity '{entity_name}' missing ID field configuration"},
@@ -1020,7 +1085,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             logger.info("=" * 80)
 
             # Step 1: Fetch ALL original data from source DB snapshot
-            service = EntityDataService()
+            service = EntityDataService(mongo_client=active_mongo_client, db_prefix=db_prefix)
             original_data = service.fetch(iso_date, entity_name, db_name=source_db)
             logger.info(f"Step 1: Fetched {len(original_data)} original records from source DB ({source_db})",extra={"operation":"Restore Modified Data"})
 
@@ -1055,7 +1120,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 merged_ids = {str(r.get(id_field)) for r in merged_data if r.get(id_field)}
 
                 # For created records with nested data, rebuild nested arrays
-                nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name)
+                nested_mapping = get_nested_field_collections().get(entity_name)
                 records_to_add = []
                 for created_record in created_records_from_db:
                     rec_id = created_record.get(id_field)
@@ -1136,7 +1201,17 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 )
 
             # Build full Terraform URL with module-based endpoint
-            terraform_url = f"{server_url}{terraform_api}"
+            terraform_url = f"{active_server_url}{terraform_api}"
+
+            # Derive tenant Okta domain fields here so they are available for
+            # both the plan call and the apply call below.
+            okta_org_name = None
+            okta_base_url = None
+            if tenant and tenant.okta_domain:
+                domain_clean = tenant.okta_domain.replace("https://", "").replace("http://", "").rstrip("/")
+                parts = domain_clean.split(".", 1)
+                okta_org_name = parts[0]
+                okta_base_url = parts[1] if len(parts) > 1 else "okta.com"
 
             # ------------------------------------------------------------------
             # PLAN GATE: all deletes go through plan/confirm flow.
@@ -1152,8 +1227,16 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 tf_plan_response = requests.post(
                     terraform_url,
                     params=plan_params,
-                    json={"data": modified_data},
-                    headers=get_okta_headers(request),
+                    json={
+                        "data":          modified_data,
+                        "tenant_id":     str(tenant.id) if tenant else None,
+                        "okta_org_name": okta_org_name,
+                        "okta_base_url": okta_base_url,
+                        "bucket_name":   tenant.supabase_bucket_name if tenant else None,
+                        "supabase_url":  tenant.supabase_url if tenant else None,
+                        "supabase_key":  tenant.supabase_key if tenant else None,
+                    },
+                    headers=tf_headers,
                 )
                 if not tf_plan_response.ok:
                     try:
@@ -1167,11 +1250,12 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
                 plan_output = tf_plan_response.json()
                 deletion_summary = plan_output.pop("deletion_summary", None)
+                plan_summary = plan_output.pop("plan_summary", None)
 
                 # Store plan metadata in pending_deletion_plans.
                 # Records are already in _<collection_name> tagged with plan_id —
                 # no duplication here.
-                plans_col = mongo_client[settings.MONGO_DB_NAME]["pending_deletion_plans"]
+                plans_col = active_mongo_client[db_prefix]["pending_deletion_plans"]
                 create_deletion_plan(
                     plan_id=plan_id,
                     db_name=db_name,
@@ -1199,6 +1283,8 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 }
                 if deletion_summary is not None:
                     response_data["deletion_summary"] = deletion_summary
+                if plan_summary is not None:
+                    response_data["plan_summary"] = plan_summary
 
                 return Response(response_data, status=status.HTTP_200_OK)
             # ------------------------------------------------------------------
@@ -1223,11 +1309,19 @@ class BulkEntityViewSet(viewsets.ViewSet):
             tf_response = requests.post(
                 terraform_url,
                 params=params,
-                json={"data": modified_data},
+                json={
+                    "data":          modified_data,
+                    "tenant_id":     str(tenant.id) if tenant else None,
+                    "okta_org_name": okta_org_name,
+                    "okta_base_url": okta_base_url,
+                    "bucket_name":   tenant.supabase_bucket_name if tenant else None,
+                    "supabase_url":  tenant.supabase_url if tenant else None,
+                    "supabase_key":  tenant.supabase_key if tenant else None,
+                },
                 headers=tf_headers,
             )
-            if not tf_response.ok:
-                delete_latest_record(entity_name,mongo_client,iso_date)
+            if not tf_response.ok and restore_records:
+                rollback_staged_restore(current_db, collection_name, id_field, restore_records)
 
             duration_ms = int((time.time() - start_time) * 1000)
 
@@ -1308,7 +1402,8 @@ class BulkEntityViewSet(viewsets.ViewSet):
                                 entity_type=entity_name,
                                 entity_record=doc,
                                 deletion_results=tf_data,
-                                access_token=okta_access_token
+                                access_token=okta_access_token,
+                                tenant=tenant,
                             )
                             verification_results.append(verification)
                         except Exception as e:
@@ -1419,6 +1514,10 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 if any(not v.get("verified") for v in verification_results):
                     response_data["warning"] = "Deletion completed but verification found issues. Check 'verification' field for details."
 
+            plan_summary = tf_data.get("plan_summary")
+            if plan_summary is not None:
+                response_data["plan_summary"] = plan_summary
+
             # Log operation completion
             log_restore_operation(
                 entity_type=entity_name,
@@ -1502,18 +1601,19 @@ class BulkEntityViewSet(viewsets.ViewSet):
         """
         try:
             # Get model class from registry
-            model_class = MODEL_REGISTRY.get(entity_name)
+            _model_registry = get_model_registry()
+            model_class = _model_registry.get(entity_name)
             if not model_class:
                 return Response({
                     "error": f"Entity '{entity_name}' not found",
-                    "available_entities": sorted(MODEL_REGISTRY.keys())
+                    "available_entities": sorted(_model_registry.keys())
                 }, status=status.HTTP_404_NOT_FOUND)
 
             # Get simple UI to backend mapping
             mapping = get_ui_backend_mapping(model_class)
 
             # Add non-editable fields configuration to response
-            non_editable_fields = NON_EDITABLE_FIELDS.get(entity_name, [])
+            non_editable_fields = get_non_editable_fields().get(entity_name, [])
 
             return Response({
                 "schema": mapping,
@@ -1569,11 +1669,12 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            if entity_name not in ENTITY_ID_MAPPING:
+            _entity_id_mapping = get_entity_id_mapping()
+            if entity_name not in _entity_id_mapping:
                 return Response(
                     {
                         "error": f"Entity '{entity_name}' not supported",
-                        "available_entities": sorted(ENTITY_ID_MAPPING.keys())
+                        "available_entities": sorted(_entity_id_mapping.keys())
                     },
                     status=status.HTTP_400_BAD_REQUEST
                 )
@@ -1581,22 +1682,31 @@ class BulkEntityViewSet(viewsets.ViewSet):
             # Validate DB snapshots exist
             tenant = _resolve_tenant(request)
             active_mongo_client = _get_mongo_client(tenant)
+            db_prefix = tenant.mongo_db_prefix if tenant else settings.MONGO_DB_NAME
             for db_param, label in [(base_db, "base_db"), (target_db, "target_db")]:
                 if db_param not in active_mongo_client.list_database_names():
                     return Response(
                         {"error": f"Snapshot '{db_param}' not found", "param": label},
                         status=status.HTTP_404_NOT_FOUND
                     )
+                # Security: verify snapshot belongs to this tenant's namespace (super admin is exempt).
+                # On a shared cluster list_database_names() returns every tenant's DBs, so membership
+                # alone is not sufficient isolation — the prefix check is what scopes it to the caller.
+                if tenant and not _is_super_admin(request) and not db_param.startswith(tenant.mongo_db_prefix + "_"):
+                    return Response(
+                        {"error": "Access denied: snapshot does not belong to your tenant", "param": label},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
 
             # Get ID field for this entity
-            id_field = ENTITY_ID_MAPPING[entity_name]
+            id_field = _entity_id_mapping[entity_name]
 
             # Extract iso dates from db names for service calls
             base_date = base_db.split("_", 1)[1].split("T")[0]
             target_date = target_db.split("_", 1)[1].split("T")[0]
 
             # Use EntityDataService to get rebuilt data with nested arrays
-            service = EntityDataService()
+            service = EntityDataService(mongo_client=active_mongo_client, db_prefix=db_prefix)
             old_docs = service.fetch(base_date, entity_name, db_name=base_db)
             new_docs = service.fetch(target_date, entity_name, db_name=target_db)
 
@@ -1607,10 +1717,10 @@ class BulkEntityViewSet(viewsets.ViewSet):
             collection_name = get_collection_name(entity_name)
             if collection_name:
                 old_docs = fetch_and_merge_restored_data(
-                    mongo_client[base_db], entity_name, collection_name, id_field, old_docs
+                    active_mongo_client[base_db], entity_name, collection_name, id_field, old_docs
                 )
                 new_docs = fetch_and_merge_restored_data(
-                    mongo_client[target_db], entity_name, collection_name, id_field, new_docs
+                    active_mongo_client[target_db], entity_name, collection_name, id_field, new_docs
                 )
                 remove_metadata_fields(old_docs)
                 remove_metadata_fields(new_docs)
@@ -1636,7 +1746,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             )
 
             # Add non-editable fields configuration to response
-            non_editable_fields = NON_EDITABLE_FIELDS.get(entity_name, [])
+            non_editable_fields = get_non_editable_fields().get(entity_name, [])
             diff_result["non_editable_fields"] = non_editable_fields
 
             return Response(diff_result, status=status.HTTP_200_OK)
@@ -1647,4 +1757,232 @@ class BulkEntityViewSet(viewsets.ViewSet):
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    # ------------------------------------------------------------------
+    # Cross-tenant entity comparison (superadmin only)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _get_latest_snapshot_for_tenant(client, prefix):
+        """
+        Return the most-recent snapshot DB name for a given tenant prefix,
+        or None if no snapshots exist.
+        Uses the same extract_time() helper as _super_admin_db_map / list_databases.
+        """
+        all_dbs = client.list_database_names()
+        candidate_dbs = [db for db in all_dbs if db.startswith(prefix + "_") and extract_time(db)]
+        if not candidate_dbs:
+            return None
+        return max(candidate_dbs, key=lambda db: extract_time(db))
+
+    @swagger_auto_schema(
+        operation_description=(
+            "**Superadmin only.** Compare a single Okta entity between two tenants by listing "
+            "each tenant's records for that entity from their respective MongoDB snapshots.\n\n"
+            "By default the latest snapshot for each tenant is used. Supply `db_a` / `db_b` "
+            "to target a specific snapshot.\n\n"
+            "Because Okta record IDs differ across tenants, this endpoint returns the raw record "
+            "lists for both tenants (no ID-level field diff). The frontend renders the side-by-side "
+            "comparison."
+        ),
+        manual_parameters=[
+            openapi.Parameter("tenant_a", openapi.IN_QUERY, type=openapi.TYPE_STRING,
+                              required=True, description="UUID of the first tenant"),
+            openapi.Parameter("tenant_b", openapi.IN_QUERY, type=openapi.TYPE_STRING,
+                              required=True, description="UUID of the second tenant"),
+            openapi.Parameter("db_a", openapi.IN_QUERY, type=openapi.TYPE_STRING, required=False,
+                              description="Explicit snapshot DB name for tenant A (default: latest)"),
+            openapi.Parameter("db_b", openapi.IN_QUERY, type=openapi.TYPE_STRING, required=False,
+                              description="Explicit snapshot DB name for tenant B (default: latest)"),
+        ],
+        responses={
+            200: openapi.Response(
+                description="Per-tenant record lists for the requested entity",
+                examples={
+                    "application/json": {
+                        "entity_name": "Users",
+                        "id_field": "user_id",
+                        "tenant_a": {
+                            "tenant_id": "<uuid>",
+                            "name": "Acme",
+                            "db": "acme_2026-06-11T0900",
+                            "count": 520,
+                            "records": ["..."]
+                        },
+                        "tenant_b": {
+                            "tenant_id": "<uuid>",
+                            "name": "Globex",
+                            "db": "globex_2026-06-10T1200",
+                            "count": 310,
+                            "records": ["..."]
+                        }
+                    }
+                }
+            ),
+            400: "Invalid entity name or missing required query params",
+            403: "Not a superadmin, or snapshot does not belong to the tenant's namespace",
+            404: "Tenant or snapshot not found",
+            500: "Internal server error",
+        },
+    )
+    @action(detail=False, methods=["get"], url_path="cross-tenant-compare/(?P<entity_name>[^/.]+)")
+    def cross_tenant_compare(self, request, entity_name=None):
+        """
+        Compare a single entity across two tenants.
+
+        Superadmin-only. Reads each tenant's MongoDB directly using mongo_uri from
+        Supabase — no per-tenant Okta login is required.
+        """
+        try:
+            from core.utils.tenant_utils import get_tenant_by_id, get_mongo_client_for_tenant
+
+            # 1. Superadmin gate
+            if not _is_super_admin(request):
+                return Response(
+                    {"error": "Only superadmins can perform cross-tenant comparisons."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            # 2. Validate entity name
+            if not entity_name:
+                return Response(
+                    {"error": "Path parameter 'entity_name' is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            _entity_id_mapping = get_entity_id_mapping()
+            if entity_name not in _entity_id_mapping:
+                return Response(
+                    {
+                        "error": f"Entity '{entity_name}' not supported",
+                        "available_entities": sorted(_entity_id_mapping.keys()),
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            id_field = _entity_id_mapping[entity_name]
+            collection_name = get_collection_name(entity_name)
+
+            # 3. Required query params
+            tenant_a_id = request.query_params.get("tenant_a")
+            tenant_b_id = request.query_params.get("tenant_b")
+            if not tenant_a_id or not tenant_b_id:
+                return Response(
+                    {"error": "Query parameters 'tenant_a' and 'tenant_b' are required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # 4. Resolve tenants from Supabase
+            tenant_a = get_tenant_by_id(tenant_a_id)
+            if not tenant_a:
+                return Response(
+                    {"error": f"Tenant '{tenant_a_id}' not found", "param": "tenant_a"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            tenant_b = get_tenant_by_id(tenant_b_id)
+            if not tenant_b:
+                return Response(
+                    {"error": f"Tenant '{tenant_b_id}' not found", "param": "tenant_b"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            client_a = get_mongo_client_for_tenant(tenant_a)
+            client_b = get_mongo_client_for_tenant(tenant_b)
+            prefix_a = tenant_a.mongo_db_prefix
+            prefix_b = tenant_b.mongo_db_prefix
+
+            # 5. Resolve snapshot DB names (explicit override or latest)
+            db_a_param = request.query_params.get("db_a")
+            db_b_param = request.query_params.get("db_b")
+
+            def _resolve_snapshot(client, prefix, db_param, label):
+                """Validate an explicit snapshot or return the latest one. Returns (db_name, error_response)."""
+                if db_param:
+                    # Validate existence
+                    if db_param not in client.list_database_names():
+                        return None, Response(
+                            {"error": f"Snapshot '{db_param}' not found", "param": label},
+                            status=status.HTTP_404_NOT_FOUND,
+                        )
+                    # Validate namespace ownership (prefix isolation)
+                    if not db_param.startswith(prefix + "_"):
+                        return None, Response(
+                            {
+                                "error": f"Access denied: snapshot '{db_param}' does not belong to "
+                                         f"the tenant's namespace (expected prefix '{prefix}_')",
+                                "param": label,
+                            },
+                            status=status.HTTP_403_FORBIDDEN,
+                        )
+                    return db_param, None
+                else:
+                    latest = BulkEntityViewSet._get_latest_snapshot_for_tenant(client, prefix)
+                    if not latest:
+                        return None, Response(
+                            {
+                                "error": f"No snapshots found for tenant (prefix='{prefix}'). "
+                                         "Run a bulk fetch first.",
+                                "param": label,
+                            },
+                            status=status.HTTP_404_NOT_FOUND,
+                        )
+                    return latest, None
+
+            db_a, err = _resolve_snapshot(client_a, prefix_a, db_a_param, "db_a")
+            if err:
+                return err
+            db_b, err = _resolve_snapshot(client_b, prefix_b, db_b_param, "db_b")
+            if err:
+                return err
+
+            # 6. Derive date strings for EntityDataService (same as diff_collections)
+            date_a = db_a.split("_", 1)[1].split("T")[0]
+            date_b = db_b.split("_", 1)[1].split("T")[0]
+
+            # 7. Fetch entity records from each tenant's snapshot
+            service_a = EntityDataService(mongo_client=client_a, db_prefix=prefix_a)
+            service_b = EntityDataService(mongo_client=client_b, db_prefix=prefix_b)
+
+            docs_a = service_a.fetch(date_a, entity_name, db_name=db_a)
+            docs_b = service_b.fetch(date_b, entity_name, db_name=db_b)
+
+            # 8. Merge restored/reverted records and strip internal metadata fields
+            if collection_name:
+                docs_a = fetch_and_merge_restored_data(
+                    client_a[db_a], entity_name, collection_name, id_field, docs_a
+                )
+                docs_b = fetch_and_merge_restored_data(
+                    client_b[db_b], entity_name, collection_name, id_field, docs_b
+                )
+                remove_metadata_fields(docs_a)
+                remove_metadata_fields(docs_b)
+
+            # 9. Build response
+            return Response(
+                {
+                    "entity_name": entity_name,
+                    "id_field": id_field,
+                    "tenant_a": {
+                        "tenant_id": str(tenant_a.id),
+                        "name": tenant_a.name,
+                        "db": db_a,
+                        "count": len(docs_a),
+                        "records": docs_a,
+                    },
+                    "tenant_b": {
+                        "tenant_id": str(tenant_b.id),
+                        "name": tenant_b.name,
+                        "db": db_b,
+                        "count": len(docs_b),
+                        "records": docs_b,
+                    },
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            traceback.print_exc()
+            logger.error(f"Error in cross_tenant_compare: {str(e)}")
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

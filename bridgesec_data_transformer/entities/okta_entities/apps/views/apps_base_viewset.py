@@ -1,4 +1,5 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from core.utils.entity_mapping import clean_entity_data
 from core.utils.mongo_utils import store_entity_incrementally
@@ -52,6 +53,7 @@ class BaseAppViewSet(BaseEntityViewSet):
         for entity_name, viewset_class in APP_ENTITY_VIEWSETS.items():
             try:
                 viewset_instance = viewset_class()
+                viewset_instance.request = request
                 extracted_data[entity_name] = []
 
                 # Entities that process ALL apps data at once (no iteration)
@@ -62,22 +64,32 @@ class BaseAppViewSet(BaseEntityViewSet):
                     store_entity_incrementally(entity_name, extracted_data[entity_name], viewset_instance, db_name)
                     continue
 
-                # Entities that need to iterate through ALL apps (one at a time)
+                # Entities that need to iterate through ALL apps (concurrent)
                 if entity_name in ENTITIES_NEEDING_APP_ITERATION:
-                    for app in all_apps:
+                    def _fetch_app(app, _vi=viewset_instance, _en=entity_name, _req=request):
                         app_id = app.get("id")
-                        app_label = app.get("label")
                         if not app_id:
-                            continue
+                            return []
+                        app_info = {"app_id": app_id, "label": app.get("label")}
                         try:
-                            data, _, _ = viewset_instance.fetch_from_okta(app_id, request=request)
-                            app_info = {"app_id": app_id, "label": app_label}
-                            extracted = viewset_instance.extract_data(data, app_info)
-                            if extracted:
-                                extracted_data[entity_name].extend(extracted)
+                            data, _, _ = _vi.fetch_from_okta(app_id, request=_req)
+                            return _vi.extract_data(data, app_info) or []
                         except Exception as e:
-                            logger.exception(f"Error processing {entity_name} for app_id {app_id}: {str(e)}")
-                            continue
+                            logger.exception(f"Error processing {_en} for app_id {app_id}: {str(e)}")
+                            return []
+
+                    results = []
+                    with ThreadPoolExecutor(max_workers=10) as executor:
+                        futures = {executor.submit(_fetch_app, app): app for app in all_apps if app.get("id")}
+                        for future in as_completed(futures):
+                            try:
+                                extracted = future.result()
+                                if extracted:
+                                    results.extend(extracted)
+                            except Exception as e:
+                                logger.exception(f"Error collecting result for {entity_name}: {str(e)}")
+
+                    extracted_data[entity_name] = results
                     store_entity_incrementally(entity_name, extracted_data[entity_name], viewset_instance, db_name)
                     continue
 
@@ -100,18 +112,26 @@ class BaseAppViewSet(BaseEntityViewSet):
                                 logger.exception(f"Error processing {entity_name}: {str(e)}")
                                 continue
                     else:
-                        for parent_record in parent_data:
-                            record_id = parent_record.get(id_field)
+                        def _fetch_parent(pr, _vi=viewset_instance, _en=entity_name, _idf=id_field, _req=request):
+                            record_id = pr.get(_idf)
                             if not record_id:
-                                continue
+                                return []
                             try:
-                                data, _, _ = viewset_instance.fetch_from_okta(record_id, request=request)
-                                extracted = viewset_instance.extract_data(data, parent_record)
-                                if extracted:
-                                    extracted_data[entity_name].extend(extracted)
+                                data, _, _ = _vi.fetch_from_okta(record_id, request=_req)
+                                return _vi.extract_data(data, pr) or []
                             except Exception as e:
-                                logger.exception(f"Error processing {entity_name} for {id_field} {record_id}: {str(e)}")
-                                continue
+                                logger.exception(f"Error processing {_en} for {_idf} {record_id}: {str(e)}")
+                                return []
+
+                        with ThreadPoolExecutor(max_workers=10) as executor:
+                            futures = {executor.submit(_fetch_parent, pr): pr for pr in parent_data}
+                            for future in as_completed(futures):
+                                try:
+                                    extracted = future.result()
+                                    if extracted:
+                                        extracted_data[entity_name].extend(extracted)
+                                except Exception as e:
+                                    logger.exception(f"Error collecting result for {entity_name}: {str(e)}")
 
                     if len(extracted_data[entity_name]) > 0:
                         store_entity_incrementally(entity_name, extracted_data[entity_name], viewset_instance, db_name)

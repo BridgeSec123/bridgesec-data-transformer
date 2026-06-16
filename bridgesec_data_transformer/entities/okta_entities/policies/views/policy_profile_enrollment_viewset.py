@@ -28,7 +28,7 @@ class PolicyProfileEnrollmentViewSet(BasePolicyViewSet):
             logger.error("Okta endpoint not defined")
             return {"error": "Okta endpoint not defined"}, 500
 
-        okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint}"
+        okta_url = f"{self.okta_base_url}/{self.okta_endpoint}"
         headers = get_okta_headers(request)
         
         params = {

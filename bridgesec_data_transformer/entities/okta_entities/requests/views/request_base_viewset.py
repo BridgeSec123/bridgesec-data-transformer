@@ -19,6 +19,7 @@ class BaseRequestConditionViewSet(BaseEntityViewSet):
         for entity_name, viewset_class in REQUEST_ENTITY_VIEWSETS.items():
             logger.info(f"Processing entity: {entity_name}")
             viewset_instance = viewset_class()
+            viewset_instance.request = request
             extracted_data[entity_name] = []
 
             # If the sub-viewset overrides fetch_and_store_data, delegate fully to it
@@ -36,6 +37,7 @@ class BaseRequestConditionViewSet(BaseEntityViewSet):
 
         for entity_name, data in extracted_data.items():
             viewset_instance = REQUEST_ENTITY_VIEWSETS[entity_name]()
+            viewset_instance.request = request
             # Skip store for entities that already handled it in fetch_and_store_data
             if type(viewset_instance).fetch_and_store_data is not BaseEntityViewSet.fetch_and_store_data:
                 continue

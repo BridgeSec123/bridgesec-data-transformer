@@ -13,12 +13,15 @@ from entities.entity_filters import should_skip_policy_extraction
 
 logger = logging.getLogger(__name__)
 
-def get_group_name_by_id(group_id, request=None):
+def get_group_name_by_id(group_id, request=None, okta_base_url=None):
     """
     Fetch group name by group ID from Okta API.
     """
     try:
-        okta_url = f"{settings.OKTA_API_URL}/api/v1/groups/{group_id}"
+        if not okta_base_url:
+            raise ValueError("get_group_name_by_id: okta_base_url must be provided.")
+        base = okta_base_url.rstrip('/')
+        okta_url = f"{base}/api/v1/groups/{group_id}"
         headers = get_okta_headers(request)
 
         response = requests.get(okta_url, headers=headers)
@@ -44,7 +47,7 @@ class PolicyMFAViewSet(BasePolicyViewSet):
             logger.error("Okta endpoint not defined")
             return {"error": "Okta endpoint not defined"}, 500
 
-        okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint}"
+        okta_url = f"{self.okta_base_url}/{self.okta_endpoint}"
         headers = get_okta_headers(request)
         
         params = {
@@ -105,7 +108,7 @@ class PolicyMFAViewSet(BasePolicyViewSet):
             group_ids = groups.get("include", [])
             group_names = []
             for group_id in group_ids:
-                group_name = get_group_name_by_id(group_id, request=request)
+                group_name = get_group_name_by_id(group_id, request=self.request, okta_base_url=self.okta_base_url)
                 group_names.append(group_name)
 
             formatted_record = {

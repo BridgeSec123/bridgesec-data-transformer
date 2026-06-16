@@ -20,7 +20,7 @@ class EntityRiskPolicyViewSet(BaseEntityViewSet):
     model = EntityRiskPolicy
 
     def fetch_from_okta(self, request=None):
-        okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint}?type=ENTITY_RISK"
+        okta_url = f"{self.okta_base_url}/{self.okta_endpoint}?type=ENTITY_RISK"
         headers = get_okta_headers(request)
 
         while True:

@@ -27,7 +27,7 @@ class PolicyProfileEnrollmentAppsViewSet(BasePolicyViewSet):
             logger.error("Okta endpoint not defined")
             return {"error": "Okta endpoint not defined"}, 500
 
-        okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(policyProfileEnrollmentId=policy_profile_enrollment_id)}"
+        okta_url = f"{self.okta_base_url}/{self.okta_endpoint.format(policyProfileEnrollmentId=policy_profile_enrollment_id)}"
         headers = get_okta_headers(request)
         
         params = {
@@ -74,7 +74,7 @@ class PolicyProfileEnrollmentAppsViewSet(BasePolicyViewSet):
             app_id = record.get("id", "")
             # if app_id:
             #     # Fetch app details
-            #     app_url = f"{settings.OKTA_API_URL}/api/v1/apps/{app_id}"
+            #     app_url = f"{self.okta_base_url}/api/v1/apps/{app_id}"
             #     try:
             #         response = requests.get(app_url, headers=headers)
             #         if response.status_code == 200:

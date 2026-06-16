@@ -16,7 +16,8 @@ class EntitiesConfig(AppConfig):
         """
         from django.conf import settings
         try:
-            col = settings.MONGO_CLIENT[settings.MONGO_DB_NAME]["pending_deletion_plans"]
+            from core.utils.mongo_utils import get_system_mongo_client
+            col = get_system_mongo_client()[settings.MONGO_DB_NAME]["pending_deletion_plans"]
             col.create_index("created_at", expireAfterSeconds=900, background=True)
             col.create_index("plan_id", unique=True, background=True)
         except Exception:

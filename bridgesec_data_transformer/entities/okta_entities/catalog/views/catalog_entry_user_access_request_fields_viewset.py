@@ -21,7 +21,7 @@ class CatalogEntryUserAccessRequestFieldsViewSet(BaseEntityViewSet):
     def fetch_and_store_data(self, db_name, request=None):
         try:
             headers = get_okta_headers(request)
-            entries_url = f"{settings.OKTA_API_URL}{self.entries_endpoint}"
+            entries_url = f"{self.okta_base_url}{self.entries_endpoint}"
 
             res = http_requests.get(entries_url, headers=headers)
             if res.status_code != 200:
@@ -38,7 +38,7 @@ class CatalogEntryUserAccessRequestFieldsViewSet(BaseEntityViewSet):
                     continue
 
                 fields_url = (
-                    f"{settings.OKTA_API_URL}/governance/api/v2/catalogs/default/entries/"
+                    f"{self.okta_base_url}/governance/api/v2/catalogs/default/entries/"
                     f"{entry_id}/requester-fields"
                 )
                 fields_res = http_requests.get(fields_url, headers=headers)

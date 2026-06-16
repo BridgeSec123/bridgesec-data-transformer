@@ -14,8 +14,24 @@ from core.authentication import CustomJWTAuthentication
 from core.services.bulk_progress_stream_service import BulkProgressStreamService
 from core.utils.progress_store import get_bulk_job
 from core.utils.sse_helpers import sse_event, make_sse_response
-
+from entities.services.SupabasePopulateService import SupabaseStateBackend
 logger = logging.getLogger(__name__)
+
+
+def _resolve_progress_mongo_uri(request) -> str:
+    """
+    Return the tenant's mongo_uri so progress reads hit the same cluster that
+    the write path (bulk_view + worker) used.  Falls back to None, which makes
+    progress_store use the system-level client (single-tenant path).
+    """
+    try:
+        from core.utils.tenant_utils import resolve_tenant_for_request, get_mongo_client_for_tenant
+        tenant = resolve_tenant_for_request(request)
+        if tenant and tenant.mongo_uri:
+            return tenant.mongo_uri
+    except Exception:
+        pass
+    return getattr(request, "_mongo_uri", None)
 
 
 class BulkProgressView(APIView):
@@ -53,7 +69,8 @@ class BulkProgressView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        job = get_bulk_job(request_id)
+        mongo_uri = _resolve_progress_mongo_uri(request)
+        job = get_bulk_job(request_id, mongo_uri=mongo_uri)
         if job is None:
             return Response(
                 {"error": f"Job '{request_id}' not found"},
@@ -109,7 +126,8 @@ class BulkProgressStreamView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        service = BulkProgressStreamService(request_id)
+        mongo_uri = _resolve_progress_mongo_uri(request)
+        service = BulkProgressStreamService(request_id, mongo_uri=mongo_uri)
 
         def _generator():
             for event in service.stream():
@@ -127,6 +145,128 @@ class BulkProgressStreamView(APIView):
 
         return make_sse_response(_generator())
 
+
+class SupabasePopulateView(APIView):
+    """
+    POST /api/supabase_populate/
+
+    Populates the consolidated Supabase mapping schema from this project's
+    in-code registries plus the OkTfModules mappings (core/utils/oktf_mappings.py).
+
+    Tables populated, in dependency order (registry first; the rest FK to it,
+    except parent_entity_mapping which is key-based / FK-free):
+      1. terraform_registry           — entity master: scalars + folded import + aliases
+      2. entity_field_rule            — non_editable / excluded_output / target_id / default
+      3. okta_endpoint_attribute      — attributes extracted per Okta endpoint
+      4. terraform_target             — Terraform module target addresses (list)
+      5. nested_entity_mapping        — parent/child nested-field topology + resource addresses
+      6. entity_dependency            — cascade-delete dependency graph
+      7. parent_entity_mapping        — app parent/child fetch routing
+
+    Each step runs independently — a failure in one is reported but does not
+    abort the others. Response includes per-step status and a final summary.
+
+    Status codes:
+      200 — all 7 tables populated successfully
+      207 — partial success (at least one step failed)
+      502 — every step failed (typically Supabase unreachable / misconfigured)
+    """
+    authentication_classes = [CustomJWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    # Registry MUST run first — every dependent populator joins against
+    # terraform_registry.id, so the table needs rows before the rest can resolve FKs.
+    # (parent_entity_mapping is key-based and FK-free, so order-independent.)
+    _POPULATE_STEPS = [
+        ("terraform_registry",      "populate_terraform_registry"),
+        ("entity_field_rule",       "populate_entity_field_rule"),
+        ("okta_endpoint_attribute", "populate_okta_endpoint_attribute"),
+        ("terraform_target",        "populate_terraform_target"),
+        ("nested_entity_mapping",   "populate_nested_entity_mapping"),
+        ("entity_dependency",       "populate_entity_dependency"),
+        ("parent_entity_mapping",   "populate_parent_entity_mapping"),
+    ]
+
+    @swagger_auto_schema(
+        operation_description=(
+            "Populate the 7 Supabase mapping tables from in-code registries. "
+            "Runs each step independently and reports per-step status."
+        ),
+        responses={
+            200: "All tables populated successfully",
+            207: "Partial success — some tables failed (see per-step status)",
+            502: "All steps failed — Supabase unreachable or misconfigured",
+        },
+        tags=["supabase"],
+    )
+    def post(self, request):
+        try:
+            supabase = SupabaseStateBackend()
+        except Exception as exc:
+            logger.exception("Failed to initialize SupabaseStateBackend")
+            return Response(
+                {
+                    "status": "failed",
+                    "error":  f"Failed to initialize Supabase client: {exc}",
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        steps_result = {}
+        successful   = 0
+        failed       = 0
+
+        for step_key, method_name in self._POPULATE_STEPS:
+            try:
+                response = getattr(supabase, method_name)()
+                record_count = (
+                    len(response.data)
+                    if response is not None and getattr(response, "data", None)
+                    else 0
+                )
+                steps_result[step_key] = {
+                    "status":  "success",
+                    "records": record_count,
+                }
+                successful += 1
+                logger.info(
+                    f"[POPULATE OK] {step_key}: {record_count} record(s) upserted",
+                    extra={"operation": "Populate Supabase", "step": step_key},
+                )
+            except Exception as exc:
+                failed += 1
+                steps_result[step_key] = {
+                    "status": "failed",
+                    "error":  f"{type(exc).__name__}: {exc}",
+                }
+                logger.exception(
+                    f"[POPULATE FAIL] {step_key}",
+                    extra={"operation": "Populate Supabase", "step": step_key},
+                )
+
+        total = len(self._POPULATE_STEPS)
+        if failed == 0:
+            overall_status = "success"
+            http_status    = status.HTTP_200_OK
+        elif successful == 0:
+            overall_status = "failed"
+            http_status    = status.HTTP_502_BAD_GATEWAY
+        else:
+            overall_status = "partial_success"
+            http_status    = status.HTTP_207_MULTI_STATUS
+
+        return Response(
+            {
+                "status":  overall_status,
+                "summary": {
+                    "total":      total,
+                    "successful": successful,
+                    "failed":     failed,
+                },
+                "steps":   steps_result,
+            },
+            status=http_status,
+        )
 
 class DiffReportView(APIView):
     """
@@ -154,8 +294,26 @@ class DiffReportView(APIView):
         tags=["bulk"],
     )
     def get(self, request, db_name):
+        from core.utils.tenant_utils import resolve_tenant_for_request, get_mongo_client_for_tenant, get_request_mongo_client
+
+        # Step 1: resolve the Mongo client — surface connection/config errors as 500.
+        # Use resolve_tenant_for_request so super admins with ?tenant_id= query param
+        # get the correct tenant's cluster instead of their JWT-scoped default.
         try:
-            mongo_client = settings.MONGO_CLIENT
+            tenant = resolve_tenant_for_request(request)
+            mongo_client = get_mongo_client_for_tenant(tenant) if tenant else get_request_mongo_client(request)
+        except Exception as exc:
+            logger.exception(
+                "Failed to resolve MongoDB client for diff report",
+                extra={"component": "api", "db_name": db_name, "error": str(exc)},
+            )
+            return Response(
+                {"error": f"MongoDB connection failed: {exc}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Step 2: read the document — surface query errors as 500, missing doc as 404.
+        try:
             summary = mongo_client[db_name]["_diff_report"].find_one({"_id": "summary"})
         except Exception as exc:
             logger.exception(
@@ -163,8 +321,8 @@ class DiffReportView(APIView):
                 extra={"component": "api", "db_name": db_name, "error": str(exc)},
             )
             return Response(
-                {"error": f"Diff report not available for '{db_name}'"},
-                status=status.HTTP_404_NOT_FOUND,
+                {"error": f"Failed to read diff report from '{db_name}': {exc}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
         if summary is None:

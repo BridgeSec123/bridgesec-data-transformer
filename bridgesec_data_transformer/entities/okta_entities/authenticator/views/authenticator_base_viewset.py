@@ -13,6 +13,7 @@ class BaseAuthenticatorViewSet(BaseEntityViewSet):
         for entity_name, viewset_class in AUTHENTICATOR_ENTITY_VIEWSETS.items():
             try:
                 viewset_instance = viewset_class()
+                viewset_instance.request = request
                 extracted_data[entity_name] = []
 
                 okta_response, status_code, _ = viewset_instance.fetch_from_okta(request=request)
@@ -25,6 +26,7 @@ class BaseAuthenticatorViewSet(BaseEntityViewSet):
 
         for entity_name, data in extracted_data.items():
             viewset_instance = AUTHENTICATOR_ENTITY_VIEWSETS[entity_name]()
+            viewset_instance.request = request
             viewset_instance.store_data(data, db_name)
 
         return extracted_data

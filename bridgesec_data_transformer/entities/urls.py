@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from entities.views.bulk_view import BulkEntityViewSet
 from entities.views.import_view import ImportResourcesView
 from entities.views.confirm_delete_view import ConfirmDeletionView
+from entities.views.progress_view import BulkProgressView, BulkProgressStreamView, DiffReportView,SupabasePopulateView
 from entities.views.progress_view import BulkProgressView, BulkProgressStreamView, DiffReportView
 from core.views.activity_log_viewset import ActivityLogViewSet
 from drf_yasg.views import get_schema_view
@@ -31,12 +32,14 @@ urlpatterns = [
     path("db-map/", BulkEntityViewSet.as_view({"get": "get_db_map_view"}), name="db-map"),
     path("import/", ImportResourcesView.as_view(), name="import-resources"),
     path("diff-collections/<str:entity_name>/", BulkEntityViewSet.as_view({"get": "diff_collections"}), name="diff-collections"),
+    path("cross-tenant-compare/<str:entity_name>/", BulkEntityViewSet.as_view({"get": "cross_tenant_compare"}), name="cross-tenant-compare"),
     path("entity-schema/<str:entity_name>/", BulkEntityViewSet.as_view({"get": "get_entity_schema"}), name="entity-schema"),
     # path("test-entity/<str:entity_name>/", BulkEntityViewSet.as_view({"get": "test_entity"}), name="test-entity"),
     path("confirm-delete/", ConfirmDeletionView.as_view(), name="confirm-delete"),
     path("api/bulk/progress/", BulkProgressView.as_view(), name="bulk-progress"),
     path("api/bulk/progress/stream/", BulkProgressStreamView.as_view(), name="bulk-progress-stream"),
     path("api/diff-report/<str:db_name>/", DiffReportView.as_view(), name="diff-report"),
+    path("api/supabase_populate/", SupabasePopulateView.as_view(), name="Supabase_Populate"),
     # Multi-tenancy
     path("logs/", ActivityLogViewSet.as_view(), name="activity-logs"),
 ]

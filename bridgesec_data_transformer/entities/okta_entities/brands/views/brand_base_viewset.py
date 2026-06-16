@@ -1,4 +1,5 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from entities.views.base_view import BaseEntityViewSet
 
@@ -17,6 +18,7 @@ class BaseBrandViewSet(BaseEntityViewSet):
         for entity_name, viewset_class in BRAND_ENTITY_VIEWSETS.items():
             try:
                 viewset_instance = viewset_class()
+                viewset_instance.request = request
 
                 if entity_name == "brands":
                     data, status_code, _ = viewset_instance.fetch_from_okta(request=request)
@@ -37,16 +39,25 @@ class BaseBrandViewSet(BaseEntityViewSet):
 
                 else:
                     extracted_data[entity_name] = []
-                    for brand in extracted_data.get("brands", []):
+                    brands = extracted_data.get("brands", [])
+
+                    def _fetch_brand_entity(brand, _vi=viewset_instance, _en=entity_name, _req=request):
                         brand_id = brand.get("brand_id")
                         brand_name = brand.get("name")
                         if not brand_id:
-                            continue
+                            return []
+                        data = _vi.fetch_from_okta(brand_id, request=_req)
+                        return _vi.extract_data(data, brand_name) or []
 
-                        data = viewset_instance.fetch_from_okta(brand_id, request=request)
-                        extracted = viewset_instance.extract_data(data, brand_name)
-                        if extracted:
-                            extracted_data[entity_name].extend(extracted)
+                    with ThreadPoolExecutor(max_workers=10) as executor:
+                        futures = {executor.submit(_fetch_brand_entity, brand): brand for brand in brands}
+                        for future in as_completed(futures):
+                            try:
+                                extracted = future.result()
+                                if extracted:
+                                    extracted_data[entity_name].extend(extracted)
+                            except Exception as e:
+                                logger.exception(f"Error collecting result for {entity_name}: {str(e)}")
 
             except Exception as e:
                 logger.exception(f"Error processing {entity_name}: {str(e)}")
@@ -54,6 +65,7 @@ class BaseBrandViewSet(BaseEntityViewSet):
 
         for entity_name, data in extracted_data.items():
             viewset_instance = BRAND_ENTITY_VIEWSETS[entity_name]()
+            viewset_instance.request = request
             viewset_instance.store_data(data, db_name)
 
         return extracted_data

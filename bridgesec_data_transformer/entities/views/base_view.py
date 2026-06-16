@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 class BaseEntityViewSet(viewsets.ModelViewSet):
     """Base viewset for Okta API integration."""
-    
+
     queryset = None
     okta_endpoint = ""
     model = None
@@ -33,32 +33,54 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
     list_serializer_class = None
     entity_type = None
     http_method_names = ["get"]
-    
+
+
+    @property
+    def okta_base_url(self):
+        """
+        Return the tenant-specific Okta base URL for this request.
+        Resolves from the JWT tenant_id → Supabase → tenant.okta_domain.
+        """
+        if getattr(settings, 'MULTI_TENANCY_ENABLED', False) and hasattr(self, 'request'):
+            from core.utils.tenant_utils import resolve_tenant_for_request
+            tenant = resolve_tenant_for_request(self.request)
+            if tenant and tenant.okta_domain:
+                domain = tenant.okta_domain
+                if not domain.startswith('http'):
+                    domain = f"https://{domain}"
+                return domain.rstrip('/')
+        raise ValueError(
+            "okta_base_url: could not resolve tenant okta_domain from self.request. "
+            "Ensure the request carries a valid tenant in multi-tenant mode."
+        )
+
     def get_queryset(self):
         """Ensure MongoDB connection before querying the database."""
         if hasattr(self, 'request'):
             # Block only schema generation requests, not actual API calls
             if "/swagger" in self.request.path:
                 return self.model.objects.none()
-            db_name = get_dynamic_db()
-            ensure_mongo_connection(db_name)
+            db_prefix = getattr(self.request, '_db_prefix', None)
+            mongo_uri = getattr(self.request, '_mongo_uri', None)
+            db_name = get_dynamic_db(prefix=db_prefix)
+            ensure_mongo_connection(db_name, mongo_uri=mongo_uri)
             return self.model.objects.using(db_name).all()
 
         # Otherwise, return an empty queryset to prevent unnecessary DB creation
         return self.model.objects.none()
-    
+
     def list(self, request, *args, **kwargs):
         """Retrieve all records from MongoDB and return the users data."""
         if not self.model or not self.serializer_class:
             logger.error("Model or serializer_class is not defined in UserViewSet.")
             return Response({"error": "Model or serializer_class not defined"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         """Retrieve start and end date from query parameters."""
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
-        
+
         return start_date, end_date
-    
+
     def fetch_from_okta(self, resource_id=None, request=None):
         """Fetch data from Okta API dynamically."""
         # Get request_id from request if available
@@ -68,8 +90,8 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
             logger.error("Okta endpoint not defined")
             return {"error": "Okta endpoint not defined"}, 500, {}
 
-        # Build URL properly to avoid double slashes
-        okta_url = build_okta_url(self.okta_endpoint)
+        # Build URL using tenant-specific base when available
+        okta_url = build_okta_url(self.okta_endpoint, okta_base=self.okta_base_url)
 
         # Get appropriate Okta headers (uses session token if available, otherwise static token)
         headers = get_okta_headers(request)
@@ -86,8 +108,6 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
                 'endpoint': self.okta_endpoint,
             }
         )
-
-        start_time = time.time()
 
         while True:  # Keep retrying if rate limited
             response = requests.get(okta_url, headers=headers)
@@ -175,9 +195,9 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
 
         # # Perform a bulk insert
         # self.model.objects.using(db_name).insert_many(data_list)
-        
+
         # # This is first code for inserting data
-        
+
         # logger.info(f"Storing {self.entity_type} data in MongoDB database: {db_name}")
 
         # for data in extracted_data:
@@ -185,7 +205,7 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
         #     entity.save(using=db_name)
 
         # return db_name
-        
+
         logger.info(f"Storing {self.entity_type} data in MongoDB database: {db_name}")
 
         # Skip collections explicitly disabled by the tenant's entity config
@@ -198,8 +218,9 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
             logger.warning("No data found to store.")
             return db_name  # No data to insert
 
-        ensure_mongo_connection(db_name) 
-        
+        _mongo_uri = getattr(self, 'request', None) and getattr(self.request, '_mongo_uri', None)
+        ensure_mongo_connection(db_name, mongo_uri=_mongo_uri or None)
+
         SORT_FIELD_MAP = {
         # App entities - sorted by label
         "okta_app_oauth": "label",
@@ -342,15 +363,17 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
         )
 
         return db_name
-    
+
     def fetch_and_store_data(self, db_name, request=None):
         """Default fetch-extract-store pipeline. Subclasses override to customise."""
         try:
             okta_response, status_code, _ = self.fetch_from_okta(request=request)
+
             if status_code == 200:
                 extracted_data = self.extract_data(okta_response)
                 self.store_data(extracted_data, db_name=db_name)
                 return {self.entity_type: extracted_data}
+
             return {self.entity_type: []}
         except Exception as e:
             logger.exception("Error in BaseEntityViewSet.fetch_and_store_data: %s", str(e))
@@ -412,10 +435,15 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
         try:
             datetime.strptime(date_str, "%Y-%m-%d")
 
-            mongo_client = MongoClient(settings.MONGO_URI)
+            from core.utils.tenant_utils import resolve_tenant_for_request, get_mongo_client_for_tenant
+            from core.utils.mongo_utils import get_system_mongo_client
+            tenant = resolve_tenant_for_request(request)
+            db_prefix = tenant.mongo_db_prefix if tenant else settings.MONGO_DB_NAME
+            mongo_client = get_mongo_client_for_tenant(tenant) if tenant else get_system_mongo_client()
+            mongo_uri = tenant.mongo_uri if tenant else getattr(settings, "MONGO_URI", None)
             all_dbs = mongo_client.list_database_names()
 
-            date_prefix = f"{settings.MONGO_DB_NAME}_{date_str}"
+            date_prefix = f"{db_prefix}_{date_str}"
             matched_dbs = [db for db in all_dbs if db.startswith(date_prefix)]
 
             if not matched_dbs:
@@ -423,7 +451,7 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
 
             latest_db = sorted(matched_dbs)[-1]
 
-            ensure_mongo_connection(latest_db)
+            ensure_mongo_connection(latest_db, mongo_uri=mongo_uri)
 
             data = list(self.model.objects.using(latest_db).all().as_pymongo())
             for record in data:

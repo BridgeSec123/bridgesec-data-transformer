@@ -3,6 +3,7 @@ import logging
 import requests
 from django.conf import settings
 from core.utils.okta_helpers import get_okta_headers
+from core.utils.rate_limit import handle_rate_limit
 
 from entities.okta_entities.auth_server.auth_server_models import AuthorizationServerKey
 from entities.okta_entities.auth_server.auth_server_serializers import AuthorizationServerKeySerializer
@@ -22,17 +23,22 @@ class AuthorizationServerKeysViewSet(BaseAuthServerViewSet):
             logger.error("Auth Server ID is required to fetch keys")
             return []
 
-        url = f"{settings.OKTA_API_URL}{self.okta_endpoint.format(auth_server_id=auth_server_id)}"
+        url = f"{self.okta_base_url}{self.okta_endpoint.format(auth_server_id=auth_server_id)}"
         headers = get_okta_headers(request)
-        response = requests.get(url, headers=headers)
 
-        if response.status_code == 200:
-            return response.json() if response.text.strip() else []
-        logger.error(
-            "Failed to fetch keys for auth server %s: %s %s",
-            auth_server_id, response.status_code, response.text,
-        )
-        return []
+        while True:
+            response = requests.get(url, headers=headers)
+
+            if handle_rate_limit(response):
+                continue
+
+            if response.status_code == 200:
+                return response.json() if response.text.strip() else []
+            logger.error(
+                "Failed to fetch keys for auth server %s: %s %s",
+                auth_server_id, response.status_code, response.text,
+            )
+            return []
 
     def extract_data(self, okta_data, auth_server_id=None):
         items = okta_data if isinstance(okta_data, list) else []

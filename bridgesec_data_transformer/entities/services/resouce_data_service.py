@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 # Import utility functions from core.utils
 from core.utils.db_utils import get_collection_name, get_latest_db
-from core.utils.collection_mapping import ENTITY_ID_MAPPING
+from core.utils.mapping_provider import get_entity_id_mapping
 from .auth_server_service import AuthServer
 from .policy_mfa_service import PolicyMFADataBuilder
 from .app_signon_policy_service import AppSignonPolicyDataBuilder
@@ -17,8 +17,13 @@ from .admin_role_custom_service import AdminRoleCustomDataBuilder
 
 
 class EntityDataService:
-    def __init__(self, mongo_client=None):
-        self.mongo_client = mongo_client if mongo_client is not None else settings.MONGO_CLIENT
+    def __init__(self, mongo_client=None, db_prefix=None):
+        if mongo_client is not None:
+            self.mongo_client = mongo_client
+        else:
+            from core.utils.mongo_utils import get_system_mongo_client
+            self.mongo_client = get_system_mongo_client()
+        self.db_prefix = db_prefix
 
     def _get_deleted_ids(self, db, collection_name, id_field):
         """
@@ -55,7 +60,7 @@ class EntityDataService:
         logger.info(f"Fetching data for date: {date_str}, entity: {entity_name}",extra={"operation":"FETCHDBFORDATE"})
 
         if db_name is None:
-            db_name = get_latest_db(self.mongo_client, date_str)
+            db_name = get_latest_db(self.mongo_client, date_str, prefix=self.db_prefix)
 
         logger.info(f"Found database: {db_name}",extra={"operation":"FETCHDBFORDATE"})
         if not db_name:
@@ -103,7 +108,7 @@ class EntityDataService:
             logger.info(f"Found {len(docs)} records in collection {collection_name}",extra={"operation":"FETCHDBFORDATE"})
 
         # Exclude documents tracked as deleted or pending deletion in the restored collection
-        id_field = ENTITY_ID_MAPPING.get(entity_name)
+        id_field = get_entity_id_mapping().get(entity_name)
         collection_name = get_collection_name(entity_name)
         excluded_ids = self._get_deleted_ids(db, collection_name, id_field)
         if excluded_ids:

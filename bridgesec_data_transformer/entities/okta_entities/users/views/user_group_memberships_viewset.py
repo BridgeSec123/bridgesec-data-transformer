@@ -30,7 +30,7 @@ class UserGroupMembershipsViewSet(BaseUserViewSet):
 
         for group_id in group_ids:
             try:
-                group_url = f"{settings.OKTA_API_URL}/api/v1/groups/{group_id}"
+                group_url = f"{self.okta_base_url}/api/v1/groups/{group_id}"
                 response = requests.get(group_url, headers=headers)
                 if response.status_code == 200:
                     group_data = response.json()
@@ -54,7 +54,7 @@ class UserGroupMembershipsViewSet(BaseUserViewSet):
             logger.error("Okta endpoint not defined")
             return {"error": "Okta endpoint not defined"}, 500
 
-        okta_url = f"{settings.OKTA_API_URL}/{self.okta_endpoint.format(user_id=user_id)}"
+        okta_url = f"{self.okta_base_url}/{self.okta_endpoint.format(user_id=user_id)}"
         headers = get_okta_headers(request)
         
         logger.info(f"Fetching data from Okta endpoint: {self.okta_endpoint}")
