@@ -74,9 +74,9 @@ class ElasticsearchHandler(logging.Handler):
 
         es = Elasticsearch(
             self._es_url,
-            retry_on_timeout=True,
-            max_retries=2,
-            request_timeout=5,
+            retry_on_timeout=False,
+            max_retries=0,
+            request_timeout=15,
         )
 
         while True:
@@ -116,13 +116,25 @@ class ElasticsearchHandler(logging.Handler):
             "operation":  None,
             "action":     None,
             "user":       None,
+            "tenant_id":  "unknown",
         }
 
-        # Pull structured fields injected via logger.xxx(..., extra={...})
-        for field in ("request_id", "component", "entity_type", "operation", "action", "user"):
+        # Pull structured fields injected via logger.xxx(..., extra={...}) or TenantContextFilter
+        for field in ("request_id", "component", "entity_type", "operation", "action", "user", "tenant_id"):
             val = getattr(record, field, None)
             if val is not None:
                 doc[field] = str(val)
+
+        # Defense-in-depth: if TenantContextFilter didn't run (handler misconfigured or
+        # called outside a request/task with set_current_tenant), try the ContextVar directly.
+        if doc["tenant_id"] == "unknown":
+            try:
+                from core.utils.tenant_utils import get_current_tenant
+                _tenant = get_current_tenant()
+                if _tenant:
+                    doc["tenant_id"] = str(_tenant.id)
+            except Exception:
+                pass
 
         # Exception info
         if record.exc_info:

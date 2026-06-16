@@ -16,6 +16,7 @@ def build_log_query(
     search=None,
     page=1,
     page_size=50,
+    tenant_id=None,
 ) -> dict:
     """
     Build an Elasticsearch query dict for the paginated log list endpoint.
@@ -24,15 +25,17 @@ def build_log_query(
     must_clauses = []
     filter_clauses = []
 
-    # --- Keyword term filters (fields are mapped as pure keyword, no .keyword sub-field) ---
+    if tenant_id:
+        filter_clauses.append({"term": {"tenant_id.keyword": tenant_id}})
+
     if level:
-        filter_clauses.append({"term": {"levelname": level}})
+        filter_clauses.append({"term": {"levelname.keyword": level}})
     if component:
-        filter_clauses.append({"term": {"component": component}})
+        filter_clauses.append({"term": {"component.keyword": component}})
     if entity_type:
-        filter_clauses.append({"term": {"entity_type": entity_type}})
+        filter_clauses.append({"term": {"entity_type.keyword": entity_type}})
     if operation:
-        filter_clauses.append({"term": {"operation": operation}})
+        filter_clauses.append({"term": {"operation.keyword": operation}})
 
     # --- Date range filter ---
     range_clause = {}
@@ -73,31 +76,31 @@ def build_log_query(
     }
 
 
-def build_summary_query() -> dict:
+def build_summary_query(tenant_id=None) -> dict:
     """
     Build an ES aggregation query for the summary/dashboard endpoint.
     Returns counts by level, counts by component, and recent error rate.
     """
+    tenant_filter = [{"term": {"tenant_id.keyword": tenant_id}}] if tenant_id else []
     return {
         "size": 0,
         "query": {
-            "range": {
-                "@timestamp": {
-                    "gte": "now-24h",   # last 24 hours window for dashboard widgets
-                    "lte": "now",
-                }
+            "bool": {
+                "filter": tenant_filter + [
+                    {"range": {"@timestamp": {"gte": "now-24h", "lte": "now"}}}
+                ]
             }
         },
         "aggs": {
             "by_level": {
                 "terms": {
-                    "field": "levelname",
+                    "field": "levelname.keyword",
                     "size": 10,
                 }
             },
             "by_component": {
                 "terms": {
-                    "field": "component",
+                    "field": "component.keyword",
                     "size": 20,
                 }
             },
@@ -108,7 +111,7 @@ def build_summary_query() -> dict:
                 "aggs": {
                     "levels": {
                         "terms": {
-                            "field": "levelname",
+                            "field": "levelname.keyword",
                             "size": 10,
                         }
                     }
@@ -118,7 +121,7 @@ def build_summary_query() -> dict:
                 "filter": {
                     "bool": {
                         "must": [
-                            {"terms": {"levelname": ["ERROR", "CRITICAL"]}},
+                            {"terms": {"levelname.keyword": ["ERROR", "CRITICAL"]}},
                             {"range": {"@timestamp": {"gte": "now-1h"}}}
                         ]
                     }
@@ -133,15 +136,16 @@ def build_summary_query() -> dict:
     }
 
 
-def build_request_trace_query(request_id: str) -> dict:
+def build_request_trace_query(request_id: str, tenant_id=None) -> dict:
     """
     Build a query to retrieve all log entries for a single request_id.
     Sorted oldest-first to read as a trace timeline.
     """
+    filters = [{"term": {"request_id.keyword": request_id}}]
+    if tenant_id:
+        filters.append({"term": {"tenant_id.keyword": tenant_id}})
     return {
-        "query": {
-            "term": {"request_id": request_id}
-        },
+        "query": {"bool": {"filter": filters}},
         "sort": [{"@timestamp": {"order": "asc"}}],
         "size": 1000,  # A single request produces at most a few hundred log lines
     }
@@ -155,6 +159,7 @@ def build_live_log_query(
     operation=None,
     search=None,
     page_size: int = 100,
+    tenant_id=None,
 ) -> dict:
     """
     Build an ES query for live streaming — returns logs newer than last_timestamp.
@@ -184,15 +189,17 @@ def build_live_log_query(
     filter_clauses = [{"range": {"@timestamp": {"gt": last_timestamp}}}]
     must_clauses = []
 
-    # Keyword filters — fields are mapped as pure keyword type in this index
+    if tenant_id:
+        filter_clauses.append({"term": {"tenant_id.keyword": tenant_id}})
+
     if level:
-        filter_clauses.append({"term": {"levelname": level}})
+        filter_clauses.append({"term": {"levelname.keyword": level}})
     if component:
-        filter_clauses.append({"term": {"component": component}})
+        filter_clauses.append({"term": {"component.keyword": component}})
     if entity_type:
-        filter_clauses.append({"term": {"entity_type": entity_type}})
+        filter_clauses.append({"term": {"entity_type.keyword": entity_type}})
     if operation:
-        filter_clauses.append({"term": {"operation": operation}})
+        filter_clauses.append({"term": {"operation.keyword": operation}})
 
     # Full-text search on message and exception info
     if search:
