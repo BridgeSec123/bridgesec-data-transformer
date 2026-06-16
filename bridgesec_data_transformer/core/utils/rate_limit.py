@@ -1,4 +1,5 @@
 import logging
+import random
 import time
 
 logger = logging.getLogger(__name__)
@@ -14,11 +15,11 @@ def rate_limit_headers(okta_response):
     }
 
 def handle_rate_limit(response):
-    """Handles API rate limiting by waiting until the reset time."""
+    """Handles API rate limiting by waiting until the reset time plus random jitter."""
     if response.status_code == 429:  # Too many requests
         reset_time = int(response.headers.get("X-Rate-Limit-Reset", time.time()))
-        wait_time = max(reset_time - time.time(), 1)
-        logger.warning(f"Rate limit exceeded. Waiting for {wait_time} seconds...")
+        wait_time = max(reset_time - time.time(), 1) + random.uniform(0, 2)
+        logger.warning(f"Rate limit exceeded. Waiting for {wait_time:.2f} seconds...")
         time.sleep(wait_time)
         return True  # Indicate that we need to retry
 

@@ -25,6 +25,30 @@ from core.serializers.log_serializer import LogQueryParamsSerializer, LogEntrySe
 logger = logging.getLogger(__name__)
 
 
+def _get_tenant_id(request) -> str | None:
+    """Extract tenant_id string from the authenticated request's _tenant object."""
+    tenant = getattr(request, '_tenant', None)
+    if tenant:
+        return str(tenant.id)
+    return getattr(request, '_tenant_id', None) or None
+
+
+def _require_tenant_id(request):
+    """
+    Return (tenant_id, None) on success.
+    When MULTI_TENANCY_ENABLED=True and no tenant context exists, return (None, 403 Response)
+    so callers can short-circuit before building any ES query.
+    Single-tenant mode always returns (None, None) — query builders omit the filter by design.
+    """
+    tenant_id = _get_tenant_id(request)
+    if getattr(settings, "MULTI_TENANCY_ENABLED", False) and not tenant_id:
+        return None, Response(
+            {"error": "Tenant context required. Ensure your token includes a valid tenant_id claim."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    return tenant_id, None
+
+
 def _hit_to_dict(hit: dict) -> dict:
     """Flatten an ES search hit into the shape LogEntrySerializer expects."""
     doc = hit.get("_source", {})
@@ -106,8 +130,11 @@ class LogStreamView(APIView):
         tags=["logs"],
     )
     def get(self, request):
+        tenant_id, err = _require_tenant_id(request)
+        if err:
+            return err
         # ========== Step 1: Create Service & Generator ==========
-        log_service = LogStreamService()
+        log_service = LogStreamService(tenant_id=tenant_id)
         generator = _sse_generator(log_service)
 
         # ========== Step 3: Return Streaming Response ==========
@@ -151,6 +178,9 @@ class LogListView(APIView):
         tags=["logs"],
     )
     def get(self, request):
+        tenant_id, err = _require_tenant_id(request)
+        if err:
+            return err
         request_id = getattr(request, "request_id", "N/A")
 
         # Validate query params
@@ -170,6 +200,7 @@ class LogListView(APIView):
             search=params.get("search"),
             page=params["page"],
             page_size=params["page_size"],
+            tenant_id=tenant_id,
         )
 
         try:
@@ -231,8 +262,11 @@ class LogSummaryView(APIView):
         tags=["logs"],
     )
     def get(self, request):
+        tenant_id, err = _require_tenant_id(request)
+        if err:
+            return err
         request_id = getattr(request, "request_id", "N/A")
-        body = build_summary_query()
+        body = build_summary_query(tenant_id=tenant_id)
 
         try:
             es = get_es_client()
@@ -304,8 +338,11 @@ class LogTraceView(APIView):
         tags=["logs"],
     )
     def get(self, request, request_id):
+        tenant_id, err = _require_tenant_id(request)
+        if err:
+            return err
         calling_request_id = getattr(request, "request_id", "N/A")
-        body = build_request_trace_query(request_id)
+        body = build_request_trace_query(request_id, tenant_id=tenant_id)
 
         try:
             es = get_es_client()

@@ -251,9 +251,8 @@ def toggle_collection_config(
             "enabled":         bool(enabled),
             "updated_at":      datetime.now(timezone.utc).isoformat(),
             "updated_by":      updated_by or "",
+            "tenant_id":       str(tenant_id) if tenant_id else None,
         }
-        if tenant_id:
-            row["tenant_id"] = str(tenant_id)
 
         # Check for existing row
         existing_q = (
@@ -261,13 +260,12 @@ def toggle_collection_config(
             .select("id")
             .eq("entity_name", entity_name)
             .eq("collection_name", collection_name)
-            .execute()
         )
-        existing_rows = existing_q.data or []
         if tenant_id:
-            existing_rows = [r for r in existing_rows if r.get("tenant_id") == str(tenant_id)]
+            existing_q = existing_q.eq("tenant_id", str(tenant_id))
         else:
-            existing_rows = [r for r in existing_rows if r.get("tenant_id") is None]
+            existing_q = existing_q.is_("tenant_id", "null")
+        existing_rows = existing_q.execute().data or []
 
         if existing_rows:
             sb.table("tenant_collection_config").update(row).eq("id", existing_rows[0]["id"]).execute()
@@ -315,20 +313,15 @@ def bulk_update_entity_config(tenant_id, updates: list, updated_by: str) -> dict
                 "enabled":     bool(enabled),
                 "updated_at":  datetime.now(timezone.utc).isoformat(),
                 "updated_by":  updated_by or "",
+                "tenant_id":   str(tenant_id) if tenant_id else None,
             }
-            if tenant_id:
-                row["tenant_id"] = str(tenant_id)
 
-            existing = (
-                sb.table("tenant_entity_config")
-                .select("id")
-                .eq("entity_name", entity_name)
-                .execute()
-            )
+            existing_q = sb.table("tenant_entity_config").select("id").eq("entity_name", entity_name)
             if tenant_id:
-                existing_rows = [r for r in (existing.data or []) if r.get("tenant_id") == str(tenant_id)]
+                existing_q = existing_q.eq("tenant_id", str(tenant_id))
             else:
-                existing_rows = [r for r in (existing.data or []) if r.get("tenant_id") is None]
+                existing_q = existing_q.is_("tenant_id", "null")
+            existing_rows = existing_q.execute().data or []
 
             if existing_rows:
                 sb.table("tenant_entity_config").update(row).eq("id", existing_rows[0]["id"]).execute()

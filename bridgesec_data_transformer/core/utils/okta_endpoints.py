@@ -333,7 +333,8 @@ def extract_id_params_from_record(entity_type: str, record: dict) -> dict:
         >>> extract_id_params_from_record("okta_policy_rule_mfa", record)
         {"policy_id": "00p123", "id": "0pr456"}
     """
-    from core.utils.collection_mapping import ENTITY_ID_MAPPING
+    from core.utils.mapping_provider import get_entity_id_mapping
+    ENTITY_ID_MAPPING = get_entity_id_mapping()
 
     required_fields = get_id_fields_for_entity(entity_type)
     id_params = {}

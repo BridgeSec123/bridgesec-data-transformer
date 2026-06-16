@@ -2,6 +2,7 @@ import json
 import logging
 
 from . import mapping_handlers
+from core.utils.mapping_provider import get_id_keys, get_none_field_lists
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ def get_data(db, collection, modified_data = None, mapped=False, id_value=None) 
     """    
     collect = db[collection]
     try:
-        id = mapping_handlers.ID_KEYS[collection]  # To handle collections with leading underscore
+        id = get_id_keys()[collection]  # To handle collections with leading underscore
         if not id_value and modified_data:
             id_value = modified_data.get(id, None)
         if not mapped:
@@ -86,7 +87,7 @@ def get_mapped_collection(db, collection, modified_data):
     """
     # Get configuration from helpers
     mapped_collection = mapping_handlers.MAPPED_ENTITIES_HELPERS["entity_mapped_collections"][collection]
-    parent_id_key = mapping_handlers.ID_KEYS[collection]
+    parent_id_key = get_id_keys()[collection]
     subset_key = mapping_handlers.MAPPED_ENTITIES_HELPERS["entity_subsets"][collection]
     
     # Fetch parent document
@@ -126,7 +127,7 @@ def transform_data(collection_name, modified_data):
         dict: The transformed data
     """
 
-    none_fields = mapping_handlers.NONE_FIELD_LISTS.get(collection_name, [])
+    none_fields = get_none_field_lists().get(collection_name, [])
     if not none_fields:
         return modified_data
 
@@ -135,7 +136,7 @@ def transform_data(collection_name, modified_data):
     
     if collection_name == "okta_policy_mfa" and is_empty(modified_data.get("external_idps")):
         modified_data["external_idps"] = []
-        for field in mapping_handlers.NONE_FIELD_LISTS.get("okta_mfa_authenticator", []):
+        for field in get_none_field_lists().get("okta_mfa_authenticator", {}):
             modified_data.pop(field, None)
         
     for field, default_value in none_fields.items():

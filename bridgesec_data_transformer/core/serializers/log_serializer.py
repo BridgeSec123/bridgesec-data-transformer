@@ -11,6 +11,7 @@ class LogEntrySerializer(serializers.Serializer):
     entity_type   = serializers.CharField(allow_null=True)
     request_id    = serializers.CharField(allow_null=True)
     user          = serializers.CharField(allow_null=True)
+    tenant_id     = serializers.CharField(allow_null=True)
     operation     = serializers.CharField(allow_null=True)
     duration_ms   = serializers.FloatField(allow_null=True)
     resource_count= serializers.IntegerField(allow_null=True)

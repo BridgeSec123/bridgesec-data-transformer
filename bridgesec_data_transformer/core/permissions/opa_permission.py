@@ -19,11 +19,14 @@ OPA_BYPASS_PATHS = (
     "/api/token/",
     "/api/token/refresh/",
     "/api/auth/token/",
+    "/api/auth/me/",           # self-service: reads caller's own context
+    "/api/auth/my-tenants/",   # self-service: reads caller's own memberships
     "/api/policies/",
     "/api/users/",
     "/api/roles/",
-    "/api/entity-config/",   # has its own EntityConfigPermission
-    "/api/scheduler-config/",  # has its own inline permission check
+    "/api/entity-config/",        # has its own EntityConfigPermission
+    "/api/scheduler-config/",     # has its own inline permission check
+    "/api/cross-tenant-migrate/", # has its own inline super-admin check
 )
 
 
@@ -124,7 +127,8 @@ class OPAPermission(BasePermission):
 
     def _build_base_input(self, request, view) -> dict:
         try:
-            db_name = get_dynamic_db()
+            db_prefix = getattr(request, '_db_prefix', None)
+            db_name = get_dynamic_db(prefix=db_prefix)
         except Exception:
             db_name = None
 
@@ -133,11 +137,16 @@ class OPAPermission(BasePermission):
         roles = getattr(user, "roles", None) or []
         if not roles and getattr(user, "role", None):
             roles = [user.role]
+        # Tenant fed to OPA is the JWT-scoped ACTIVE tenant (set by
+        # CustomJWTAuthentication), not the user's global home tenant — a user can
+        # belong to several tenants. Falls back to the user's home tenant when the
+        # request carries no active tenant (single-tenant / legacy callers).
+        active_tenant_id = getattr(request, "_tenant_id", None) or getattr(user, "tenant_id", "")
         return {
             "user": {
                 "email":            getattr(user, "email", None),
                 "roles":            roles,
-                "tenant_id":        str(getattr(user, "tenant_id", "") or ""),
+                "tenant_id":        str(active_tenant_id or ""),
                 "is_authenticated": bool(getattr(user, "is_authenticated", False)),
             },
             "method": request.method,

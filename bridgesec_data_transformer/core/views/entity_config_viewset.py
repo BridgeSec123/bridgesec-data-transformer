@@ -124,10 +124,10 @@ class EntityConfigListView(APIView):
 
         if result["errors"]:
             return Response(
-                {"updated": result["updated"], "errors": result["errors"]},
+                {"tenant_id": tenant_id, "updated": result["updated"], "errors": result["errors"]},
                 status=status.HTTP_207_MULTI_STATUS,
             )
-        return Response({"updated": result["updated"]}, status=status.HTTP_200_OK)
+        return Response({"tenant_id": tenant_id, "updated": result["updated"]}, status=status.HTTP_200_OK)
 
 
 class EntityConfigDetailView(APIView):
@@ -161,7 +161,7 @@ class EntityConfigDetailView(APIView):
                 {"detail": result["errors"][0]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        return Response({"name": config_name, "enabled": enabled}, status=status.HTTP_200_OK)
+        return Response({"tenant_id": tenant_id, "name": config_name, "enabled": enabled}, status=status.HTTP_200_OK)
 
 
 class EntityConfigCollectionView(APIView):
@@ -229,6 +229,6 @@ class EntityConfigCollectionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(
-            {"entity_name": entity_name, "collection_name": collection_name, "enabled": enabled},
+            {"tenant_id": tenant_id, "entity_name": entity_name, "collection_name": collection_name, "enabled": enabled},
             status=status.HTTP_200_OK,
         )

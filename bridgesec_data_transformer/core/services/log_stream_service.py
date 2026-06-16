@@ -50,6 +50,7 @@ class LogStreamService:
         poll_interval: int = 2,
         heartbeat_interval: int = 15,
         initial_lookback_seconds: int = 30,
+        tenant_id: Optional[str] = None,
     ):
         """
         Initialize the streaming service.
@@ -58,10 +59,12 @@ class LogStreamService:
             poll_interval: Seconds between ES queries (default: 2)
             heartbeat_interval: Seconds between keep-alive pings (default: 15)
             initial_lookback_seconds: How far back to start (default: 30)
+            tenant_id: Scope stream to this tenant's logs only
         """
         self.poll_interval = poll_interval
         self.heartbeat_interval = heartbeat_interval
         self.initial_lookback_seconds = initial_lookback_seconds
+        self.tenant_id = tenant_id
         self.es_client = get_es_client()
 
     def get_initial_timestamp(self) -> str:
@@ -108,8 +111,8 @@ class LogStreamService:
         # Poll indefinitely
         while True:
             try:
-                # Build ES query for logs newer than last_ts (all logs, no filtering)
-                body = build_live_log_query(last_timestamp=last_ts)
+                # Build ES query for logs newer than last_ts, scoped to this tenant
+                body = build_live_log_query(last_timestamp=last_ts, tenant_id=self.tenant_id)
                 result = self.es_client.search(index=INDEX_PATTERN, body=body)
                 hits = result["hits"]["hits"]
 

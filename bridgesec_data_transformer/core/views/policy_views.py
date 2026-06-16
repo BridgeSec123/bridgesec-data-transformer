@@ -35,10 +35,19 @@ class PolicyViewSet(viewsets.ViewSet):
         return "super_admin" in (getattr(request.user, "roles", None) or [])
 
     def _caller_tenant_id(self, request):
-        """Return the authenticated user's tenant_id, or None for super_admin."""
+        """Return the tenant scope for policy management.
+
+        - super_admin: ?tenant_id=X authors/lists for that tenant; absent → global (None).
+        - everyone else: the JWT-scoped active tenant (request._tenant_id), falling back
+          to the user's home tenant. A user can belong to several tenants, so the active
+          tenant — not the global users.tenant_id — is authoritative.
+        """
         if self._is_super_admin(request):
-            return None
-        return str(getattr(request.user, "tenant_id", "") or "") or None
+            return request.query_params.get("tenant_id") or None
+        return (
+            getattr(request, "_tenant_id", None)
+            or (str(getattr(request.user, "tenant_id", "") or "") or None)
+        )
 
     def _get_or_404(self, pk):
         from core.utils.supabase_policy import SupabasePolicyRule
@@ -55,6 +64,15 @@ class PolicyViewSet(viewsets.ViewSet):
         if rule.tenant_id and rule.tenant_id != caller_tid:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("You can only modify policies that belong to your tenant.")
+
+    def _assert_can_read(self, request, rule):
+        """Raise PermissionDenied if a non-super-admin tries to read another tenant's rule."""
+        if self._is_super_admin(request):
+            return
+        caller_tid = self._caller_tenant_id(request)
+        if rule.tenant_id and rule.tenant_id != caller_tid:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You can only view policies that belong to your tenant.")
 
     # ------------------------------------------------------------------
     # CRUD
@@ -80,9 +98,19 @@ class PolicyViewSet(viewsets.ViewSet):
     def create(self, request):
         ser = PolicyRuleSerializer(data=request.data, context={"request": request})
         ser.is_valid(raise_exception=True)
-        # Stamp tenant_id automatically: super_admin → None (global), everyone else → their tenant
-        extra = {"tenant_id": self._caller_tenant_id(request)}
-        rule = ser.save(**extra)
+
+        body_tenant_id = ser.validated_data.get("tenant_id")
+        caller_tenant_id = self._caller_tenant_id(request)
+
+        if body_tenant_id and not self._is_super_admin(request):
+            if str(body_tenant_id) != str(caller_tenant_id or ""):
+                return Response(
+                    {"error": "You can only create policies for your own tenant."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        resolved_tenant_id = body_tenant_id or caller_tenant_id
+        rule = ser.save(tenant_id=resolved_tenant_id)
         try:
             opa_client.push_policy(str(rule.id), rule.rego_source)
         except Exception as e:
@@ -101,6 +129,7 @@ class PolicyViewSet(viewsets.ViewSet):
     @swagger_auto_schema(tags=_OPA_TAG)
     def retrieve(self, request, pk=None):
         rule = self._get_or_404(pk)
+        self._assert_can_read(request, rule)
         return Response(PolicyRuleSerializer(rule, context={"request": request}).to_representation(rule))
 
     @swagger_auto_schema(tags=_OPA_TAG)

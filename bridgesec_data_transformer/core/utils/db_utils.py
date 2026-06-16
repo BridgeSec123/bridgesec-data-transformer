@@ -3,11 +3,13 @@ import logging
 import re
 from datetime import datetime
 
-from core.utils.collection_mapping import (ENTITY_ID_MAPPING,
-                                           RESOURCE_COLLECTION_MAP)
-from core.utils.nested_mapping import (ENTITIES_WITH_BUILDERS,
-                                       NESTED_FIELD_COLLECTIONS,
-                                       NESTED_FIELD_ID_MAPPING)
+from core.utils.mapping_provider import (
+    get_entities_with_builders,
+    get_entity_id_mapping,
+    get_nested_field_collections,
+    get_nested_field_id_mapping,
+    get_resource_collection_map,
+)
 from deepdiff import DeepDiff
 from django.conf import settings
 
@@ -181,7 +183,7 @@ def get_collection_name(entity_name):
     """Get collection name for a given entity type (case-insensitive match)."""
     logger.info("Extracting collection name for the given entity from mappings",extra={"operation":'Get Collection Name'})
     entity_name_lower = entity_name.lower()
-    for entity_type, sub_entities in RESOURCE_COLLECTION_MAP.items():
+    for entity_type, sub_entities in get_resource_collection_map().items():
         for entry in sub_entities:
             for display_name, collection_name in entry.items():
                 if display_name.lower() == entity_name_lower:
@@ -189,12 +191,17 @@ def get_collection_name(entity_name):
     return None
 
 
-def get_latest_db(mongo_client, date_str):
-    """Get the latest database for a given date."""
+def get_latest_db(mongo_client, date_str, prefix=None):
+    """
+    Get the latest database for a given date.
+    Pass prefix=tenant.mongo_db_prefix so the correct tenant namespace is searched.
+    Falls back to settings.MONGO_DB_NAME when prefix is None.
+    """
     try:
         logger.info("Finding Latest DB for given date",extra={"operation":'Get Latest Db'})
         datetime.strptime(date_str, "%Y-%m-%d")
-        date_prefix = f"{settings.MONGO_DB_NAME}_{date_str}"
+        db_prefix = prefix if prefix is not None else settings.MONGO_DB_NAME
+        date_prefix = f"{db_prefix}_{date_str}"
 
         all_dbs = mongo_client.list_database_names()
         matching_dbs = [db for db in all_dbs if db.startswith(date_prefix)]
@@ -214,13 +221,17 @@ def get_latest_db(mongo_client, date_str):
         return None
 
 
-def get_previous_db(mongo_client, current_db_name):
-    """Return the snapshot DB immediately before current_db_name, or None if first."""
+def get_previous_db(mongo_client, current_db_name, prefix=None):
+    """
+    Return the snapshot DB immediately before current_db_name, or None if first.
+    Pass prefix=tenant.mongo_db_prefix to scope search to the correct tenant namespace.
+    """
     logger.info(
         "Finding previous DB snapshot",
         extra={'operation': 'get_previous_db', 'current_db': current_db_name}
     )
-    prefix = f"{settings.MONGO_DB_NAME}_"
+    db_prefix = prefix if prefix is not None else settings.MONGO_DB_NAME
+    prefix = f"{db_prefix}_"
     all_dbs = sorted(
         db for db in mongo_client.list_database_names()
         if db.startswith(prefix) and extract_time(db)
@@ -386,7 +397,7 @@ def _get_modified_items(common_ids, old_items, new_items, id_field):
 
 def compare_nested_arrays(old_doc, new_doc, entity_name):
     """Compare nested arrays in old and new documents for builder entities."""
-    nested_mappings = NESTED_FIELD_COLLECTIONS.get(entity_name, {})
+    nested_mappings = get_nested_field_collections().get(entity_name, {})
     if not nested_mappings:
         return {}, old_doc, new_doc
 
@@ -397,7 +408,7 @@ def compare_nested_arrays(old_doc, new_doc, entity_name):
         old_array = (old_doc or {}).get(nested_field, [])
         new_array = (new_doc or {}).get(nested_field, [])
 
-        id_field = NESTED_FIELD_ID_MAPPING.get(nested_field, {}).get("child_id_field")
+        id_field = get_nested_field_id_mapping().get(nested_field, {}).get("child_id_field")
         if not id_field:
             if old_array != new_array:
                 nested_diffs[nested_field] = {
@@ -429,8 +440,8 @@ def _get_main_doc_diff(old_doc, new_doc, entity_name=None):
     if not old_doc and not new_doc:
         return None
 
-    if entity_name in ENTITIES_WITH_BUILDERS:
-        nested_fields = set(NESTED_FIELD_COLLECTIONS.get(entity_name, {}))
+    if entity_name in get_entities_with_builders():
+        nested_fields = set(get_nested_field_collections().get(entity_name, {}))
         old_filtered = {k: v for k, v in old_doc.items() if k not in nested_fields}
         new_filtered = {k: v for k, v in new_doc.items() if k not in nested_fields}
         return DeepDiff(old_filtered, new_filtered, ignore_order=True)
@@ -530,7 +541,7 @@ def get_collection_diff(old_docs, new_docs, id_field, entity_name=None, base_db=
     old_map = {str(doc[id_field]): doc for doc in old_docs if id_field in doc}
     new_map = {str(doc[id_field]): doc for doc in new_docs if id_field in doc}
 
-    is_builder = entity_name in ENTITIES_WITH_BUILDERS if entity_name else False
+    is_builder = entity_name in get_entities_with_builders() if entity_name else False
     all_ids = sorted(set(old_map) | set(new_map))
 
     changed = []

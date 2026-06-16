@@ -10,12 +10,14 @@ import requests
 import json
 from dotenv import load_dotenv
 import os
-from core.utils.collection_mapping import ENTITY_ID_MAPPING
-from core.utils.db_utils import get_latest_db,get_collection_name
-from core.utils.constants import (ENTITY_TARGET_FIELD_MAP,
-                                  SINGLETON_RESOURCE_IDENTIFIERS)
-from core.utils.nested_mapping import (NESTED_FIELD_COLLECTIONS,
-                                       NESTED_FIELD_ID_MAPPING)
+from core.utils.db_utils import get_latest_db, get_collection_name
+from core.utils.mapping_provider import (
+    get_entity_id_mapping,
+    get_entity_target_field_map,
+    get_nested_field_collections,
+    get_nested_field_id_mapping,
+    get_singleton_resource_identifiers,
+)
 
 from core.utils.mapping_handlers import MAPPED_ENTITIES_HELPERS
 from django.utils.text import slugify
@@ -24,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 from pymongo import DESCENDING
 
-def delete_latest_record(entity_name, mongo_client, date_str):
+def delete_latest_record(entity_name, mongo_client, date_str, prefix=None):
     """
     Delete the most recently inserted document from a collection
     in the latest database for a given date.
@@ -33,10 +35,11 @@ def delete_latest_record(entity_name, mongo_client, date_str):
         entity_name (str): Name of the entity (collection without underscore).
         mongo_client: MongoDB client instance.
         date_str (str): Date string in format YYYY-MM-DD.
+        prefix: Optional tenant mongo_db_prefix. Falls back to settings.MONGO_DB_NAME.
     """
 
     # Get latest DB using helper function
-    db_name = get_latest_db(mongo_client, date_str)
+    db_name = get_latest_db(mongo_client, date_str, prefix=prefix)
 
     if not db_name:
         print("No database found for the given date")
@@ -64,6 +67,55 @@ def delete_latest_record(entity_name, mongo_client, date_str):
     else:
         print("Deletion failed")
         return None
+
+
+def rollback_staged_restore(db, collection_name, id_field, restore_records):
+    """
+    Roll back staged restore records after a Terraform failure.
+
+    Entities originally "created" via BDT only exist in _<collection_name> — their
+    only source of truth. Deleting them on rollback would permanently orphan them in
+    Okta with no BDT record. Instead, revert the document to its prior "created" state
+    (preserved as _previous_state by _store_collection before the upsert).
+
+    Entities sourced from the Okta snapshot (also present in entity_name) are safe to
+    delete from _<collection_name> — the next GET falls back to the original snapshot.
+
+    Args:
+        db: MongoDB database instance (current snapshot DB)
+        collection_name: Base collection name (e.g. "okta_app_oauth")
+        id_field: Primary key field for the entity (e.g. "app_id")
+        restore_records: Records that were staged for modification
+    """
+    staged_col = db[f"_{collection_name}"]
+
+    for doc in restore_records:
+        record_id = doc.get(id_field)
+        if not record_id:
+            continue
+
+        staged = staged_col.find_one({id_field: record_id}, {"_id": 0})
+        if not staged:
+            continue
+
+        previous_state = staged.get("_previous_state")
+        if previous_state:
+            # Entity was originally "created" — revert to that state instead of deleting.
+            staged_col.replace_one({id_field: record_id}, previous_state)
+            logger.info(
+                f"Reverted {id_field}='{record_id}' in '_{collection_name}' to "
+                f"'created' state after Terraform failure",
+                extra={"operation": "Rollback Staged Restore"},
+            )
+        else:
+            # Entity has its source of truth in the main Okta snapshot collection.
+            # Safe to remove the staged change — next read falls back to the original.
+            staged_col.delete_one({id_field: record_id})
+            logger.info(
+                f"Removed staged restore for {id_field}='{record_id}' from "
+                f"'_{collection_name}' after Terraform failure",
+                extra={"operation": "Rollback Staged Restore"},
+            )
 
 
 def _extract_ids_from_data(data_records, field_name, include_nested=False):
@@ -141,19 +193,19 @@ def _store_collection(db, entity_name, collection_name, data, restored_by, sourc
     # Get ID field for upsert
     # Check if this is a nested collection
     id_field = None
-    nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name, {})
+    nested_mapping = get_nested_field_collections().get(entity_name, {})
 
     # Find if this collection is a nested collection
     for nested_field, nested_collection_name in nested_mapping.items():
         if nested_collection_name == collection_name:
             # This is a nested collection - use child_id_field
-            id_field = NESTED_FIELD_ID_MAPPING.get(nested_field, {}).get("child_id_field")
+            id_field = get_nested_field_id_mapping().get(nested_field, {}).get("child_id_field")
             logger.info(f"Detected nested collection {collection_name}, using child_id_field: {id_field}",extra={"operation":"Stores Data With Restore Metadata"})
             break
 
     # If not a nested collection, use the entity's ID field
     if not id_field:
-        id_field = ENTITY_ID_MAPPING.get(entity_name)
+        id_field = get_entity_id_mapping().get(entity_name)
 
     if id_field:
         # Use upsert strategy (recommended)
@@ -168,6 +220,15 @@ def _store_collection(db, entity_name, collection_name, data, restored_by, sourc
 
             id_value = doc.get(id_field)
             if id_value:
+                # Before overwriting, preserve the prior "created" state so that
+                # rollback_staged_restore() can revert instead of delete on Terraform
+                # failure. Newly created entities only exist in _<collection> — a blind
+                # delete would permanently orphan them in Okta with no BDT record.
+                existing_doc = restored_collection.find_one({id_field: id_value}, {"_id": 0})
+                if existing_doc and existing_doc.get("operation_type") == "created":
+                    existing_doc.pop("_previous_state", None)  # never nest snapshots
+                    doc["_previous_state"] = existing_doc
+
                 # Upsert: update if exists, insert if not
                 restored_collection.replace_one(
                     {id_field: id_value},
@@ -207,7 +268,7 @@ def store_restored_data_with_metadata(db, entity_name, collection_name, modified
     logger.info(f"Storing {len(modified_data)} records for {entity_name}",extra={"operation":"Universal Restore Data Storage"})
 
     # Check if this entity has nested fields
-    nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name)
+    nested_mapping = get_nested_field_collections().get(entity_name)
 
     if nested_mapping:
         # Entity with nested data - split into parent and nested collections
@@ -252,7 +313,7 @@ def store_created_data(db, entity_name, collection_name, created_data):
 
     logger.info(f"Storing created data for {entity_name}: {len(created_data)} records",extra={"operation":"Store New Data Without Metadata"})
 
-    nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name)
+    nested_mapping = get_nested_field_collections().get(entity_name)
 
     if nested_mapping:
         # Has nested collections → split parent + nested
@@ -317,19 +378,19 @@ def store_deleted_data_with_metadata(db, entity_name, collection_name, deleted_d
     deleted_collection = db[deleted_collection_name]
 
     # Get ID field for upsert
-    nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name, {})
+    nested_mapping = get_nested_field_collections().get(entity_name, {})
     id_field = None
 
     # Find if this collection is a nested collection
     for nested_field, nested_collection_name in nested_mapping.items():
         if nested_collection_name == collection_name:
-            id_field = NESTED_FIELD_ID_MAPPING.get(nested_field, {}).get("child_id_field")
+            id_field = get_nested_field_id_mapping().get(nested_field, {}).get("child_id_field")
             logger.info(f"Detected nested collection {collection_name}, using child_id_field: {id_field}",extra={"operation":"Store Deletion Data With Metadata"})
             break
 
     # If not a nested collection, use the entity's ID field
     if not id_field:
-        id_field = ENTITY_ID_MAPPING.get(entity_name)
+        id_field = get_entity_id_mapping().get(entity_name)
 
     if not id_field:
         logger.error(f"No ID field defined for {entity_name}, cannot store deleted records",extra={"operation":"Store Deletion Data With Metadata"})
@@ -388,7 +449,7 @@ def update_deletion_status(db, entity_name, collection_name, deleted_ids, new_st
     deleted_collection = db[deleted_collection_name]
 
     # Get ID field
-    id_field = ENTITY_ID_MAPPING.get(entity_name)
+    id_field = get_entity_id_mapping().get(entity_name)
     if not id_field:
         logger.error(f"No ID field defined for {entity_name}, cannot update deletion status",extra={"operation":"Update Deletion Status"})
         return 0
@@ -463,16 +524,16 @@ def handle_nested_deletion(db, entity_name, deleted_parent_records, deleted_by, 
         - cascade_info: Dict with cascade details
     """
     # Check if entity has nested data
-    nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name)
+    nested_mapping = get_nested_field_collections().get(entity_name)
 
     if not nested_mapping:
         # No nested data, return parent IDs only
-        parent_id_field = ENTITY_ID_MAPPING.get(entity_name)
+        parent_id_field = get_entity_id_mapping().get(entity_name)
         parent_ids = [str(record.get(parent_id_field)) for record in deleted_parent_records if record.get(parent_id_field)]
         return parent_ids, {}
 
     # Entity has nested data - cascade deletion
-    parent_id_field = ENTITY_ID_MAPPING.get(entity_name)
+    parent_id_field = get_entity_id_mapping().get(entity_name)
     parent_ids = [str(record.get(parent_id_field)) for record in deleted_parent_records if record.get(parent_id_field)]
 
     cascade_info = {
@@ -488,7 +549,7 @@ def handle_nested_deletion(db, entity_name, deleted_parent_records, deleted_by, 
         nested_coll = f"_{nested_collection_name}"
 
         # Get nested ID mapping
-        nested_id_config = NESTED_FIELD_ID_MAPPING.get(nested_field, {})
+        nested_id_config = get_nested_field_id_mapping().get(nested_field, {})
         child_id_field = nested_id_config.get("child_id_field", "id")
         parent_id_field_in_nested = nested_id_config.get("parent_id_field", parent_id_field)
 
@@ -554,7 +615,7 @@ def validate_deletion_safety(source_db, entity_name, collection_name, deleted_re
         List of error messages (empty if valid)
     """
     errors = []
-    id_field = ENTITY_ID_MAPPING.get(entity_name)
+    id_field = get_entity_id_mapping().get(entity_name)
 
     if not id_field:
         errors.append(f"No ID field configured for entity '{entity_name}'")
@@ -640,7 +701,7 @@ def rebuild_restored_data_with_nested_arrays(db, entity_name, collection_name, i
     Returns only the LATEST version of each record.
     Filters out records with operation_type="deleted".
     """
-    nested_mapping = NESTED_FIELD_COLLECTIONS.get(entity_name)
+    nested_mapping = get_nested_field_collections().get(entity_name)
 
     # Simple entity - fetch and return latest versions
     if not nested_mapping:
@@ -678,8 +739,6 @@ def rebuild_restored_data_with_nested_arrays(db, entity_name, collection_name, i
     parent_map = {str(r.get(id_field)): copy.deepcopy(r) for r in parent_data if r.get(id_field)}
 
     # Attach nested data
-    from core.utils.nested_mapping import NESTED_FIELD_ID_MAPPING
-
     for nested_field, nested_coll_name in nested_mapping.items():
         nested_coll = f"_{nested_coll_name}"
 
@@ -691,8 +750,8 @@ def rebuild_restored_data_with_nested_arrays(db, entity_name, collection_name, i
             continue
 
         # Get nested ID field and parent ID field from mapping
-        nested_id_field = NESTED_FIELD_ID_MAPPING.get(nested_field, {}).get("child_id_field", "id")
-        parent_id_field = NESTED_FIELD_ID_MAPPING.get(nested_field, {}).get("parent_id_field", id_field)
+        nested_id_field = get_nested_field_id_mapping().get(nested_field, {}).get("child_id_field", "id")
+        parent_id_field = get_nested_field_id_mapping().get(nested_field, {}).get("parent_id_field", id_field)
 
         nested_data = _get_latest_records_by_id(
             list(db[nested_coll].find({}, {"_id": 0})), nested_id_field
@@ -754,7 +813,8 @@ def remove_metadata_fields(data):
         "created_at",
         "updated_at",
         "unique_id",
-        "_id"
+        "_id",
+        "_previous_state",
     ]
 
     if isinstance(data, list):
@@ -912,8 +972,8 @@ def merge_restored_with_original(original_data, restored_data, id_field):
                     continue
 
                 # Handle nested arrays
-                if isinstance(value, list) and key in NESTED_FIELD_ID_MAPPING:
-                    nested_id_field = NESTED_FIELD_ID_MAPPING[key].get("child_id_field", "id")
+                if isinstance(value, list) and key in get_nested_field_id_mapping():
+                    nested_id_field = get_nested_field_id_mapping()[key].get("child_id_field", "id")
                     merged_record[key] = _merge_records(
                         merged_record.get(key, []), value, nested_id_field, metadata_fields
                     )

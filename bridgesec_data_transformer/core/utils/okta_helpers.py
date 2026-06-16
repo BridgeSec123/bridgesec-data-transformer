@@ -8,18 +8,21 @@ from bridgesec_logging import log_okta_api_call
 logger = logging.getLogger(__name__)
 
 
-def build_okta_url(endpoint):
+def build_okta_url(endpoint, okta_base=None):
     """
     Build a properly formatted Okta API URL.
     Handles trailing/leading slashes to avoid double slashes.
 
     Args:
         endpoint: The API endpoint (e.g., '/api/v1/users' or 'api/v1/users')
+        okta_base: Tenant-specific Okta base URL (required in multi-tenant mode).
 
     Returns:
         str: Properly formatted URL
     """
-    base_url = settings.OKTA_API_URL.rstrip('/')
+    if not okta_base:
+        raise ValueError("build_okta_url: okta_base must be provided in multi-tenant mode.")
+    base_url = okta_base.rstrip('/')
     endpoint = endpoint.lstrip('/')
     return f"{base_url}/{endpoint}"
 
@@ -110,12 +113,9 @@ def get_okta_headers(request=None):
     if okta_access_token:
         # Use user's Okta access token (Bearer format)
         return {"Authorization": f"Bearer {okta_access_token}"}
-    elif settings.OKTA_API_TOKEN:
-        # Fallback to static API token only if configured (SSWS format)
-        return {"Authorization": f"SSWS {settings.OKTA_API_TOKEN}"}
     else:
-        # No token available
-        logger.error("No Okta authentication token available! User must be logged in.",extra={"operation":"Get Okta Headers"})
+        # No token available — in multi-tenant mode Bearer token is the only supported auth
+        logger.error("No Okta authentication token available! User must be logged in.", extra={"operation": "Get Okta Headers"})
         return {}
 
 

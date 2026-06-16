@@ -20,8 +20,11 @@ from pymongo import MongoClient
 class MongoSRVBackend(MongoBackend):
     def _get_connection(self):
         if not getattr(self, '_connection', None):
-            self._connection = MongoClient(
-                settings.MONGO_URI,
-                serverSelectionTimeoutMS=10000,
-            )
+            # Use MONGO_URI from .env if set, otherwise resolve from Supabase system tenant
+            uri = getattr(settings, 'MONGO_URI', '') or ''
+            if uri:
+                self._connection = MongoClient(uri, serverSelectionTimeoutMS=10000)
+            else:
+                from core.utils.mongo_utils import get_system_mongo_client
+                self._connection = get_system_mongo_client()
         return self._connection

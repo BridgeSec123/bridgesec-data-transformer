@@ -24,15 +24,18 @@ logger = logging.getLogger(__name__)
 
 @task_failure.connect(sender='core.tasks.bulk_tasks.run_bulk_entity_task')
 @task_failure.connect(sender='core.tasks.bulk_tasks.finalize_bulk_entity_task')
+@task_failure.connect(sender='core.tasks.diff_tasks.run_post_bulk_diff_task')
 def _on_bulk_task_failure(sender=None, kwargs=None, **kw):
-    request_id = (kwargs or {}).get('request_id')
+    _kw = kwargs or {}
+    request_id = _kw.get('request_id')
+    tenant_id = _kw.get('tenant_id')
     if request_id:
         try:
             from core.utils.progress_store import set_job_status
             set_job_status(request_id, 'failed')
             logger.warning(
                 "Bulk task failed — job marked as failed via signal",
-                extra={'component': 'celery', 'task_name': sender, 'request_id': request_id},
+                extra={'component': 'celery', 'task_name': sender, 'request_id': request_id, 'tenant_id': tenant_id},
             )
         except Exception:
             pass  # never let a signal handler crash the worker
@@ -40,7 +43,9 @@ def _on_bulk_task_failure(sender=None, kwargs=None, **kw):
 
 @task_revoked.connect
 def _on_task_revoked(request=None, terminated=None, signum=None, **kw):
-    request_id = (getattr(request, 'kwargs', None) or {}).get('request_id')
+    _task_kwargs = getattr(request, 'kwargs', None) or {}
+    request_id = _task_kwargs.get('request_id')
+    tenant_id = _task_kwargs.get('tenant_id')
     if request_id:
         try:
             from core.utils.progress_store import set_job_status
@@ -52,6 +57,7 @@ def _on_task_revoked(request=None, terminated=None, signum=None, **kw):
                     'request_id': request_id,
                     'terminated': terminated,
                     'signum':     signum,
+                    'tenant_id':  tenant_id,
                 },
             )
         except Exception:
@@ -119,7 +125,7 @@ def notify_backend_via_rabbitmq(db_name, status='completed', error_details=None)
 
 
 @shared_task(bind=True)
-def process_single_entity_group(self, entity_name, viewset_class_path, db_name, okta_access_token=None, okta_granted_scopes=None, request_id=None, tenant_id=None, disabled_collection_names=None):
+def process_single_entity_group(self, entity_name, viewset_class_path, db_name, okta_access_token=None, okta_granted_scopes=None, request_id=None, tenant_id=None, disabled_collection_names=None, track_progress=True, mongo_uri=None):
     """
     Process a single entity group in a Celery worker.
     This task runs in parallel with other entity group tasks.
@@ -142,9 +148,9 @@ def process_single_entity_group(self, entity_name, viewset_class_path, db_name, 
         worker_id = self.request.id  # Celery task ID
         log_worker_assignment(worker_id, entity_name, request_id)
 
-        if request_id:
+        if request_id and track_progress:
             from core.utils.progress_store import mark_entity_running
-            mark_entity_running(request_id, entity_name, worker_id)
+            mark_entity_running(request_id, entity_name, worker_id, mongo_uri=mongo_uri)
 
         logger.info(
             f"[ENTITY: {entity_name}] Starting processing...",
@@ -160,17 +166,21 @@ def process_single_entity_group(self, entity_name, viewset_class_path, db_name, 
         from core.utils.mongo_utils import ensure_mongo_connection
         from importlib import import_module
 
-        # Ensure MongoDB connection for this worker
+        # Resolve tenant and ensure MongoDB connection for this worker.
+        # Track tenant object so we can attach its URI to mock_request below.
+        _resolved_tenant = None
         if tenant_id:
             try:
-                from core.utils.tenant_utils import get_tenant_by_id, ensure_mongo_connection_for_tenant
-                tenant = get_tenant_by_id(tenant_id)
-                if tenant:
-                    ensure_mongo_connection_for_tenant(tenant, db_name)
+                from core.utils.tenant_utils import get_tenant_by_id, ensure_mongo_connection_for_tenant, set_current_tenant
+                _resolved_tenant = get_tenant_by_id(tenant_id)
+                set_current_tenant(_resolved_tenant)
+                if _resolved_tenant:
+                    ensure_mongo_connection_for_tenant(_resolved_tenant, db_name)
                 else:
                     ensure_mongo_connection(db_name)
             except Exception:
-                ensure_mongo_connection(db_name)
+                _uri = _resolved_tenant.mongo_uri if (_resolved_tenant and hasattr(_resolved_tenant, 'mongo_uri')) else None
+                ensure_mongo_connection(db_name, mongo_uri=_uri)
         else:
             ensure_mongo_connection(db_name)
 
@@ -179,26 +189,36 @@ def process_single_entity_group(self, entity_name, viewset_class_path, db_name, 
         module = import_module(module_path)
         viewset_class = getattr(module, class_name)
 
-        # Create mock request for OAuth token
-        mock_request = None
-        if okta_access_token:
-            mock_request = MockRequest(okta_access_token, okta_granted_scopes)
+        # Build mock request with all tenant attributes so that:
+        #   - okta_base_url resolves the tenant's Okta domain (via _tenant_id)
+        #   - store_data() connects to the tenant's MongoDB (via _mongo_uri)
+        #   - get_queryset() uses the tenant's DB prefix (via _db_prefix)
+        mock_request = MockRequest(okta_access_token, okta_granted_scopes)
+        if tenant_id:
+            mock_request._tenant_id = tenant_id
+        if _resolved_tenant:
+            mock_request._mongo_uri  = _resolved_tenant.mongo_uri
+            mock_request._db_prefix  = _resolved_tenant.mongo_db_prefix
+            mock_request._tenant     = _resolved_tenant
 
-        # Instantiate viewset and fetch data
+        # Instantiate viewset and fetch data.
+        # Set viewset_instance.request so okta_base_url property can resolve the
+        # tenant's Okta domain — without this it would fall back to settings.OKTA_API_URL.
         viewset_instance = viewset_class()
         viewset_instance._disabled_collection_names = set(disabled_collection_names or [])
+        viewset_instance.request = mock_request
         extracted_data = viewset_instance.fetch_and_store_data(db_name, request=mock_request)
 
         if not extracted_data:
-            if request_id:
+            if request_id and track_progress:
                 from core.utils.progress_store import mark_entity_empty
-                mark_entity_empty(request_id, entity_name)
+                mark_entity_empty(request_id, entity_name, mongo_uri=mongo_uri)
             return {
                 'status': 'success',
                 'entity_name': entity_name,
                 'record_counts': {},
                 'total_records': 0,
-                'processing_time_seconds': time.time() - start_time
+                'processing_time_seconds': time.time() - start_time,
             }
 
         output_dir = os.path.join(settings.BASE_DIR, "output", db_name)
@@ -236,20 +256,20 @@ def process_single_entity_group(self, entity_name, viewset_class_path, db_name, 
             }
         )
 
-        if request_id:
+        if request_id and track_progress:
             if total_records > 0:
                 from core.utils.progress_store import update_entity_done
-                update_entity_done(request_id, entity_name, record_counts, processing_time)
+                update_entity_done(request_id, entity_name, record_counts, processing_time, mongo_uri=mongo_uri)
             else:
                 from core.utils.progress_store import mark_entity_empty
-                mark_entity_empty(request_id, entity_name)
+                mark_entity_empty(request_id, entity_name, mongo_uri=mongo_uri)
 
         return {
             'status': 'success',
             'entity_name': entity_name,
             'record_counts': record_counts,
             'total_records': total_records,
-            'processing_time_seconds': processing_time
+            'processing_time_seconds': processing_time,
         }
 
     except Exception as e:
@@ -266,9 +286,9 @@ def process_single_entity_group(self, entity_name, viewset_class_path, db_name, 
             }
         )
 
-        if request_id:
+        if request_id and track_progress:
             from core.utils.progress_store import update_entity_error
-            update_entity_error(request_id, entity_name, str(e))
+            update_entity_error(request_id, entity_name, str(e), mongo_uri=mongo_uri)
 
         return {
             'status': 'error',
@@ -288,6 +308,7 @@ def run_bulk_entity_task(
     request_id=None,
     db_name=None,
     tenant_id=None,
+    track_progress=True,
 ):
     """
     Dispatches a Celery chord: all entity tasks run in parallel, and
@@ -296,6 +317,9 @@ def run_bulk_entity_task(
 
     tenant_id: when provided, only entities enabled for that tenant are backed up.
                When None (single-tenancy mode), uses global entity config.
+    track_progress: when True (manual/API runs) the SSE progress job documents are
+               written so the frontend can poll. When False (scheduled runs) the
+               progress machinery is skipped — the _diff_report is still produced.
     """
     start_time = time.time()
 
@@ -344,15 +368,26 @@ def run_bulk_entity_task(
         logger.info("Using SSWS token authentication (static API token fallback)")
 
     try:
-        ensure_mongo_connection(db_name)
+        _chord_mongo_uri = None
+        if tenant_id:
+            try:
+                from core.utils.tenant_utils import get_tenant_by_id, set_current_tenant
+                _t = get_tenant_by_id(tenant_id)
+                if _t:
+                    _chord_mongo_uri = _t.mongo_uri
+                    set_current_tenant(_t)
+            except Exception:
+                pass
+        ensure_mongo_connection(db_name, mongo_uri=_chord_mongo_uri)
         logger.info(f"MongoDB connection established for db_name={db_name}")
 
         # For view-triggered runs, create_bulk_job was already called synchronously
         # in bulk_view.post() before .delay() — job doc already exists.
-        # For scheduled tasks (no view), create it here.
-        if not job_created_by_view:
+        # For scheduled tasks (no view), create it here — but only when progress
+        # tracking is on. Scheduled runs (track_progress=False) skip the SSE job doc.
+        if track_progress and not job_created_by_view:
             from core.utils.progress_store import create_bulk_job
-            create_bulk_job(request_id, db_name, list(entity_viewsets.keys()))
+            create_bulk_job(request_id, db_name, list(entity_viewsets.keys()), mongo_uri=_chord_mongo_uri)
 
         tasks = []
         for entity_name, viewset_class in entity_viewsets.items():
@@ -367,15 +402,23 @@ def run_bulk_entity_task(
                     request_id=request_id,
                     tenant_id=tenant_id,
                     disabled_collection_names=list(disabled_collections.get(entity_name, set())),
+                    track_progress=track_progress,
+                    mongo_uri=_chord_mongo_uri,
                 )
             )
 
         logger.info(f"Dispatching chord of {len(tasks)} entity tasks...")
+        # Thread the exact mongo_uri this bulk run wrote to all the way into the
+        # diff task so it reads/writes the SAME cluster — never re-resolving and
+        # risking a different cluster (the cause of the missing scheduled diff).
         chord(tasks)(
             finalize_bulk_entity_task.s(
                 db_name=db_name,
                 request_id=request_id,
                 start_time_epoch=start_time,
+                tenant_id=tenant_id,
+                mongo_uri=_chord_mongo_uri,
+                track_progress=track_progress,
             )
         )
 
@@ -412,7 +455,7 @@ def run_bulk_entity_task(
 
 
 @shared_task
-def finalize_bulk_entity_task(entity_results, db_name, request_id, start_time_epoch):
+def finalize_bulk_entity_task(entity_results, db_name, request_id, start_time_epoch, tenant_id=None, mongo_uri=None, track_progress=True):
     """
     Chord callback — Celery triggers this automatically once ALL
     process_single_entity_group tasks have completed.
@@ -428,6 +471,13 @@ def finalize_bulk_entity_task(entity_results, db_name, request_id, start_time_ep
         start_time_epoch: Unix timestamp recorded before chord dispatch,
                           used to compute total wall-clock time.
     """
+    if tenant_id:
+        try:
+            from core.utils.tenant_utils import get_tenant_by_id, set_current_tenant
+            set_current_tenant(get_tenant_by_id(tenant_id))
+        except Exception:
+            pass
+
     total_groups = len(ENTITY_VIEWSETS)
 
     # ── Aggregate results ──────────────────────────────────────────────────────
@@ -438,7 +488,10 @@ def finalize_bulk_entity_task(entity_results, db_name, request_id, start_time_ep
     for res in (entity_results or []):
         if res.get('status') == 'success':
             successful += 1
-            logger.info(f"✓ {res['entity_name']}: {res.get('processing_time_seconds', 0):.2f}s")
+            logger.info(
+                f"✓ {res['entity_name']}: {res.get('processing_time_seconds', 0):.2f}s",
+                extra={'component': 'celery', 'request_id': request_id, 'tenant_id': tenant_id},
+            )
         else:
             failed += 1
             error_details.append({
@@ -447,7 +500,8 @@ def finalize_bulk_entity_task(entity_results, db_name, request_id, start_time_ep
             })
             logger.error(
                 f"✗ {res.get('entity_name', 'unknown')}: "
-                f"{res.get('error_message', 'Unknown error')}"
+                f"{res.get('error_message', 'Unknown error')}",
+                extra={'component': 'celery', 'request_id': request_id, 'tenant_id': tenant_id},
             )
 
     if failed == 0 and successful > 0:
@@ -492,9 +546,14 @@ def finalize_bulk_entity_task(entity_results, db_name, request_id, start_time_ep
     # ── Notify RabbitMQ ────────────────────────────────────────────────────────
     notify_backend_via_rabbitmq(db_name, notify_status, error_details if error_details else None)
 
-    # ── Trigger diff task ──────────────────────────────────────────────────────
-    from core.utils.progress_store import set_job_status
-    set_job_status(request_id, 'diff_running')
+    # ── Transition to diff_running so SSE stays alive while the diff runs ────────
+    # The diff task calls set_job_completed(request_id, {full summary}) when it
+    # finishes, which is when the SSE stream delivers its terminal "complete" event
+    # carrying the populated diff_summary.  If the diff task fails, the
+    # @task_failure.connect signal handler sets status="failed" instead.
+    if track_progress:
+        from core.utils.progress_store import set_job_status
+        set_job_status(request_id, "diff_running", mongo_uri=mongo_uri)
 
     try:
         from celery import current_app
@@ -503,6 +562,9 @@ def finalize_bulk_entity_task(entity_results, db_name, request_id, start_time_ep
             kwargs={
                 'current_db_name': db_name,
                 'request_id':      request_id,
+                'tenant_id':       tenant_id,
+                'mongo_uri':       mongo_uri,
+                'track_progress':  track_progress,
             },
         )
         logger.info(
@@ -513,6 +575,7 @@ def finalize_bulk_entity_task(entity_results, db_name, request_id, start_time_ep
                 'request_id':  request_id,
                 'db_name':     db_name,
                 'bulk_status': overall_status,
+                'tenant_id':   tenant_id,
             }
         )
     except Exception as send_err:
@@ -523,6 +586,41 @@ def finalize_bulk_entity_task(entity_results, db_name, request_id, start_time_ep
                 'task_name':  'post_bulk_diff',
                 'request_id': request_id,
                 'db_name':    db_name,
+                'tenant_id':  tenant_id,
+            }
+        )
+        # SSE is already closed as 'completed' — no status update needed here
+
+    try:
+        from celery import current_app
+        current_app.send_task(
+            'core.tasks.supabase_sync_tasks.sync_okta_users_to_supabase',
+            kwargs={
+                'current_db_name': db_name,
+                'tenant_id':       tenant_id,
+                'mongo_uri':       mongo_uri,
+                'request_id':      request_id,
+            },
+        )
+        logger.info(
+            "Post-bulk Supabase user sync task queued",
+            extra={
+                'component':  'celery',
+                'task_name':  'supabase_sync',
+                'request_id': request_id,
+                'db_name':    db_name,
+                'tenant_id':  tenant_id,
+            }
+        )
+    except Exception as send_err:
+        logger.error(
+            f"Could not queue Supabase user sync task: {send_err}",
+            extra={
+                'component':  'celery',
+                'task_name':  'supabase_sync',
+                'request_id': request_id,
+                'db_name':    db_name,
+                'tenant_id':  tenant_id,
             }
         )
 
@@ -538,146 +636,69 @@ def finalize_bulk_entity_task(entity_results, db_name, request_id, start_time_ep
 
 
 @shared_task
-def run_scheduled_bulk_task():
+def run_scheduled_bulk_task_for_tenant(tenant_id: str):
     """
-    Celery Beat scheduled task — runs daily at midnight UTC.
+    Scheduled bulk fetch for a single tenant. Called directly by Celery Beat at
+    the exact UTC time derived from the tenant's scheduler_hour/minute/timezone
+    (registered at Beat startup via beat_init in celery.py).
 
-    When MULTI_TENANCY_ENABLED=True: loops all active Tenant documents and
-    dispatches one run_bulk_entity_task per tenant using that tenant's
-    service app credentials.
-
-    When MULTI_TENANCY_ENABLED=False (default): obtains a single service
-    access token from global settings and runs a single bulk fetch (original
-    single-tenant behaviour).
+    No time-checking needed here — if Beat called this task, it is time to run.
+    The tenant is re-fetched from Supabase so a scheduler_enabled=False change
+    made after Beat started is still honoured.
     """
-    from django.conf import settings as _settings
-
-    multi_tenancy = getattr(_settings, "MULTI_TENANCY_ENABLED", False)
-
-    if multi_tenancy:
-        return _run_scheduled_bulk_task_multi_tenant()
-    else:
-        return _run_scheduled_bulk_task_single_tenant()
-
-
-def _get_local_now(tz_name: str):
-    """Return current datetime in the given IANA timezone. Falls back to UTC on error."""
     import datetime as _dt
-    try:
-        from zoneinfo import ZoneInfo
-        return _dt.datetime.now(ZoneInfo(tz_name or "UTC"))
-    except Exception:
-        return _dt.datetime.now(_dt.timezone.utc)
-
-
-def _run_scheduled_bulk_task_single_tenant():
-    """Original single-tenant scheduled bulk fetch."""
-    from django.conf import settings as _s
-    from core.utils.service_token import get_service_access_token
-
-    if not getattr(_s, "SCHEDULER_ENABLED", True):
-        logger.info("Scheduled bulk fetch skipped — SCHEDULER_ENABLED=False")
-        return {"status": "skipped", "reason": "scheduler_disabled"}
-
-    tz_name        = getattr(_s, "SCHEDULER_TIMEZONE", "UTC")
-    configured_hour   = getattr(_s, "SCHEDULER_HOUR", 0)
-    configured_minute = getattr(_s, "SCHEDULER_MINUTE", 0)
-    local_now = _get_local_now(tz_name)
-
-    if local_now.hour != configured_hour or local_now.minute != configured_minute:
-        logger.info(
-            f"Scheduled bulk fetch skipped "
-            f"(local {tz_name} time={local_now.strftime('%H:%M')}, "
-            f"configured={configured_hour:02d}:{configured_minute:02d})"
-        )
-        return {"status": "skipped", "reason": "not_scheduled_time"}
-
-    logger.info(
-        "Scheduled bulk fetch starting (single-tenant): acquiring service app access token...",
-        extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch'}
-    )
-
-    try:
-        access_token, granted_scopes = get_service_access_token()
-        logger.info(
-            "Service access token obtained. Delegating to run_bulk_entity_task...",
-            extra={
-                'component': 'celery',
-                'task_name': 'scheduled_bulk_fetch',
-                'scope_count': len(granted_scopes),
-            }
-        )
-    except Exception as e:
-        logger.exception(
-            f"Scheduled bulk fetch failed: could not obtain service access token: {e}",
-            extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch'}
-        )
-        notify_backend_via_rabbitmq(
-            "N/A", "failed",
-            [{"entity": "scheduled_task", "error": f"Token acquisition failed: {e}"}]
-        )
-        return {"status": "error", "error": str(e)}
-
-    return run_bulk_entity_task(
-        okta_access_token=access_token,
-        okta_granted_scopes=granted_scopes,
-    )
-
-
-def _run_scheduled_bulk_task_multi_tenant():
-    """Multi-tenant scheduled bulk fetch: one task per active tenant whose time matches."""
     from core.utils.supabase_tenant import SupabaseTenant
     from core.utils.tenant_service_token import get_service_access_token_for_tenant
 
     logger.info(
-        "Scheduled bulk fetch starting (multi-tenant)...",
-        extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch'}
+        f"Scheduled bulk fetch triggered for tenant {tenant_id}",
+        extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch', 'tenant_id': tenant_id}
     )
 
-    tenants, _ = SupabaseTenant.list_all(active_only=True, page=1, page_size=1000)
-    logger.info(f"Found {len(tenants)} active tenant(s)")
+    tenant = SupabaseTenant.get_by_id(tenant_id)
+    if not tenant:
+        logger.error(
+            f"Scheduled bulk fetch: tenant {tenant_id} not found in Supabase.",
+            extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch', 'tenant_id': tenant_id}
+        )
+        return {"status": "error", "reason": "tenant_not_found"}
 
-    results = []
-    for tenant in tenants:
-        if not getattr(tenant, "scheduler_enabled", True):
-            logger.info(f"Tenant '{tenant.name}' scheduler disabled — skipping")
-            results.append({"tenant": tenant.name, "status": "skipped", "reason": "scheduler_disabled"})
-            continue
+    if not tenant.scheduler_enabled:
+        logger.info(
+            f"Scheduled bulk fetch skipped for tenant '{tenant.name}' — scheduler_enabled=False",
+            extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch', 'tenant_id': tenant_id}
+        )
+        return {"status": "skipped", "reason": "scheduler_disabled"}
 
-        tz_name           = getattr(tenant, "scheduler_timezone", "UTC") or "UTC"
-        configured_hour   = getattr(tenant, "scheduler_hour", 0)
-        configured_minute = getattr(tenant, "scheduler_minute", 0)
-        local_now = _get_local_now(tz_name)
+    # Slot-claim dedup: prevents double dispatch if Beat retries the task or
+    # APScheduler and Beat both fire in the same minute.
+    slot_key = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H%M")
+    if not SupabaseTenant.try_claim_scheduled_slot(tenant.id, slot_key):
+        logger.info(
+            f"Tenant '{tenant.name}' skipped — slot {slot_key} already claimed (duplicate trigger)",
+            extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch', 'tenant_id': tenant_id}
+        )
+        return {"status": "skipped", "reason": "already_ran", "slot": slot_key}
 
-        if local_now.hour != configured_hour or local_now.minute != configured_minute:
-            logger.info(
-                f"Tenant '{tenant.name}' skipped "
-                f"(local {tz_name} time={local_now.strftime('%H:%M')}, "
-                f"configured={configured_hour:02d}:{configured_minute:02d})"
-            )
-            results.append({"tenant": tenant.name, "status": "skipped", "reason": "not_scheduled_time"})
-            continue
-
-        try:
-            access_token, granted_scopes = get_service_access_token_for_tenant(tenant)
-            logger.info(
-                f"Service token obtained for tenant '{tenant.name}'. Dispatching bulk task.",
-                extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch', 'tenant': tenant.name}
-            )
-            run_bulk_entity_task.delay(
-                okta_access_token=access_token,
-                okta_granted_scopes=granted_scopes,
-                tenant_id=str(tenant.id),
-            )
-            results.append({"tenant": tenant.name, "status": "dispatched"})
-        except Exception as e:
-            logger.exception(
-                f"Failed to dispatch bulk fetch for tenant '{tenant.name}': {e}",
-                extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch'}
-            )
-            results.append({"tenant": tenant.name, "status": "error", "error": str(e)})
-
-    return {"status": "dispatched", "tenants": results}
+    try:
+        access_token, granted_scopes = get_service_access_token_for_tenant(tenant)
+        logger.info(
+            f"Service token obtained for tenant '{tenant.name}'. Dispatching bulk task.",
+            extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch', 'tenant_id': tenant_id}
+        )
+        run_bulk_entity_task.delay(
+            okta_access_token=access_token,
+            okta_granted_scopes=granted_scopes,
+            tenant_id=str(tenant.id),
+            track_progress=False,
+        )
+        return {"status": "dispatched", "tenant": tenant.name}
+    except Exception as e:
+        logger.exception(
+            f"Scheduled bulk fetch failed for tenant '{tenant.name}': {e}",
+            extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch', 'tenant_id': tenant_id}
+        )
+        return {"status": "error", "error": str(e)}
 
 
 @shared_task

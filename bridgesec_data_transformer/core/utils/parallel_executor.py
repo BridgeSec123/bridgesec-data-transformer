@@ -41,7 +41,7 @@ class ParallelExecutionResult:
     total_time_seconds: float
 
 
-def _init_worker_process(db_name: str):
+def _init_worker_process(db_name: str, mongo_uri: str = None):
     """
     Initialize a worker process with fresh MongoDB connections.
 
@@ -54,8 +54,8 @@ def _init_worker_process(db_name: str):
     # Reset any inherited connection state
     reset_connections_for_process()
 
-    # Establish fresh connections for this worker
-    ensure_mongo_connection(db_name)
+    # Establish fresh connections for this worker using tenant URI when available
+    ensure_mongo_connection(db_name, mongo_uri=mongo_uri)
 
     logger.info(f"[PID {os.getpid()}] Worker initialized for database: {db_name}")
 
@@ -66,7 +66,8 @@ def process_entity_group(
     db_name: str,
     okta_access_token: Optional[str],
     okta_granted_scopes: Optional[List[str]],
-    output_dir: str
+    output_dir: str,
+    mongo_uri: Optional[str] = None,
 ) -> EntityGroupResult:
     """
     Process a single entity group in a worker process.
@@ -101,8 +102,8 @@ def process_entity_group(
         from core.utils.mongo_utils import ensure_mongo_connection
         from importlib import import_module
 
-        # Ensure MongoDB connection for this worker
-        ensure_mongo_connection(db_name)
+        # Ensure MongoDB connection for this worker using tenant URI when available
+        ensure_mongo_connection(db_name, mongo_uri=mongo_uri)
 
         # Dynamically import viewset class from path
         module_path, class_name = viewset_class_path.rsplit('.', 1)
@@ -193,7 +194,8 @@ def execute_parallel_bulk_fetch(
     db_name: str,
     okta_access_token: Optional[str] = None,
     okta_granted_scopes: Optional[List[str]] = None,
-    max_workers: int = 4
+    max_workers: int = 4,
+    mongo_uri: Optional[str] = None,
 ) -> ParallelExecutionResult:
     """
     Execute bulk entity fetch in parallel using ProcessPoolExecutor.
@@ -232,7 +234,8 @@ def execute_parallel_bulk_fetch(
             db_name,
             okta_access_token,
             okta_granted_scopes,
-            output_dir
+            output_dir,
+            mongo_uri,
         ))
 
     # Execute in parallel with ProcessPoolExecutor
@@ -245,7 +248,7 @@ def execute_parallel_bulk_fetch(
             max_workers=max_workers,
             mp_context=ctx,
             initializer=_init_worker_process,
-            initargs=(db_name,)
+            initargs=(db_name, mongo_uri),
         )
     except Exception as e:
         logger.error(f"Failed to create ProcessPoolExecutor: {e}")

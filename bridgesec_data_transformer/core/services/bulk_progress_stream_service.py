@@ -21,8 +21,9 @@ class BulkProgressStreamService:
     MAX_STREAM_DURATION = 1800  # 30 min hard cutoff — handles SIGKILL / broker crash
                                 # where Celery signals cannot fire
 
-    def __init__(self, request_id: str):
+    def __init__(self, request_id: str, mongo_uri: str = None):
         self.request_id = request_id
+        self.mongo_uri = mongo_uri
 
     def stream(self):
         """
@@ -44,7 +45,7 @@ class BulkProgressStreamService:
                 }
                 return
 
-            job = get_bulk_job(self.request_id)
+            job = get_bulk_job(self.request_id, mongo_uri=self.mongo_uri)
 
             if job is None:
                 yield {"type": "error", "error": f"Job '{self.request_id}' not found"}

@@ -21,6 +21,7 @@ class PolicyRuleSerializer(serializers.Serializer):
     action      = serializers.CharField()
     effect      = serializers.ChoiceField(choices=["allow", "deny"], default="allow")
     conditions  = serializers.DictField(required=False, default=dict)
+    tenant_id   = serializers.CharField(allow_null=True, required=False, default=None)
     rego_source = serializers.CharField(read_only=True)
     created_by  = serializers.CharField(read_only=True)
     created_at  = serializers.CharField(read_only=True)
@@ -56,6 +57,7 @@ class PolicyRuleSerializer(serializers.Serializer):
     def create(self, validated_data, tenant_id=None):
         from core.utils.supabase_policy import SupabasePolicyRule
 
+        tenant_id = validated_data.pop("tenant_id", tenant_id)
         request = self.context.get("request")
         created_by = getattr(getattr(request, "user", None), "email", None) if request else None
         now = datetime.now(timezone.utc).isoformat()

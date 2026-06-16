@@ -3,6 +3,72 @@ from typing import Dict, List, Optional, Any
 
 logger = logging.getLogger(__name__)
 
+ENTITY_UNIQUE_FIELDS = {
+    "okta_app_oauth": "label",
+    "okta_app_saml": "label",
+    "okta_app_bookmark": "label",
+    "okta_app_auto_login": "label",
+    "okta_app_three_field": "label",
+    "okta_app_basic_auth": "label",
+    "okta_app_swa": "label",
+    "okta_app_signon_policy": "name",
+    "okta_app_oauth_api_scope":"app_id",
+
+    "okta_app_group_assignment": "group_id",
+    "okta_app_access_policy_assignment" : "policy_id",
+
+    "okta_user": "email",
+
+    "okta_user_type": "name",
+
+    "okta_group": "name",
+    "okta_group_rule": "name",
+    "okta_group_role": "group_id",
+
+    "okta_policy_password": "name",
+    "okta_policy_mfa": "name",
+    "okta_policy_rule_mfa": "name",
+    "okta_policy_sign_on": "name",
+    "okta_policy_profile_enrollment":"name",
+
+    # Identity Provider Modules
+    "okta_idp_oidc": "name",
+    "okta_idp_social": "name",
+    "okta_idp_saml": "name",
+    "okta_idp_discovery": "name",
+    "okta_brand": "brand_id",
+    "okta_theme": "theme_id",
+    "okta_auth_server": "auth_server_id",
+    "okta_inline_hook":"inline_hook_id",
+    "okta_review": "campaign_id",
+    "okta_principal_entitlements": "principal_entitlement_id",
+    "okta_request_condition": "name",
+    "okta_request_sequence": "id",
+    "okta_request_v2": "request_v2_id",
+    "okta_catalog_entry_default": "entry_id",
+    "okta_end_user_my_requests": "entry_id",
+    "okta_entitlement_bundle": "name",
+    "okta_entitlement": "name",
+    "okta_request": "request_id",
+    "okta_request_settings": "resource_id",
+    "okta_principal_rate_limits": "principal_id",
+    "okta_rate_limit_admin_notification_settings": "notifications_enabled",
+    "okta_rate_limit_warning_threshold_percentage": "warning_threshold",
+    "okta_domain": "name",
+    "okta_hook_key": "name",
+    "okta_api_token": "id",
+    "okta_app_token": "id",
+    "okta_app_connection": "id",
+    "okta_push_provider": "name",
+    "okta_api_service_integration": "type",
+    "okta_ui_schema": "id",
+    "okta_agent_pools": "name",
+    "okta_app_federated_claim": "name",
+    "okta_user_risk": "user_id",
+    "okta_entity_risk_policy_rule": "name",
+    "okta_set_usage_as_exempt_list": "app_id",
+}
+
 # Configuration constants
 MAPPED_ENTITIES_HELPERS = {
 

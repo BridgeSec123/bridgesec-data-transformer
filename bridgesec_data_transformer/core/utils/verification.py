@@ -22,7 +22,10 @@ def verify_deletion_complete(
     entity_type: str,
     entity_record: Dict[str, Any],
     deletion_results: Dict[str, Any],
-    access_token: Optional[str] = None
+    access_token: Optional[str] = None,
+    mongo_client=None,
+    db_prefix: Optional[str] = None,
+    tenant=None,
 ) -> Dict[str, Any]:
     """
     Main verification function - runs all 3 checks after deletion.
@@ -78,7 +81,7 @@ def verify_deletion_complete(
     # CHECK 1: Okta API Verification
     logger.info("Check 1: Verifying deletion in Okta API...",extra={"operation":"Verify Deletion"})
     if access_token:
-        okta_check = verify_okta_deletion(entity_type, entity_record, access_token)
+        okta_check = verify_okta_deletion(entity_type, entity_record, access_token, tenant=tenant)
     else:
         okta_check = {
             "status": "warning",
@@ -89,21 +92,21 @@ def verify_deletion_complete(
 
     # CHECK 2: MongoDB Verification
     logger.info("Check 2: Verifying deletion in MongoDB...",extra={"operation":"Verify Deletion"})
-    mongodb_check = verify_mongodb_deletion(entity_type, entity_record)
+    mongodb_check = verify_mongodb_deletion(entity_type, entity_record, mongo_client=mongo_client, db_prefix=db_prefix)
     verification_results["checks"]["mongodb"] = mongodb_check
     _log_check_result("MongoDB", mongodb_check)
 
     # CHECK 3: Terraform State Verification
     logger.info("Check 3: Verifying deletion from Terraform state...",extra={"operation":"Verify Deletion"})
     state_check = verify_terraform_state_deletion(
-        entity_type, entity_record, deletion_results
+        entity_type, entity_record, deletion_results, tenant=tenant
     )
     verification_results["checks"]["terraform_state"] = state_check
     _log_check_result("Terraform State", state_check)
 
     # CHECK 4: Find orphaned dependencies
     logger.info("Check 4: Looking for orphaned dependencies...",extra={"operation":"Verify Deletion"})
-    orphaned = find_orphaned_dependencies(entity_type, entity_record, deletion_results)
+    orphaned = find_orphaned_dependencies(entity_type, entity_record, deletion_results, tenant=tenant)
     verification_results["orphaned_dependencies"] = orphaned
 
     if orphaned:
@@ -129,7 +132,8 @@ def verify_deletion_complete(
 def verify_okta_deletion(
     entity_type: str,
     entity_record: Dict[str, Any],
-    access_token: str
+    access_token: str,
+    tenant=None,
 ) -> Dict[str, str]:
     """
     CHECK 1: Verify resource deleted from Okta API (should return 404).
@@ -152,7 +156,9 @@ def verify_okta_deletion(
         get_entity_display_name
     )
 
-    okta_domain = settings.OKTA_API_URL
+    okta_domain = tenant.okta_domain if tenant else None
+    if okta_domain and not okta_domain.startswith("http"):
+        okta_domain = f"https://{okta_domain}"
 
     try:
         # Extract ID parameters from entity record
@@ -166,7 +172,7 @@ def verify_okta_deletion(
 
         # Build endpoint URL using generic mapping
         endpoint = get_okta_api_endpoint(entity_type, **id_params)
-        full_url = f"{okta_domain}{endpoint}"
+        full_url = f"{okta_domain.rstrip('/')}{endpoint}"
 
         # Make API request
         headers = {
@@ -205,7 +211,9 @@ def verify_okta_deletion(
 
 def verify_mongodb_deletion(
     entity_type: str,
-    entity_record: Dict[str, Any]
+    entity_record: Dict[str, Any],
+    mongo_client=None,
+    db_prefix: Optional[str] = None,
 ) -> Dict[str, str]:
     """
     CHECK 2: Verify deletion recorded in MongoDB.
@@ -215,25 +223,26 @@ def verify_mongodb_deletion(
     Args:
         entity_type: Entity type
         entity_record: Dict with entity IDs
+        mongo_client: Tenant-specific MongoClient. Falls back to settings.MONGO_CLIENT.
+        db_prefix: Tenant mongo_db_prefix. Falls back to settings.MONGO_DB_NAME.
 
     Returns:
         {"status": "pass/warning/error", "details": "..."}
-
-    Example:
-        >>> verify_mongodb_deletion("App Oauth", {"app_id": "0oa123"})
-        {"status": "pass", "details": "Record marked as deleted in MongoDB"}
     """
     from core.utils.db_utils import get_latest_db
-    from core.utils.collection_mapping import ENTITY_ID_MAPPING
+    from core.utils.mapping_provider import get_entity_id_mapping
+    ENTITY_ID_MAPPING = get_entity_id_mapping()
     from core.utils.db_utils import get_collection_name
 
-    mongo_client = settings.MONGO_CLIENT
+    if not mongo_client:
+        from core.utils.mongo_utils import get_system_mongo_client
+        mongo_client = get_system_mongo_client()
 
     try:
         # Get current database (today's DB)
         from datetime import datetime
         today_str = datetime.now().strftime("%Y-%m-%d")
-        db_name = get_latest_db(mongo_client, today_str)
+        db_name = get_latest_db(mongo_client, today_str, prefix=db_prefix)
 
         if not db_name:
             return {
@@ -328,7 +337,8 @@ def verify_mongodb_deletion(
 def verify_terraform_state_deletion(
     entity_type: str,
     entity_record: Dict[str, Any],
-    deletion_results: Dict[str, Any]
+    deletion_results: Dict[str, Any],
+    tenant=None,
 ) -> Dict[str, str]:
     """
     CHECK 3: Verify resource removed from Terraform state file in Supabase.
@@ -362,7 +372,8 @@ def verify_terraform_state_deletion(
         get_state_file_from_supabase,
         check_resource_in_state
     )
-    from core.utils.collection_mapping import ENTITY_ID_MAPPING
+    from core.utils.mapping_provider import get_entity_id_mapping
+    ENTITY_ID_MAPPING = get_entity_id_mapping()
 
     try:
         # Get deployment name for this entity type
@@ -376,7 +387,7 @@ def verify_terraform_state_deletion(
 
         # Fetch state file from Supabase
         logger.debug(f"Fetching state file for deployment: {deployment}")
-        state_data = get_state_file_from_supabase(deployment)
+        state_data = get_state_file_from_supabase(deployment, tenant=tenant)
 
         if not state_data:
             return {
@@ -432,7 +443,8 @@ def verify_terraform_state_deletion(
 def find_orphaned_dependencies(
     entity_type: str,
     entity_record: Dict[str, Any],
-    deletion_results: Dict[str, Any]
+    deletion_results: Dict[str, Any],
+    tenant=None,
 ) -> List[Dict[str, Any]]:
     """
     Find dependencies that should have been deleted but still exist in state.
@@ -467,7 +479,8 @@ def find_orphaned_dependencies(
         get_state_file_from_supabase,
         get_dependent_resources_in_state
     )
-    from core.utils.collection_mapping import ENTITY_ID_MAPPING
+    from core.utils.mapping_provider import get_entity_id_mapping
+    ENTITY_ID_MAPPING = get_entity_id_mapping()
 
     orphaned = []
 
@@ -485,7 +498,7 @@ def find_orphaned_dependencies(
         if not deployment:
             return []
 
-        state_data = get_state_file_from_supabase(deployment)
+        state_data = get_state_file_from_supabase(deployment, tenant=tenant)
         if not state_data:
             return []
 
