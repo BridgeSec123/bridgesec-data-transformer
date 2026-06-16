@@ -18,13 +18,31 @@ def get_cached_jwks():
     response = requests.get(jwks_url)
     return response.json()
 
-def generate_jwt_token(user, expiry_hours: int = 24):
+def generate_jwt_token(user, expiry_hours: int = 24, login_tenant_id: str = None):
     roles = getattr(user, "roles", None) or []
+    # Use login_tenant_id (the tenant they logged in through) when provided.
+    # Falls back to user.tenant_id for backwards-compatible callers.
+    # Super admin has user.tenant_id=None, so login_tenant_id is essential for them.
+    tenant_id = login_tenant_id or (str(user.tenant_id) if getattr(user, "tenant_id", None) else None)
+
+    # Multi-tenancy: scope the roles claim to the active tenant. A user can hold a
+    # different role per tenant (user_tenants.role), so the global users.roles list
+    # is not authoritative for an active session. super_admin is a global role and is
+    # preserved as-is (super admins bypass OPA entirely).
+    if getattr(settings, "MULTI_TENANCY_ENABLED", False) and tenant_id and "super_admin" not in roles:
+        try:
+            from core.utils.supabase_user_tenant import SupabaseUserTenant
+            tenant_role = SupabaseUserTenant.get_role(str(user.id), str(tenant_id))
+            if tenant_role:
+                roles = [tenant_role]
+        except Exception as e:
+            logger.warning(f"Per-tenant role lookup failed for user={user.id} tenant={tenant_id}: {e}")
+
     payload = {
         "user_id":   str(user.id),
         "email":     user.email,
         "roles":     roles,
-        "tenant_id": str(user.tenant_id) if getattr(user, "tenant_id", None) else None,
+        "tenant_id": tenant_id,
         "exp":       datetime.utcnow() + timedelta(hours=expiry_hours),
         "iat":       datetime.utcnow(),
     }
@@ -89,14 +107,11 @@ def get_user_from_request(request):
             except Exception as okta_error:
                 logger.debug(f"Okta RS256 decode failed: {str(okta_error)}")
 
-        # If RS256 verified decode failed, extract claims unverified (auth already passed)
+        # SECURITY: do NOT fall back to unverified claims. If RS256 verification
+        # failed (bad signature, expired, wrong issuer/audience), the token's
+        # identity cannot be trusted — leave email as "Unknown".
         if not decoded and token_alg == "RS256":
-            try:
-                unverified_claims = jwt.get_unverified_claims(token)
-                email = unverified_claims.get("sub") or unverified_claims.get("email")
-                logger.info(f"Extracted user from Okta token unverified claims: {email}")
-            except Exception as e:
-                logger.warning(f"Could not extract unverified claims: {str(e)}")
+            logger.warning("Okta RS256 token failed verification; refusing to read unverified claims")
 
         # Try custom HS256 JWT (username/password login)
         if not decoded and token_alg != "RS256":

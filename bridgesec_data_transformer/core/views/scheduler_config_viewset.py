@@ -30,6 +30,11 @@ logger = logging.getLogger(__name__)
 
 _WRITE_ROLES = {"super_admin", "tenant_admin"}
 
+# The scheduler polls every 15 minutes (Celery Beat + APScheduler), and the
+# per-tenant gate matches hour AND minute exactly. A minute outside these ticks
+# would be configured but never fire — reject it instead of silently never running.
+_VALID_MINUTES = {0, 15, 30, 45}
+
 AVAILABLE_TIMEZONES = [
     "UTC",
     "US/Eastern",
@@ -79,10 +84,9 @@ class SchedulerConfigView(APIView):
                 "available_timezones": AVAILABLE_TIMEZONES,
             })
 
-        tenant = _resolve_tenant(request)
+        tenant = _resolve_tenant(request) # tenant = SupabaseTenant.get(tenant_id)
         if not tenant:
             return Response({"detail": "Tenant not found."}, status=status.HTTP_404_NOT_FOUND)
-
         tenant_scopes = _resolve_scopes(
             getattr(tenant, "service_scopes", None) or getattr(settings, "OKTA_SERVICE_SCOPES", "")
         )
@@ -126,8 +130,12 @@ class SchedulerConfigView(APIView):
 
         if "scheduler_minute" in update:
             m = int(update["scheduler_minute"])
-            if not (0 <= m <= 59):
-                return Response({"detail": "scheduler_minute must be 0–59."}, status=status.HTTP_400_BAD_REQUEST)
+            if m not in _VALID_MINUTES:
+                return Response(
+                    {"detail": "scheduler_minute must be one of 0, 15, 30, 45 "
+                               "(the scheduler polls every 15 minutes)."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             update["scheduler_minute"] = m
 
         if "scheduler_timezone" in update and update["scheduler_timezone"] not in AVAILABLE_TIMEZONES:

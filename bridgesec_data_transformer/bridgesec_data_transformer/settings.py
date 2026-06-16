@@ -15,9 +15,6 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
-from core.utils.mongo_utils import connect_to_mongo
-from mongoengine import connect
-from pymongo import MongoClient
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,12 +23,12 @@ env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR.parent, '.env'), overwrite=False)
 
 
-OKTA_API_URL = env("OKTA_API_URL")
-OKTA_API_TOKEN = env("OKTA_API_TOKEN", default=None)
-OKTA_CLIENT_ID = env("OKTA_CLIENT_ID")
+# OKTA_API_URL = env("OKTA_API_URL")
+# OKTA_API_TOKEN = env("OKTA_API_TOKEN", default=None)
+# OKTA_CLIENT_ID = env("OKTA_CLIENT_ID")
+# OKTA_ISSUER = env("OKTA_ISSUER")
+# OKTA_SECRET_KEY = env("OKTA_SECRET_KEY")
 OKTA_REDIRECT_URI = env("OKTA_REDIRECT_URI")
-OKTA_ISSUER = env("OKTA_ISSUER")
-OKTA_SECRET_KEY = env("OKTA_SECRET_KEY")
 FRONTEND_REDIRECT_URL = env("FRONTEND_REDIRECT_URL")
 FRONTEND_URL = env("FRONTEND_URL")
 SERVER_URL = env("SERVER_URL")
@@ -65,8 +62,11 @@ ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default=None)
 #   SUPABASE_KEY=your-anon-key-here
 #   SUPABASE_BUCKET=terraform-states
 SUPABASE_URL = env("SUPABASE_URL", default=None)
-SUPABASE_KEY = env("SUPABASE_KEY", default=None)
+SUPABASE_KEY = env("SUPABASE_SERVICE_ROLE_KEY", default=None)
 SUPABASE_BUCKET = env("SUPABASE_BUCKET", default="terraform-states")
+# TTL (seconds) for the in-process Supabase-backed mapping cache.
+# Set shorter in dev (e.g. 30) so that re-seeding takes effect quickly.
+MAPPINGS_CACHE_TTL_SEC = env.int("MAPPINGS_CACHE_TTL_SEC", default=300)
 
 # Okta OAuth Scopes for API access
 # These scopes are requested during login to access Okta Admin APIs
@@ -223,7 +223,7 @@ MIDDLEWARE = [
     'bridgesec_logging.middleware.LoggingMiddleware',  # Centralized logging middleware
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'core.middleware.tenant_middleware.TenantContextMiddleware',  # Attach request._tenant
+    # 'core.middleware.tenant_middleware.TenantContextMiddleware',  # Attach request._tenant
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -297,7 +297,7 @@ USE_I18N = True
 
 USE_TZ = True
 
-SESSION_COOKIE_HTTPONLY = False
+SESSION_COOKIE_HTTPONLY = True  # session cookie must not be readable by JavaScript (XSS -> session theft)
 # SESSION_COOKIE_SECURE = False          # Only if using HTTPS
 # SESSION_COOKIE_SAMESITE = "Lax"
 
@@ -314,13 +314,17 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-MONGO_DB_NAME = env("MONGO_DB_NAME")
-MONGO_URI = env("MONGO_URI")
-MONGO_CLIENT = MongoClient(MONGO_URI)
-# TF_STATE_API_KEY = env("TF_STATE_API_KEY")
+MONGO_DB_NAME = env("MONGO_DB_NAME", default="bridgesec")
+MONGO_URI     = env("MONGO_URI", default="")
 
-connect(db=MONGO_DB_NAME, host=MONGO_URI)
-connect_to_mongo()
+# MONGO_CLIENT is intentionally None at startup.
+# All request-handling code uses tenant-specific clients resolved from Supabase
+# via request._mongo_client. get_system_mongo_client() provides a lazy fallback
+# for control-plane collections (progress tracking, scheduled tasks).
+MONGO_CLIENT = None
+
+# MongoEngine default connection is also deferred — per-db aliases are registered
+# on demand inside ensure_mongo_connection(). No startup connection needed.
 MONGO_CONNECTIONS = set()
 
 # Elasticsearch Configuration (for log querying)
@@ -362,7 +366,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://jaggiest-stephania-autonomously.ngrok-free.dev",
-    
+
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -382,12 +386,12 @@ LOGGING = {
 
     'formatters': {
         'verbose': {
-            'format': '{asctime} | {levelname} | {module}.{funcName}:{lineno} | {message}',
+            'format': '{asctime} | {levelname} | {tenant_id} | {module}.{funcName}:{lineno} | {message}',
             'style': '{',
         },
         'json': {
             '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
-            'format': '%(asctime)s %(levelname)s %(name)s %(module)s %(funcName)s %(lineno)d %(message)s',
+            'format': '%(asctime)s %(levelname)s %(name)s %(module)s %(funcName)s %(lineno)d %(tenant_id)s %(message)s',
             'datefmt': '%Y-%m-%dT%H:%M:%S',
         },
         'colored': {
@@ -404,6 +408,12 @@ LOGGING = {
         },
     },
 
+    'filters': {
+        'tenant_context': {
+            '()': 'bridgesec_logging.config.TenantContextFilter',
+        },
+    },
+
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
@@ -415,19 +425,21 @@ LOGGING = {
             'filename': os.path.join(LOG_DIR, 'app.log'),
             'formatter': 'verbose',
             'level': 'DEBUG',
-
+            'filters': ['tenant_context'],
         },
         'celery_file': {
             'class': 'logging.FileHandler',
             'filename': os.path.join(LOG_DIR, 'bridgesec_celery.log'),
             'formatter': 'json',
             'level': 'DEBUG',
+            'filters': ['tenant_context'],
         },
         'error_file': {
             'class': 'logging.FileHandler',
             'filename': os.path.join(LOG_DIR, 'error.log'),
             'formatter': 'verbose',
             'level': 'ERROR',
+            'filters': ['tenant_context'],
         },
         # Ships log records to Elasticsearch so the /api/logs/summary/ and
         # /api/logs/ endpoints have data to query against (bridgesec-logs-* index).
@@ -435,6 +447,7 @@ LOGGING = {
             '()': 'core.utils.es_log_handler.ElasticsearchHandler',
             'es_url': env("ELASTICSEARCH_URL", default="http://localhost:9200"),
             'level': 'DEBUG',
+            'filters': ['tenant_context'],
         },
     },
 
@@ -538,21 +551,13 @@ CELERY_IMPORTS = [
     'core.tasks.diff_tasks',
 ]
 
-# Celery Beat — scheduled tasks
-from celery.schedules import crontab
+# Celery Beat — per-tenant schedules are registered at Beat startup via the
+# beat_init signal in celery.py, which reads Supabase once and registers one
+# exact crontab per active tenant. Restart Beat to pick up schedule changes.
+from celery.schedules import crontab  # noqa: F401 — kept for use in celery.py
+CELERY_BEAT_SCHEDULE = {}
 
-CELERY_BEAT_SCHEDULE = {
-    'scheduled-bulk-fetch': {
-        'task': 'core.tasks.bulk_tasks.run_scheduled_bulk_task',
-        # Fires every 15 minutes; the task converts to tenant timezone and checks
-        # both hour and minute, so :00/:15/:30/:45 values are all supported.
-        'schedule': crontab(minute='0,15,30,45'),
-    },
-}
-
-# Single-tenant scheduler defaults (overridden per-tenant via Supabase in multi-tenant mode)
-SCHEDULER_ENABLED  = os.environ.get("SCHEDULER_ENABLED", "true").lower() == "true"
-SCHEDULER_HOUR     = int(os.environ.get("SCHEDULER_HOUR", "0"))
-SCHEDULER_MINUTE   = int(os.environ.get("SCHEDULER_MINUTE", "0"))
-SCHEDULER_TIMEZONE = os.environ.get("SCHEDULER_TIMEZONE", "UTC")
-
+# APScheduler is the FALLBACK scheduler, used only when Celery Beat is not running.
+# It is OPT-IN: set USE_APSCHEDULER=true only in a deployment that runs APScheduler
+# INSTEAD of Beat (do NOT run both — they would double-dispatch each tenant per tick).
+USE_APSCHEDULER = os.environ.get("USE_APSCHEDULER", "false").lower() == "true"

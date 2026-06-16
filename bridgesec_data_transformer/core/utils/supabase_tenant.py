@@ -27,6 +27,7 @@ class SupabaseTenant:
         self.mongo_db_prefix      = row.get("mongo_db_prefix")
         self.terraform_server_url = row.get("terraform_server_url")
         self.terraform_state_path = row.get("terraform_state_path")
+        self.supabase_bucket_name = row.get("supabase_bucket_name")    # per-tenant Supabase bucket name
         # Optional: per-tenant Supabase instance for complete data isolation.
         # When blank the master Supabase (from .env) is used instead.
         self.supabase_url         = row.get("supabase_url")
@@ -37,10 +38,20 @@ class SupabaseTenant:
         self.is_active            = row.get("is_active", True)
         self.created_at           = row.get("created_at")
         # Scheduler config (migration 005)
-        self.scheduler_enabled    = row.get("scheduler_enabled", True)
-        self.scheduler_hour       = row.get("scheduler_hour", 0)
-        self.scheduler_minute     = row.get("scheduler_minute", 0)
-        self.scheduler_timezone   = row.get("scheduler_timezone", "UTC")
+        # Use `or` fallbacks so explicit SQL NULLs behave the same as missing keys.
+        _se = row.get("scheduler_enabled")
+        self.scheduler_enabled    = _se if _se is not None else True
+        self.scheduler_hour       = int(row.get("scheduler_hour") or 0)
+        self.scheduler_minute     = int(row.get("scheduler_minute") or 0)
+        self.scheduler_timezone   = row.get("scheduler_timezone") or "UTC"
+        # Last scheduled-run slot key claimed for this tenant (migration 008).
+        self.last_scheduled_run   = row.get("last_scheduled_run")
+        self.okta_app_id          = row.get("okta_app_id")
+        # Per-tenant logo stored in Supabase Storage (migration 009).
+        # logo_bucket_path: bucket-relative path used for upload/delete operations.
+        # logo_url: permanent public URL stored on upload; returned directly to the UI.
+        self.logo_bucket_path     = row.get("logo_bucket_path")
+        self.logo_url             = row.get("logo_url")
         self._row                 = row
 
     # ------------------------------------------------------------------ #
@@ -90,6 +101,9 @@ class SupabaseTenant:
             query = get_supabase_client().table(TABLE).select("*", count="exact")
             if active_only:
                 query = query.eq("is_active", True)
+            # Stable ordering so get_system_mongo_client() always picks the same
+            # "first active tenant" regardless of which process calls it first.
+            query = query.order("created_at")
             result = query.range(offset, offset + page_size - 1).execute()
             return [cls(row) for row in (result.data or [])], (result.count or 0)
         except Exception as e:
@@ -113,6 +127,38 @@ class SupabaseTenant:
         except Exception as e:
             logger.error(f"SupabaseTenant.create() failed: {e}")
             raise
+
+    @classmethod
+    def try_claim_scheduled_slot(cls, tenant_id: str, slot_key: str) -> bool:
+        """
+        Atomically claim a scheduled-run slot for a tenant.
+
+        Performs a conditional UPDATE that sets last_scheduled_run = slot_key only
+        when it is currently NULL or a different slot. Postgres row-level locking
+        guarantees that exactly one caller wins, even if Beat and the APScheduler
+        fallback (or a retry) fire for the same slot concurrently.
+
+        Returns:
+            True  → this caller won the slot and should dispatch the bulk fetch.
+            False → the slot was already claimed (duplicate trigger) — skip.
+
+        Fails closed (returns False) on any Supabase error so a flaky lookup never
+        causes a double dispatch.
+        """
+        try:
+            result = (
+                get_supabase_client()
+                .table(TABLE)
+                .update({"last_scheduled_run": slot_key})
+                .eq("id", str(tenant_id))
+                # last_scheduled_run IS DISTINCT FROM slot_key (also matches NULL)
+                .or_(f"last_scheduled_run.is.null,last_scheduled_run.neq.{slot_key}")
+                .execute()
+            )
+            return bool(result.data)  # rows returned → row was updated → claimed
+        except Exception as e:
+            logger.error(f"SupabaseTenant.try_claim_scheduled_slot({tenant_id}, {slot_key}) failed: {e}")
+            return False
 
     @classmethod
     def update(cls, tenant_id: str, data: dict):

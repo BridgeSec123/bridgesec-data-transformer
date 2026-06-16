@@ -6,7 +6,7 @@ from rest_framework import permissions
 
 from core.views.okta_logout_viewset import OktaLogoutView
 from core.views.user_views import UserCreateView
-from core.views.auth_views import CustomTokenObtainPairView, CustomTokenObtainView, CustomTokenRefreshView
+from core.views.auth_views import CustomTokenObtainPairView, CustomTokenObtainView, CustomTokenRefreshView, ResolveTenantView, CurrentTenantView, MyTenantsView
 from core.views.okta_login_viewset import OktaLoginView
 from core.views.okta_callback_viewset import OktaCallbackView
 from core.views.token_retrieval_view import TokenRetrievalView
@@ -14,10 +14,13 @@ from core.views.tenant_viewset import (
     TenantListCreateView, TenantDetailView,
     TenantUserListView, TenantUserDetailView,
 )
+from core.views.tenant_logo_viewset import TenantLogoView
 from core.views.chat_viewset import ChatView
 from core.views.log_views import LogListView, LogSummaryView, LogTraceView, LogStreamView
 from core.views.entity_config_viewset import EntityConfigListView, EntityConfigDetailView, EntityConfigCollectionView
 from core.views.scheduler_config_viewset import SchedulerConfigView
+from core.views.cross_tenant_summary_view import CrossTenantSummaryView
+from core.views.cross_tenant_migrate_view import CrossTenantMigrateView
 
 # Your views
 # from core.views.user_views import UserCreateView
@@ -49,13 +52,17 @@ urlpatterns = [
     path("okta/login/", OktaLoginView.as_view(), name="okta_login"),
     path("okta/callback/", OktaCallbackView.as_view(), name="okta-callback"),
     path("okta/logout/", OktaLogoutView.as_view(), name="okta-logout"),
+    path("api/auth/resolve-tenant/", ResolveTenantView.as_view(), name="resolve-tenant"),
+    path("api/auth/me/", CurrentTenantView.as_view(), name="auth-me"),
     path("api/auth/token/", TokenRetrievalView.as_view(), name="auth-token"),
+    path("api/auth/my-tenants/", MyTenantsView.as_view(), name="my-tenants"),
     path("api/chat/", ChatView.as_view(), name="chat"),
     # Multi-tenancy management (super-admin only)
     path("api/tenants/", TenantListCreateView.as_view(), name="tenant-list-create"),
     path("api/tenants/<str:tenant_id>/", TenantDetailView.as_view(), name="tenant-detail"),
     path("api/tenants/<str:tenant_id>/users/", TenantUserListView.as_view(), name="tenant-users"),
     path("api/tenants/<str:tenant_id>/users/<str:uid>/", TenantUserDetailView.as_view(), name="tenant-user-detail"),
+    path("api/tenants/<str:tenant_id>/logo/", TenantLogoView.as_view(), name="tenant-logo"),
     path("api/logs/",                 LogListView.as_view(),    name="log-list"),
     path("api/logs/summary/",         LogSummaryView.as_view(), name="log-summary"),
     path("api/logs/stream/",          LogStreamView.as_view(),  name="log-stream"),
@@ -66,6 +73,10 @@ urlpatterns = [
     path("api/entity-config/<str:entity_name>/collections/<str:collection_name>/", EntityConfigCollectionView.as_view(), name="entity-config-collection"),
     # Scheduler configuration (schedule time + scopes display)
     path("api/scheduler-config/", SchedulerConfigView.as_view(), name="scheduler-config"),
+    # Cross-tenant summary (super-admin only)
+    path("api/cross-tenant/summary/", CrossTenantSummaryView.as_view(), name="cross-tenant-summary"),
+    # Cross-tenant entity migration (super-admin only)
+    path("api/cross-tenant-migrate/", CrossTenantMigrateView.as_view(), name="cross-tenant-migrate"),
 ]
     # path("user/", UserCreateView.as_view({"post": "post"}), name="create-user"),
     # path('okta_user/', OktaLoginViewSet.as_view({"post": "create"}), name='okta-login'),

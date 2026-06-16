@@ -2,6 +2,7 @@ from urllib.parse import quote
 import logging
 
 from django.conf import settings
+from django.http import HttpResponseRedirect
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -21,16 +22,19 @@ class OktaLoginView(APIView):
             }
         )
 
+        # force_login=true → adds prompt=login to Okta URL (initial sign-in only).
+        # Tenant switches omit this so Okta SSO session handles re-auth silently.
+        force_login = request.query_params.get("force_login", "").lower() == "true"
+
         # --- Multi-tenancy: resolve tenant from ?okta_domain query param ---
+        # okta_domain is encoded into the OAuth state param so the callback
+        # can look it up from Supabase directly — no session dependency.
         okta_domain = request.query_params.get("okta_domain")
         tenant = None
         if getattr(settings, "MULTI_TENANCY_ENABLED", False) and okta_domain:
             from core.utils.tenant_utils import get_tenant_by_okta_domain
             tenant = get_tenant_by_okta_domain(okta_domain)
             if tenant:
-                # Store tenant_id in session for the callback
-                request.session["tenant_id"] = str(tenant.id)
-                request.session.save()
                 logger.info(f"Multi-tenant login for tenant '{tenant.name}'")
             else:
                 logger.warning(f"Tenant not found for okta_domain='{okta_domain}'")
@@ -50,6 +54,12 @@ class OktaLoginView(APIView):
         # URL encode the scopes to handle special characters
         encoded_scopes = quote(scopes, safe='')
 
+        prompt_param = "&prompt=login" if force_login else ""
+
+        # Encode okta_domain into state so the callback can resolve the tenant
+        # from Supabase without needing the session to survive the Okta redirect.
+        state = okta_domain if okta_domain else "no_tenant"
+
         # Build authorize URL - handle both org and custom auth servers
         if '/oauth2/' in issuer_base:
             # Custom authorization server (e.g., /oauth2/default)
@@ -59,8 +69,8 @@ class OktaLoginView(APIView):
                 f"response_type=code&"
                 f"scope={encoded_scopes}&"
                 f"redirect_uri={redirect_uri}&"
-                f"state=xyz&nonce=abc&"
-                f"prompt=login"
+                f"state={state}&nonce=abc"
+                f"{prompt_param}"
             )
         else:
             # Org authorization server
@@ -70,8 +80,8 @@ class OktaLoginView(APIView):
                 f"response_type=code&"
                 f"scope={encoded_scopes}&"
                 f"redirect_uri={redirect_uri}&"
-                f"state=xyz&nonce=abc&"
-                f"prompt=login"
+                f"state={state}&nonce=abc"
+                f"{prompt_param}"
             )
 
         logger.info(
@@ -83,6 +93,6 @@ class OktaLoginView(APIView):
             }
         )
 
-        return Response({"authorization_url": authorize_url})
+        return HttpResponseRedirect(authorize_url)
 
 

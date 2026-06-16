@@ -29,6 +29,19 @@ def _serialize_user(user) -> dict:
     }
 
 
+def _serialize_user_from_junction(row, tenant_id: str) -> dict:
+    """Serialize a user_tenants junction row (shape: {role, users: {id, email, username, roles}})."""
+    user_data = row.get("users") or {}
+    return {
+        "id":          str(user_data.get("id", "")),
+        "email":       user_data.get("email", ""),
+        "username":    user_data.get("username", ""),
+        "roles":       user_data.get("roles") or ["user"],
+        "tenant_id":   tenant_id,
+        "tenant_role": row.get("role", "user"),
+    }
+
+
 def _is_super_admin(user) -> bool:
     return "super_admin" in (getattr(user, "roles", None) or [])
 
@@ -81,7 +94,10 @@ class UserManagementViewSet(viewsets.ViewSet):
         manual_parameters=[
             openapi.Parameter("page",      openapi.IN_QUERY, type=openapi.TYPE_INTEGER, default=1),
             openapi.Parameter("page_size", openapi.IN_QUERY, type=openapi.TYPE_INTEGER, default=20),
-            openapi.Parameter("tenant_id", openapi.IN_QUERY, type=openapi.TYPE_STRING),
+            openapi.Parameter(
+                "tenant_id", openapi.IN_QUERY, type=openapi.TYPE_STRING,
+                description="Super-admin only: override which tenant to list. Omit to auto-derive from JWT.",
+            ),
         ],
     )
     def list(self, request):
@@ -91,17 +107,52 @@ class UserManagementViewSet(viewsets.ViewSet):
 
         page      = max(1, int(request.query_params.get("page", 1)))
         page_size = min(100, max(1, int(request.query_params.get("page_size", 20))))
-        # tenant_admin can only see their own tenant's users
-        tenant_id = request.query_params.get("tenant_id")
-        if not _is_super_admin(request.user):
-            tenant_id = str(getattr(request.user, "tenant_id", "") or "")
 
+        # Resolve tenant_id in priority order:
+        # 1. ?tenant_id= query param (super_admin only — prevents cross-tenant escalation)
+        # 2. request._tenant_id from JWT claim (set by both HS256 and Okta auth paths)
+        # 3. user record tenant_id (fallback for tokens issued without tenant claim)
+        # 4. None → super_admin sees all users; non-admin gets 400
+        tenant_id = None
+        if _is_super_admin(request.user):
+            tenant_id = request.query_params.get("tenant_id") or None
+
+        if not tenant_id:
+            tenant_id = getattr(request, "_tenant_id", None) or None
+
+        if not tenant_id:
+            raw = getattr(request.user, "tenant_id", None)
+            tenant_id = str(raw) if raw else None
+
+        if not tenant_id and not _is_super_admin(request.user):
+            return Response(
+                {"detail": "Could not determine tenant from your token. Contact an administrator."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # When scoped to a tenant, fetch from user_tenants junction table so users
+        # added via tenant membership (not just users.tenant_id FK) are included.
+        if tenant_id:
+            from core.utils.supabase_user_tenant import SupabaseUserTenant
+            rows, total = SupabaseUserTenant.get_users_for_tenant(
+                tenant_id, page=page, page_size=page_size
+            )
+            return Response({
+                "total":     total,
+                "page":      page,
+                "page_size": page_size,
+                "tenant_id": tenant_id,
+                "results":   [_serialize_user_from_junction(r, tenant_id) for r in rows],
+            })
+
+        # No tenant_id — super_admin listing all users system-wide.
         UserBackend = _get_user_backend()
-        users, total = UserBackend.list_all(page=page, page_size=page_size, tenant_id=tenant_id or None)
+        users, total = UserBackend.list_all(page=page, page_size=page_size)
         return Response({
             "total":     total,
             "page":      page,
             "page_size": page_size,
+            "tenant_id": None,
             "results":   [_serialize_user(u) for u in users],
         })
 

@@ -40,9 +40,18 @@ class OktaLogoutView(APIView):
             response.delete_cookie("access_token")
             return response
 
+        # Resolve tenant-specific issuer from session tenant_id → Supabase
+        okta_issuer = settings.OKTA_ISSUER.rstrip('/')
+        tenant_id = request.session.get("tenant_id")
+        if tenant_id and getattr(settings, 'MULTI_TENANCY_ENABLED', False):
+            from core.utils.tenant_utils import get_tenant_by_id
+            tenant = get_tenant_by_id(tenant_id)
+            if tenant and tenant.okta_issuer:
+                okta_issuer = tenant.okta_issuer.rstrip('/')
+
         # Okta logout URL
         logout_url = (
-            f"{settings.OKTA_ISSUER}/v1/logout?"
+            f"{okta_issuer}/v1/logout?"
             f"id_token_hint={id_token}&"
             f"post_logout_redirect_uri={redirect_url}"
         )

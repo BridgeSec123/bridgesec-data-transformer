@@ -6,12 +6,29 @@ Tenant data is stored in Supabase (not MongoDB).
 MongoDB connections in this module are only for per-tenant snapshot databases.
 """
 import logging
+from contextvars import ContextVar
 from datetime import datetime
+from typing import Optional
 
 from django.conf import settings
 from pymongo import MongoClient
 
 logger = logging.getLogger(__name__)
+
+# Stores the current SupabaseTenant object for the duration of a request/task.
+# Set by CustomJWTAuthentication (HTTP) and Celery task entry points (background).
+# Read by TenantContextFilter before each ES log record is emitted.
+_current_tenant_ctx: ContextVar[Optional[object]] = ContextVar("current_tenant", default=None)
+
+
+def set_current_tenant(tenant) -> None:
+    """Store the SupabaseTenant object (or None) for the current request/task context."""
+    _current_tenant_ctx.set(tenant)
+
+
+def get_current_tenant():
+    """Return the current SupabaseTenant object, or None if not set."""
+    return _current_tenant_ctx.get()
 
 # Module-level connection pool: keyed by mongo_uri so connections are reused
 _tenant_clients: dict = {}
@@ -59,15 +76,21 @@ def get_dynamic_db_for_tenant(tenant) -> str:
 
 def get_tenant_from_request(request):
     """
-    Return the SupabaseTenant attached by TenantContextMiddleware, or None.
+    Return the SupabaseTenant for the current request, or None.
 
     Single shared helper imported by all views (BulkEntityViewSet,
     ConfirmDeletionView, etc.) so tenant-resolution behaviour is consistent.
     Returns None when MULTI_TENANCY_ENABLED=False or no tenant on the request.
+
+    CustomJWTAuthentication sets request._tenant_id from the JWT payload;
+    this function resolves the full tenant object from that ID.
     """
     if not getattr(settings, "MULTI_TENANCY_ENABLED", False):
         return None
-    return getattr(request, "_tenant", None)
+    tenant_id = getattr(request, "_tenant_id", None)
+    if tenant_id:
+        return get_tenant_by_id(tenant_id)
+    return None
 
 
 def get_request_mongo_client(request) -> MongoClient:
@@ -82,21 +105,34 @@ def get_request_mongo_client(request) -> MongoClient:
     return _s.MONGO_CLIENT
 
 
+def get_client_for_uri(uri: str) -> MongoClient:
+    """
+    Return a MongoClient for the given URI, reusing connections per URI string.
+
+    Use this when you already have the URI (e.g. from a Celery task parameter)
+    rather than a full SupabaseTenant object.  Shares the same _tenant_clients
+    cache as get_mongo_client_for_tenant so connections are never duplicated.
+    """
+    if uri not in _tenant_clients:
+        _tenant_clients[uri] = MongoClient(uri)
+        logger.info(f"Created MongoClient for uri prefix: {uri[:30]}...")
+    return _tenant_clients[uri]
+
+
 def get_mongo_client_for_tenant(tenant) -> MongoClient:
     """
     Return a MongoClient for the given tenant's snapshot database,
     reusing connections per URI.
-    Falls back to settings.MONGO_URI when the tenant has no mongo_uri configured.
+    Uses the tenant's own mongo_uri from Supabase — never silently falls back
+    to another tenant's URI so data isolation is guaranteed.
     """
-    from django.conf import settings as _s
-    uri = tenant.mongo_uri or _s.MONGO_URI
+    uri = tenant.mongo_uri
     if not uri:
-        raise ValueError(f"No MongoDB URI available for tenant '{tenant.name}' and no global MONGO_URI configured.")
-    if uri not in _tenant_clients:
-        _tenant_clients[uri] = MongoClient(uri)
-        source = "tenant-specific" if tenant.mongo_uri else "global fallback"
-        logger.info(f"Created new MongoClient for tenant '{tenant.name}' using {source} URI (prefix: {uri[:30]}...)")
-    return _tenant_clients[uri]
+        raise ValueError(
+            f"Tenant '{tenant.name}' has no mongo_uri configured in Supabase. "
+            "Set mongo_uri on the tenant record to enable MongoDB access."
+        )
+    return get_client_for_uri(uri)
 
 
 def is_super_admin(user) -> bool:
@@ -122,9 +158,11 @@ def resolve_tenant_for_request(request):
     """
     Resolve the active tenant for a request with super-admin awareness.
 
-    - Regular users/tenant_admin: returns request._tenant (set by middleware from JWT).
-    - Super admin + ?tenant_id= present: resolves and returns that specific tenant.
-    - Super admin without ?tenant_id=: returns None — caller handles cross-tenant or default.
+    - Regular users/tenant_admin: resolves from _tenant_id set by CustomJWTAuthentication.
+    - Super admin + ?tenant_id= present: resolves that specific tenant (explicit override).
+    - Super admin without ?tenant_id=: falls back to JWT-scoped tenant (same as regular users).
+      After a tenant switch the new JWT carries the switched tenant_id, so this correctly
+      scopes the super_admin to the tenant they switched into.
     - Multi-tenancy disabled: always returns None.
     """
     if not getattr(settings, "MULTI_TENANCY_ENABLED", False):
@@ -132,28 +170,39 @@ def resolve_tenant_for_request(request):
 
     user = getattr(request, "user", None)
     if is_super_admin(user):
+        # Explicit query-param override takes priority (cross-tenant admin operations)
         tenant_id = request.query_params.get("tenant_id")
         if tenant_id:
             return get_tenant_by_id(tenant_id)
-        return None
+        # Fall through to JWT-scoped tenant resolution below
 
-    return getattr(request, "_tenant", None)
+    # Shared path for regular users and super_admin (without query-param override):
+    # resolve from request._tenant cached by CustomJWTAuthentication,
+    # or load lazily from _tenant_id (JWT claim) on first call.
+    tenant = getattr(request, "_tenant", None)
+    if tenant is None:
+        tenant_id = getattr(request, "_tenant_id", None)
+        if tenant_id:
+            tenant = get_tenant_by_id(tenant_id)
+            request._tenant = tenant
+    return tenant
 
 
 def ensure_mongo_connection_for_tenant(tenant, db_name: str):
     """
     Register a MongoEngine alias for this tenant's snapshot DB so that
     MongoEngine models can be used with .using(alias).
-    Falls back to settings.MONGO_URI when the tenant has no mongo_uri configured.
+    Raises ValueError when the tenant has no mongo_uri configured.
 
     Alias format: "tenant_{tenant_id}_{db_name}"
     """
     try:
         import mongoengine
-        from django.conf import settings as _s
-        uri = tenant.mongo_uri or _s.MONGO_URI
+        uri = tenant.mongo_uri
         if not uri:
-            raise ValueError(f"No MongoDB URI available for tenant '{tenant.name}' and no global MONGO_URI configured.")
+            raise ValueError(
+                f"Tenant '{tenant.name}' has no mongo_uri configured in Supabase."
+            )
         alias = f"tenant_{tenant.id}_{db_name}"
         if alias not in mongoengine.connection._get_connection_settings():
             mongoengine.connect(db=db_name, host=uri, alias=alias)

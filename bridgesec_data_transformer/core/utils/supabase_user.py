@@ -39,8 +39,9 @@ class SupabaseUser:
         self.username  = row.get("username") or row.get("email")
         self.roles     = row.get("roles") or ["user"]   # always a list
         self.tenant_id = row.get("tenant_id")
-        self.password  = row.get("password")
-        self._row      = row
+        self.password      = row.get("password")
+        self.okta_user_id  = row.get("okta_user_id")
+        self._row          = row
 
     @property
     def is_authenticated(self):
@@ -85,6 +86,23 @@ class SupabaseUser:
             return None
 
     @classmethod
+    def get_by_username(cls, username: str):
+        """Return SupabaseUser for the given username, or None."""
+        try:
+            result = (
+                get_supabase_client()
+                .table(TABLE)
+                .select("*")
+                .eq("username", username)
+                .limit(1)
+                .execute()
+            )
+            return cls(result.data[0]) if result.data else None
+        except Exception as e:
+            logger.error(f"SupabaseUser.get_by_username({username}) failed: {e}")
+            return None
+
+    @classmethod
     def create_or_update(
         cls,
         email: str,
@@ -93,16 +111,18 @@ class SupabaseUser:
         tenant_id: str = None,
         # legacy single-role compat — ignored if roles is provided
         role: str = None,
+        okta_user_id: str = None,
     ):
         """Upsert a user row by email. Returns the SupabaseUser instance."""
         if roles is None:
             roles = [role] if role else ["user"]
         try:
             data = {
-                "email":     email,
-                "username":  username or email,
-                "roles":     roles,
-                "tenant_id": tenant_id,
+                "email":        email,
+                "username":     username or email,
+                "roles":        roles,
+                "tenant_id":    tenant_id,
+                "okta_user_id": okta_user_id,
             }
             result = (
                 get_supabase_client()
@@ -122,10 +142,11 @@ class SupabaseUser:
         """Persist current state back to Supabase."""
         try:
             data = {
-                "email":     self.email,
-                "username":  self.username,
-                "roles":     self.roles,
-                "tenant_id": self.tenant_id,
+                "email":        self.email,
+                "username":     self.username,
+                "roles":        self.roles,
+                "tenant_id":    self.tenant_id,
+                "okta_user_id": getattr(self, "okta_user_id", None),
             }
             client = get_supabase_client()
             if self.id:
@@ -141,14 +162,51 @@ class SupabaseUser:
 
     @classmethod
     def list_all(cls, page: int = 1, page_size: int = 20, tenant_id: str = None):
-        """Return paginated (users, total) — optionally scoped to a tenant."""
+        """Return paginated (users, total) — optionally scoped to a tenant.
+
+        When tenant_id is given, also merges the per-tenant role from the
+        user_tenants junction table into each user's effective roles list so
+        callers always see the full picture (global roles + tenant role).
+        """
         try:
             offset = (page - 1) * page_size
-            query = get_supabase_client().table(TABLE).select("*", count="exact")
+            client = get_supabase_client()
+            query = client.table(TABLE).select("*", count="exact")
             if tenant_id is not None:
                 query = query.eq("tenant_id", str(tenant_id))
             result = query.range(offset, offset + page_size - 1).execute()
-            return [cls(row) for row in (result.data or [])], (result.count or 0)
+            users = [cls(row) for row in (result.data or [])]
+
+            if tenant_id and users:
+                # Pull per-tenant roles from user_tenants and merge them in.
+                # user_tenants.role is a single TEXT value that may differ from
+                # the global users.roles array (e.g. "test_admin" for one tenant,
+                # "user" globally). We append it when it's not already present.
+                try:
+                    user_ids = [str(u.id) for u in users if u.id]
+                    ut_result = (
+                        client.table("user_tenants")
+                        .select("user_id, role")
+                        .eq("tenant_id", str(tenant_id))
+                        .in_("user_id", user_ids)
+                        .execute()
+                    )
+                    tenant_role_map = {
+                        row["user_id"]: row["role"]
+                        for row in (ut_result.data or [])
+                        if row.get("role")
+                    }
+                    for user in users:
+                        tenant_role = tenant_role_map.get(str(user.id))
+                        if tenant_role and tenant_role not in (user.roles or []):
+                            user.roles = list(user.roles or []) + [tenant_role]
+                except Exception as merge_err:
+                    logger.warning(
+                        f"SupabaseUser.list_all(): could not merge user_tenants roles "
+                        f"for tenant {tenant_id}: {merge_err}"
+                    )
+
+            return users, (result.count or 0)
         except Exception as e:
             logger.error(f"SupabaseUser.list_all() failed: {e}")
             return [], 0

@@ -36,8 +36,38 @@ class CustomJWTAuthentication(BaseAuthentication):
                 raise Exception("User not found")
             # Attach tenant_id and roles from JWT to the request
             request._tenant_id = payload.get('tenant_id')
-            if not hasattr(user, 'roles'):
-                user.roles = payload.get('roles', ['user'])
+            # Under multi-tenancy the JWT roles claim is scoped to the active tenant
+            # (see generate_jwt_token) and is authoritative — it overrides the global
+            # users.roles loaded onto the SupabaseUser. In single-tenant mode the claim
+            # equals the global roles, so only fill in when the user has none.
+            jwt_roles = payload.get('roles')
+            if getattr(settings, 'MULTI_TENANCY_ENABLED', False) and jwt_roles is not None:
+                user.roles = jwt_roles
+            elif not getattr(user, 'roles', None):
+                user.roles = jwt_roles or ['user']
+
+            # Eagerly resolve tenant resources so every downstream code path
+            # reads request._mongo_client / _db_prefix instead of falling back
+            # to the global settings.MONGO_CLIENT (which is the default tenant).
+            if getattr(settings, 'MULTI_TENANCY_ENABLED', False) and request._tenant_id:
+                try:
+                    from core.utils.tenant_utils import get_tenant_by_id, get_mongo_client_for_tenant
+                    _tenant = get_tenant_by_id(request._tenant_id)
+                    if _tenant:
+                        request._tenant       = _tenant
+                        request._mongo_client = get_mongo_client_for_tenant(_tenant)
+                        request._db_prefix    = _tenant.mongo_db_prefix
+                        request._mongo_uri    = _tenant.mongo_uri
+                except Exception as _e:
+                    logger.warning(f"Tenant resource init failed for tenant_id={request._tenant_id}: {_e}")
+
+            # Store the resolved tenant object in ContextVar so log records carry tenant_id
+            try:
+                from core.utils.tenant_utils import set_current_tenant
+                set_current_tenant(getattr(request, '_tenant', None))
+            except Exception:
+                pass
+
             return (user, None)
         except Exception:
             pass  # Not an internal token, try Okta token
@@ -83,13 +113,17 @@ class CustomJWTAuthentication(BaseAuthentication):
                 logger.warning("No matching key found for Okta token")
                 return None
 
-            # Verify the token
+            # Verify the token. Audience AND issuer are now enforced (fail-closed).
+            # OKTA_AUDIENCE must match the `aud` your Okta authorization server issues
+            # (default auth server -> "api://default"; org server -> the issuer URL).
+            expected_audience = getattr(settings, "OKTA_AUDIENCE", "api://default")
             payload = jwt.decode(
                 token,
                 key,
                 algorithms=["RS256"],
-                audience="api://default",  # Okta default audience
-                options={"verify_aud": False}  # Skip audience verification for flexibility
+                audience=expected_audience,
+                issuer=settings.OKTA_ISSUER,
+                options={"verify_aud": True, "verify_iss": True},
             )
 
             # Get user email from token
@@ -111,6 +145,10 @@ class CustomJWTAuthentication(BaseAuthentication):
                 request.session['okta_granted_scopes'] = payload.get('scp', [])
                 request.session.save()
                 logger.info(f"Stored Okta access token in session for user: {email}")
+
+            # Mirror the same attribute set by the HS256 path so downstream
+            # code (e.g. UserManagementViewSet) can always read request._tenant_id.
+            request._tenant_id = str(user.tenant_id) if getattr(user, "tenant_id", None) else None
 
             return user
 

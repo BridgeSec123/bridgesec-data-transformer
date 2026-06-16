@@ -56,15 +56,19 @@ class OktaCallbackView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # --- Multi-tenancy: load tenant from session if set during login ---
+        # --- Multi-tenancy: resolve tenant from OAuth state param ---
+        # OktaLoginView encodes okta_domain into state. Okta returns it unchanged
+        # in the callback URL, so we can query Supabase directly — no session needed.
         tenant = None
         if getattr(settings, "MULTI_TENANCY_ENABLED", False):
-            tenant_id = request.session.get("tenant_id")
-            if tenant_id:
-                from core.utils.tenant_utils import get_tenant_by_id
-                tenant = get_tenant_by_id(tenant_id)
+            state = request.GET.get("state", "")
+            if state and state != "no_tenant":
+                from core.utils.supabase_tenant import SupabaseTenant
+                tenant = SupabaseTenant.get_by_okta_domain(state)
                 if tenant:
-                    logger.info(f"Using tenant '{tenant.name}' for OAuth callback")
+                    logger.info(f"Using tenant '{tenant.name}' for OAuth callback (via state param)")
+                else:
+                    logger.warning(f"Tenant not found for okta_domain='{state}' from state param")
 
         # Resolve issuer and credentials — use tenant's if available
         if tenant:
@@ -116,15 +120,17 @@ class OktaCallbackView(APIView):
         # SECURITY: Do not log full access tokens
         # logger.info(f"OKTA ACCESS TOKEN: {access_token}")
         logger.info(f"OKTA ACCESS TOKEN received (length: {len(access_token) if access_token else 0})")
+        print(f"\n[OKTA ACCESS TOKEN] {access_token}\n")
 
         # TEMPORARY DEBUG: Remove this after debugging!
-        logger.debug(f"DEBUG - Full Access Token: {access_token}")
+        # logger.debug(f"DEBUG - Full Access Token: {access_token}")
 
         if not id_token or not access_token:
             return Response({"error": "Token not received"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Extract granted scopes from access token
         granted_scopes = self._extract_scopes_from_token(access_token)
+        print(f"\n[OKTA GRANTED SCOPES] {granted_scopes}\n")
 
         logger.info(
             "Token exchange successful",
@@ -157,13 +163,15 @@ class OktaCallbackView(APIView):
         logger.info(f"Token issuer claim: {actual_issuer}")
         logger.info(f"Expected issuer: {issuer_base}")
 
-        # Now decode with proper issuer validation
+        # Now decode with proper issuer validation.
+        # audience must be the tenant's client_id (not the global settings value)
+        # because Okta sets aud = the client_id of the app that requested the token.
         payload = jwt.decode(
             id_token,
             key,
             algorithms=["RS256"],
-            audience=settings.OKTA_CLIENT_ID,
-            issuer=actual_issuer,  # Use actual issuer from token instead of settings
+            audience=client_id,
+            issuer=actual_issuer,
             access_token=access_token
         )
 
@@ -218,8 +226,12 @@ class OktaCallbackView(APIView):
                 ip_address=request.META.get("REMOTE_ADDR"),
             )
 
-        # Generate custom access token for application
-        jwt_token = generate_jwt_token(user)
+        # Generate custom access token for application.
+        # Pass the session tenant so JWT always carries a concrete tenant_id.
+        # Critical for super admin whose user.tenant_id is None.
+        login_tenant_id = str(tenant.id) if tenant else None
+        jwt_token = generate_jwt_token(user, login_tenant_id=login_tenant_id)
+        print(f"\n[JWT TOKEN] {email}: {jwt_token}\n")
 
         # Store session data
         session = request.session
