@@ -149,10 +149,14 @@ class ResolveTenantView(APIView):
             )
 
         logger.info(f"resolve-tenant: user '{username}' → default tenant '{default_tenant.name}'")
+        login_hint = getattr(user, "email", "") or ""
+        redirect_url = f"/okta/login/?okta_domain={default_tenant.okta_domain}&force_login=true"
+        if login_hint:
+            redirect_url += f"&login_hint={login_hint}"
         return Response({
             "requires_tenant_selection": False,
             "is_super_admin": is_super_admin,
-            "redirect_url": f"/okta/login/?okta_domain={default_tenant.okta_domain}&force_login=true",
+            "redirect_url": redirect_url,
         })
 
 
@@ -185,6 +189,8 @@ class MyTenantsView(APIView):
         user = request.user
         current_tenant_id = getattr(request, "_tenant_id", None)
         is_super_admin = "super_admin" in (getattr(user, "roles", None) or [])
+        user_email = getattr(user, "email", "") or ""
+        login_hint_param = f"&login_hint={user_email}" if user_email else ""
 
         tenant_entries = []
 
@@ -197,6 +203,7 @@ class MyTenantsView(APIView):
                     "okta_domain": t.okta_domain,
                     "role": "super_admin",
                     "current": str(t.id) == str(current_tenant_id),
+                    "switch_url": f"/okta/login/?okta_domain={t.okta_domain}&force_login=false{login_hint_param}",
                 })
         else:
             assigned = SupabaseUserTenant.get_tenants_for_user(str(user.id))
@@ -221,10 +228,12 @@ class MyTenantsView(APIView):
                     "okta_domain": t.okta_domain,
                     "role": roles_map.get(str(t.id), "user"),
                     "current": str(t.id) == str(current_tenant_id),
+                    "switch_url": f"/okta/login/?okta_domain={t.okta_domain}&force_login=false{login_hint_param}",
                 })
 
         return Response({
             "current_tenant_id": str(current_tenant_id) if current_tenant_id else None,
+            "login_hint": getattr(user, "email", "") or "",
             "tenants": tenant_entries,
         })
 

@@ -60,6 +60,11 @@ class OktaLoginView(APIView):
         # from Supabase without needing the session to survive the Okta redirect.
         state = okta_domain if okta_domain else "no_tenant"
 
+        # Pre-fill the Okta username field so the user lands directly on the password page
+        # (requires Identifier First flow enabled on the Okta tenant).
+        login_hint = request.query_params.get("login_hint", "")
+        login_hint_param = f"&login_hint={quote(login_hint, safe='')}" if login_hint else ""
+
         # Build authorize URL - handle both org and custom auth servers
         if '/oauth2/' in issuer_base:
             # Custom authorization server (e.g., /oauth2/default)
@@ -71,6 +76,7 @@ class OktaLoginView(APIView):
                 f"redirect_uri={redirect_uri}&"
                 f"state={state}&nonce=abc"
                 f"{prompt_param}"
+                f"{login_hint_param}"
             )
         else:
             # Org authorization server
@@ -82,6 +88,7 @@ class OktaLoginView(APIView):
                 f"redirect_uri={redirect_uri}&"
                 f"state={state}&nonce=abc"
                 f"{prompt_param}"
+                f"{login_hint_param}"
             )
 
         logger.info(
