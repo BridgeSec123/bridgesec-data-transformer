@@ -1206,3 +1206,166 @@ def cancel_deletion_plan(plan_id, plans_collection):
         f"Cancelled deletion plan {plan_id} — removed {result.deleted_count} plan document(s)",
         extra={"operation": "Cancel Deletion Plan"},
     )
+
+
+# ---------------------------------------------------------------------------
+# Cross-tenant migration helpers
+# ---------------------------------------------------------------------------
+
+def store_migrated_data(db, entity_name, collection_name, records, source_tenant_id, source_db):
+    """
+    Store cross-tenant migrated records in _{collection_name} with provenance metadata.
+
+    Mirrors store_created_data but:
+    - Uses replace_one(upsert=True) keyed on the entity's label field so retrying
+      the migration does not create duplicate staging entries.
+    - Stamps migrated_from_tenant_id and migrated_from_db on every record so they
+      can be targeted for promotion or cleanup independently of other 'created' records.
+    - Keeps operation_type='created' so update_created_records_with_ids() can write
+      real Okta IDs back after OkTf returns successfully.
+    """
+    logger.info(
+        f"Storing {len(records)} migrated records for {entity_name} in _{collection_name}",
+        extra={"operation": "Store Migrated Data"},
+    )
+
+    label_field = MAPPED_ENTITIES_HELPERS["entity_unique_fields"].get(collection_name, "label")
+    nested_mapping = get_nested_field_collections().get(entity_name)
+    now_str = str(datetime.utcnow())
+    tenant_id_str = str(source_tenant_id)
+
+    def _build_doc(rec):
+        doc = copy.deepcopy(rec)
+        doc.pop("_id", None)
+        doc["operation_type"] = "created"
+        doc["created_at"] = now_str
+        doc["migrated_from_tenant_id"] = tenant_id_str
+        doc["migrated_from_db"] = source_db
+        return doc
+
+    def _upsert(col, doc):
+        label_value = doc.get(label_field)
+        if label_value:
+            col.replace_one(
+                {"operation_type": "created", label_field: label_value},
+                doc,
+                upsert=True,
+            )
+        else:
+            col.insert_one(doc)
+
+    staging_col = db[f"_{collection_name}"]
+
+    if nested_mapping:
+        accumulated_nested = {nc: [] for nc in nested_mapping.values()}
+        parent_records = []
+
+        for parent in records:
+            parent_copy = copy.deepcopy(parent)
+            unique_fields_key = MAPPED_ENTITIES_HELPERS["entity_unique_fields"].get(collection_name, "")
+            unique_id = slugify(parent.get(unique_fields_key, "")) if unique_fields_key else None
+
+            for nested_field, nested_coll_name in nested_mapping.items():
+                nested_array = parent.get(nested_field, [])
+                if nested_array:
+                    accumulated_nested[nested_coll_name].extend(nested_array)
+                parent_copy.pop(nested_field, None)
+
+            parent_records.append(parent_copy)
+
+        for nested_coll_name, nested_records in accumulated_nested.items():
+            nested_col = db[f"_{nested_coll_name}"]
+            for rec in nested_records:
+                doc = _build_doc(rec)
+                if unique_id:
+                    doc["unique_id"] = unique_id
+                nested_col.insert_one(doc)
+
+        for rec in parent_records:
+            _upsert(staging_col, _build_doc(rec))
+
+        logger.info(
+            f"Stored {len(parent_records)} migrated parent records in _{collection_name}",
+            extra={"operation": "Store Migrated Data"},
+        )
+    else:
+        for rec in records:
+            _upsert(staging_col, _build_doc(rec))
+
+        logger.info(
+            f"Stored {len(records)} migrated records in _{collection_name}",
+            extra={"operation": "Store Migrated Data"},
+        )
+
+
+def mark_records_migrated(db, collection_name, id_field, source_tenant_id):
+    """
+    After OkTf confirms resource creation, finalise staging records in _{collection_name}.
+
+    Records that received a real Okta ID (written by update_created_records_with_ids)
+    are promoted to operation_type='migrated'.  Records for which OkTf never returned
+    an ID (partial failure or already-existing resources) are deleted so they do not
+    accumulate as stale 'created' entries.
+
+    Returns the number of records promoted to 'migrated'.
+    """
+    tenant_id_str = str(source_tenant_id)
+    now_str = str(datetime.utcnow())
+    staging_col = db[f"_{collection_name}"]
+
+    promoted = staging_col.update_many(
+        {
+            "operation_type": "created",
+            "migrated_from_tenant_id": tenant_id_str,
+            id_field: {"$exists": True, "$nin": [None, "", "null"]},
+        },
+        {"$set": {"operation_type": "migrated", "migrated_at": now_str}},
+    )
+    logger.info(
+        f"Promoted {promoted.modified_count} record(s) to 'migrated' in _{collection_name}",
+        extra={"operation": "Mark Records Migrated"},
+    )
+
+    cleaned = staging_col.delete_many(
+        {"operation_type": "created", "migrated_from_tenant_id": tenant_id_str}
+    )
+    if cleaned.deleted_count:
+        logger.warning(
+            f"Removed {cleaned.deleted_count} unconfirmed migration record(s) from "
+            f"_{collection_name} — OkTf did not return IDs for them",
+            extra={"operation": "Mark Records Migrated"},
+        )
+
+    return promoted.modified_count
+
+
+def cleanup_failed_migration(db, collection_name, source_tenant_id, nested_mapping=None):
+    """
+    On OkTf failure, delete all records that were pre-staged for the migration
+    from _{collection_name} (and nested collections when applicable).
+
+    Uses the migrated_from_tenant_id tag set by store_migrated_data to avoid
+    touching any other 'created' records that may exist in the same collection.
+    """
+    tenant_id_str = str(source_tenant_id)
+    staging_col = db[f"_{collection_name}"]
+
+    result = staging_col.delete_many(
+        {"operation_type": "created", "migrated_from_tenant_id": tenant_id_str}
+    )
+    logger.info(
+        f"Cleaned up {result.deleted_count} failed migration record(s) from _{collection_name}",
+        extra={"operation": "Cleanup Failed Migration"},
+    )
+
+    if nested_mapping:
+        for nested_coll_name in nested_mapping.values():
+            nr = db[f"_{nested_coll_name}"].delete_many(
+                {"operation_type": "created", "migrated_from_tenant_id": tenant_id_str}
+            )
+            if nr.deleted_count:
+                logger.info(
+                    f"Cleaned up {nr.deleted_count} nested migration record(s) from "
+                    f"_{nested_coll_name}",
+                    extra={"operation": "Cleanup Failed Migration"},
+                )

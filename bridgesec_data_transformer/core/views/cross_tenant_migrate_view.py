@@ -19,16 +19,17 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.authentication import CustomJWTAuthentication
-from core.tasks.bulk_tasks import MockRequest
+from core.permissions.decorators import require_permission
 from core.utils.db_utils import get_collection_name
 from core.utils.mapping_provider import get_entity_id_mapping, get_nested_field_collections
 from core.utils.migration_utils import strip_entity_ids
 from core.utils.module_mapping import get_terraform_api_for_entity
-from core.utils.okta_helpers import get_okta_headers
 from core.utils.restore_utils import (
+    cleanup_failed_migration,
     fetch_and_merge_restored_data,
+    mark_records_migrated,
     remove_metadata_fields,
-    store_created_data,
+    store_migrated_data,
     update_created_records_with_ids,
 )
 from core.utils import mapping_handlers
@@ -44,26 +45,13 @@ _METADATA_FIELDS = [
 ]
 
 
-def _is_super_admin(request) -> bool:
-    user = getattr(request, "user", None)
-    if not user:
-        return False
-    return "super_admin" in (getattr(user, "roles", None) or [])
-
-
 class CrossTenantMigrateView(APIView):
     authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    # super-admin-only: "cross_tenant_migrate" is only in super_admin's Supabase permission list
 
+    @require_permission("cross_tenant_migrate")
     def post(self, request):
-        # ── Step 1: Auth guard ────────────────────────────────────────────────
-        if not _is_super_admin(request):
-            return Response(
-                {"error": "Only super admins can perform cross-tenant migration."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        # ── Step 2: Parse + validate inputs ──────────────────────────────────
+        # ── Step 1: Parse + validate inputs ──────────────────────────────────
         source_tenant_id = request.data.get("source_tenant_id")
         source_db        = request.data.get("source_db")
         target_db        = request.data.get("target_db")
@@ -130,6 +118,7 @@ class CrossTenantMigrateView(APIView):
                 {"error": f"Entity '{entity_name}' has no ID field configured."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+        nested_mapping = get_nested_field_collections().get(entity_name)
 
         try:
             # ── Step 5: Read records from Tenant A's MongoDB ──────────────────
@@ -139,7 +128,9 @@ class CrossTenantMigrateView(APIView):
                 db_prefix=source_tenant.mongo_db_prefix,
             )
             iso_date_src = source_db.split("_", 1)[1].split("T")[0]
-            records = service.fetch(iso_date_src, entity_name, db_name=source_db)
+            from core.utils.entity_config import get_excluded_app_ids_for_tenant
+            records = service.fetch(iso_date_src, entity_name, db_name=source_db,
+                                    excluded_app_ids=get_excluded_app_ids_for_tenant(source_tenant))
 
             if record_ids:
                 str_ids = [str(i) for i in record_ids]
@@ -159,65 +150,104 @@ class CrossTenantMigrateView(APIView):
             # ── Step 6: Strip Okta IDs ────────────────────────────────────────
             stripped_records, warnings = strip_entity_ids(entity_name, records)
 
-            # ── Step 7: Get Tenant B's Okta token (M2M, no user login) ───────
-            from core.utils.tenant_service_token import get_service_access_token_for_tenant
-            access_token, granted_scopes = get_service_access_token_for_tenant(target_tenant)
-
-            # ── Step 8: Connect to Tenant B's MongoDB ─────────────────────────
+            # ── Step 7: Connect to Tenant B's MongoDB ─────────────────────────
+            # (Service token acquisition moved to OkTf — see use_service_token flag)
             target_mongo_client = get_mongo_client_for_tenant(target_tenant)
             target_db_conn = target_mongo_client[target_db]
 
-            # ── Step 9: Store stripped records in Tenant B's _collection ──────
-            store_created_data(
+            # ── Step 8: Store stripped records in Tenant B's _collection ──────
+            store_migrated_data(
                 target_db_conn,
                 entity_name,
                 collection_name,
                 copy.deepcopy(stripped_records),
+                source_tenant_id=source_tenant_id,
+                source_db=source_db,
             )
             logger.info(
                 f"cross_tenant_migrate: stored {len(stripped_records)} records "
-                f"in {target_db}[_{collection_name}] with operation_type='created'."
+                f"in {target_db}[_{collection_name}] with operation_type='created', "
+                f"migrated_from_tenant_id='{source_tenant_id}'."
             )
 
-            # ── Step 10: Build MockRequest for Tenant B ───────────────────────
-            mock_request = MockRequest(
-                okta_access_token=access_token,
-                okta_granted_scopes=granted_scopes,
-            )
-            mock_request._tenant       = target_tenant
-            mock_request._tenant_id    = str(target_tenant.id)
-            mock_request._mongo_uri    = target_tenant.mongo_uri
-            mock_request._db_prefix    = target_tenant.mongo_db_prefix
-            mock_request._mongo_client = target_mongo_client
+            # ── Step 9: Prepare records for OkTf ─────────────────────────────
+            # Only send the stripped_records (NEW records from Tenant A), not the
+            # full merged dataset. _run_terraform_create builds a complete desired
+            # state for Terraform reconciliation; the direct REST path only CREATEs
+            # what is new — sending existing records would cause duplicate failures.
+            send_records = copy.deepcopy(stripped_records)
+            remove_metadata_fields(send_records)
+            for record in send_records:
+                for val in record.values():
+                    if isinstance(val, list):
+                        for item in val:
+                            if isinstance(item, dict):
+                                for field in _METADATA_FIELDS:
+                                    item.pop(field, None)
 
-            # ── Step 11: Terraform merge + call ───────────────────────────────
-            tf_response, tf_data = self._run_terraform_create(
-                mock_request=mock_request,
-                target_mongo_client=target_mongo_client,
-                target_db_conn=target_db_conn,
-                target_db=target_db,
-                entity_name=entity_name,
-                collection_name=collection_name,
-                id_field=id_field,
-                target_tenant=target_tenant,
+            # ── Step 10: Resolve OkTf endpoint — one shared instance for every tenant ──
+            active_server_url = settings.SERVER_URL
+            terraform_api = get_terraform_api_for_entity(entity_name)
+            if not terraform_api:
+                raise ValueError(
+                    f"No Terraform API configured for entity: {entity_name}"
+                )
+            terraform_url = f"{active_server_url}{terraform_api}"
+
+            okta_org_name = None
+            okta_base_url = None
+            if getattr(target_tenant, "okta_domain", None):
+                domain_clean = (
+                    target_tenant.okta_domain
+                    .replace("https://", "")
+                    .replace("http://", "")
+                    .rstrip("/")
+                )
+                parts = domain_clean.split(".", 1)
+                okta_org_name = parts[0]
+                okta_base_url = parts[1] if len(parts) > 1 else "okta.com"
+
+            # ── Step 11: POST to OkTf — service token path ───────────────────
+            # OkTf reads tenant credentials from BDT's Supabase, generates a
+            # DPoP key pair internally, and calls Okta REST API directly.
+            tf_response = requests.post(
+                terraform_url,
+                params={"collection_name": collection_name},
+                json={
+                    "data":              send_records,
+                    "tenant_id":         str(target_tenant.id),
+                    "okta_org_name":     okta_org_name,
+                    "okta_base_url":     okta_base_url,
+                    "bucket_name":       getattr(target_tenant, "supabase_bucket_name", None),
+                    "use_service_token": True,
+                },
+                headers={},
             )
+
+            try:
+                tf_data = tf_response.json()
+            except Exception:
+                tf_data = {"message": tf_response.text}
 
             if not tf_response.ok:
+                cleanup_failed_migration(
+                    target_db_conn, collection_name, source_tenant_id, nested_mapping
+                )
                 logger.error(
-                    f"cross_tenant_migrate: Terraform failed "
+                    f"cross_tenant_migrate: OkTf failed "
                     f"(status={tf_response.status_code}): {tf_data}"
                 )
                 return Response(
-                    {"error": "Terraform apply failed.", "details": tf_data},
+                    {"error": "OkTf call failed.", "details": tf_data},
                     status=status.HTTP_502_BAD_GATEWAY,
                 )
 
             # ── Step 12: Write real Okta IDs back to _collection ─────────────
             created_resources = tf_data.get("created_resources", [])
+            label_field = mapping_handlers.MAPPED_ENTITIES_HELPERS[
+                "entity_unique_fields"
+            ].get(collection_name, "label")
             if created_resources:
-                label_field = mapping_handlers.MAPPED_ENTITIES_HELPERS[
-                    "entity_unique_fields"
-                ].get(collection_name, "label")
                 label_to_id = {r["label"]: r["id"] for r in created_resources}
                 update_created_records_with_ids(
                     target_db_conn, collection_name, id_field, label_field, label_to_id
@@ -227,19 +257,69 @@ class CrossTenantMigrateView(APIView):
                     f"real Okta IDs to {target_db}[_{collection_name}]."
                 )
 
-            # ── Step 13: Return ───────────────────────────────────────────────
+            # Promote records that received a real ID → operation_type='migrated'.
+            # Records OkTf never confirmed (no ID written back) are removed so they
+            # do not accumulate as stale 'created' entries in the _collection.
+            stored_count = mark_records_migrated(
+                target_db_conn, collection_name, id_field, source_tenant_id
+            )
+
+            # ── Step 13: Log + Return ─────────────────────────────────────────
+            okta_errors = tf_data.get("errors", [])
+            try:
+                from core.utils.activity_logger import ActivityLogger
+                tenant = getattr(request, "_tenant", None)
+                ActivityLogger.log(
+                    action="migrate",
+                    tenant_id=str(tenant.id) if tenant else None,
+                    user_email=getattr(request.user, "email", None),
+                    entity_name=entity_name,
+                    db_name=target_db,
+                    status="success" if not okta_errors else "partial_success",
+                    details={
+                        "source_tenant": source_tenant.name,
+                        "target_tenant": target_tenant.name,
+                        "source_db": source_db,
+                        "migrated_count": len(created_resources),
+                        "errors": len(okta_errors),
+                    },
+                )
+            except Exception:
+                pass
+
+            try:
+                from core.notifications import notify
+                from core.notifications import events
+                _tenant = getattr(request, '_tenant', None)
+                _t_id = str(_tenant.id) if _tenant else None
+                if _t_id:
+                    evt = events.CROSS_TENANT_MIGRATION_COMPLETED if not okta_errors else events.CROSS_TENANT_MIGRATION_FAILED
+                    notify(evt, {'entity': entity_name, 'migrated_count': len(created_resources), 'errors': len(okta_errors), 'source': source_tenant.name, 'target': target_tenant.name}, _t_id)
+            except Exception:
+                pass
+
             return Response(
                 {
-                    "entity_name":    entity_name,
-                    "migrated_count": len(stripped_records),
-                    "tf_message":     tf_data.get("message", ""),
-                    "warnings":       warnings,
+                    "entity_name":      entity_name,
+                    "migrated_count":   len(created_resources),
+                    "stored_count":     stored_count,
+                    "tf_message":       tf_data.get("message", ""),
+                    "warnings":         warnings,
+                    "errors":           okta_errors,
                 },
                 status=status.HTTP_200_OK,
             )
 
         except Exception as exc:
             logger.exception(f"cross_tenant_migrate: unexpected error — {exc}")
+            try:
+                from core.notifications import notify
+                from core.notifications import events
+                _tenant = getattr(request, '_tenant', None)
+                if _tenant:
+                    notify(events.CROSS_TENANT_MIGRATION_FAILED, {'error': str(exc)}, str(_tenant.id))
+            except Exception:
+                pass
             return Response(
                 {"error": "Migration failed due to an internal error.", "details": str(exc)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -249,7 +329,6 @@ class CrossTenantMigrateView(APIView):
 
     def _run_terraform_create(
         self,
-        mock_request,
         target_mongo_client,
         target_db_conn,
         target_db,
@@ -266,9 +345,8 @@ class CrossTenantMigrateView(APIView):
         3. Strip metadata fields.
         4. POST the complete desired state to OkTf with Tenant B's token.
         """
-        active_server_url = (
-            getattr(target_tenant, "terraform_server_url", None) or settings.SERVER_URL
-        )
+        # OkTf is one shared instance for every tenant — not per-tenant config.
+        active_server_url = settings.SERVER_URL
         db_prefix = target_tenant.mongo_db_prefix
 
         # a) Fetch existing records from Tenant B's snapshot (the baseline)
@@ -277,7 +355,9 @@ class CrossTenantMigrateView(APIView):
             db_prefix=db_prefix,
         )
         iso_date = target_db.split("_", 1)[1].split("T")[0]
-        original_data = service.fetch(iso_date, entity_name, db_name=target_db)
+        from core.utils.entity_config import get_excluded_app_ids_for_tenant
+        original_data = service.fetch(iso_date, entity_name, db_name=target_db,
+                                      excluded_app_ids=get_excluded_app_ids_for_tenant(target_tenant))
         logger.info(
             f"_run_terraform_create: {len(original_data)} existing records "
             f"in target DB {target_db}."
@@ -365,21 +445,21 @@ class CrossTenantMigrateView(APIView):
             okta_org_name = parts[0]
             okta_base_url = parts[1] if len(parts) > 1 else "okta.com"
 
-        # g) POST to OkTf with Tenant B's service token
-        tf_headers = get_okta_headers(mock_request)
+        # g) POST to OkTf — use_service_token instructs OkTf to fetch credentials
+        #    from Supabase itself and generate a DPoP-bound token internally.
+        #    BDT does not send an Authorization header for this path.
         tf_response = requests.post(
             terraform_url,
             params={"collection_name": collection_name},
             json={
-                "data":          merged_data,
-                "tenant_id":     str(target_tenant.id),
-                "okta_org_name": okta_org_name,
-                "okta_base_url": okta_base_url,
-                "bucket_name":   getattr(target_tenant, "supabase_bucket_name", None),
-                "supabase_url":  getattr(target_tenant, "supabase_url", None),
-                "supabase_key":  getattr(target_tenant, "supabase_key", None),
+                "data":              merged_data,
+                "tenant_id":         str(target_tenant.id),
+                "okta_org_name":     okta_org_name,
+                "okta_base_url":     okta_base_url,
+                "bucket_name":       getattr(target_tenant, "supabase_bucket_name", None),
+                "use_service_token": True,
             },
-            headers=tf_headers,
+            headers={},
         )
 
         try:

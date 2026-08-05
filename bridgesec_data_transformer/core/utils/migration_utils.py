@@ -4,13 +4,28 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# Fields that exist in BDT/Terraform representations but have no valid equivalent in
+# Okta's REST API creation body.  Sending them causes E0000003 "not well-formed".
+# Also includes fields that are source-tenant-specific policy/assignment references
+# that must not carry over to a target tenant.
+_STRIP_FOR_MIGRATION = frozenset([
+    "implicit_assignment",   # Terraform concept — no settings.oauthClient equivalent in Okta REST API
+    "authentication_policy", # policy ID from source tenant; must be re-linked in target
+    "client_id",             # Okta-assigned OAuth client_id; regenerated on creation
+    "client_basic_secret",   # source-tenant client secret; never transferable
+    "auto_key_rotation",     # only valid for private_key_jwt; sending with client_secret_basic causes E0000003
+    "pkce_required",         # not recognized in POST /api/v1/apps on all Okta versions; PKCE enforcement is a target-org policy
+])
+
+
 def strip_entity_ids(entity_name, records):
     """
     Strip Okta-issued IDs from records so they are treated as new creates
     when submitted to the Terraform pipeline.
 
     Returns (stripped_records, warnings):
-      - stripped_records: deep-copy of records with primary + nested child IDs removed
+      - stripped_records: deep-copy of records with primary + nested child IDs removed,
+        plus any fields in _STRIP_FOR_MIGRATION that must not cross tenant boundaries.
       - warnings: list of cross-reference _id fields that still remain and may be
                   tenant-specific (e.g. group_id inside a policy condition)
     """
@@ -27,6 +42,10 @@ def strip_entity_ids(entity_name, records):
         # Strip primary entity ID
         if id_field:
             record.pop(id_field, None)
+
+        # Strip fields that are invalid or tenant-specific for cross-tenant creation
+        for field in _STRIP_FOR_MIGRATION:
+            record.pop(field, None)
 
         # Strip nested child/parent IDs for entities with builder collections
         for nested_field_name in nested_field_collections:

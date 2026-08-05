@@ -18,15 +18,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.authentication import CustomJWTAuthentication
+from core.permissions.decorators import require_permission
 
 logger = logging.getLogger(__name__)
-
-
-def _is_super_admin(request) -> bool:
-    user = getattr(request, "user", None)
-    if not user:
-        return False
-    return "super_admin" in (getattr(user, "roles", None) or [])
 
 
 def _build_tenant_summary(tenant, today_display: str) -> dict:
@@ -79,7 +73,21 @@ def _build_tenant_summary(tenant, today_display: str) -> dict:
 
         latest_db = summary["last_snapshot"]["db_name"] if summary["last_snapshot"] else None
         if latest_db:
-            summary["total_users"] = client[latest_db]["okta_user"].count_documents({})
+            try:
+                db = client[latest_db]
+                if "okta_user" in db.list_collection_names():
+                    summary["total_users"] = db["okta_user"].count_documents({})
+                else:
+                    logger.info(
+                        "cross_tenant_summary: okta_user collection not found in '%s' "
+                        "for tenant '%s' — users entity may be disabled or did not run",
+                        latest_db, tenant.name,
+                    )
+            except Exception as user_count_err:
+                logger.warning(
+                    "cross_tenant_summary: failed to count users in '%s' for tenant '%s': %s",
+                    latest_db, tenant.name, user_count_err,
+                )
 
     except Exception as e:
         logger.warning(f"cross_tenant_summary: failed for tenant '{tenant.name}': {e}")
@@ -89,8 +97,9 @@ def _build_tenant_summary(tenant, today_display: str) -> dict:
 
 class CrossTenantSummaryView(APIView):
     authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    # super-admin-only: "view_cross_tenant_summary" is only in super_admin's Supabase permission list
 
+    @require_permission("view_cross_tenant_summary")
     @swagger_auto_schema(
         operation_description=(
             "**Super-admin only.**\n\n"
@@ -142,29 +151,16 @@ class CrossTenantSummaryView(APIView):
         },
     )
     def get(self, request):
-        if not _is_super_admin(request):
-            return Response(
-                {"error": "Super-admin access required"},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
         if not getattr(settings, "MULTI_TENANCY_ENABLED", False):
             return Response(
                 {"error": "Multi-tenancy is not enabled"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        from core.utils.supabase_user_tenant import SupabaseUserTenant
         from core.utils.supabase_tenant import SupabaseTenant
 
-        user_id = str(request.user.id)
-        # get_tenants_for_user returns partial objects (no mongo_uri/mongo_db_prefix)
-        # so fetch full tenant rows individually
-        mapped = SupabaseUserTenant.get_tenants_for_user(user_id)
-        tenants = [
-            t for t in (SupabaseTenant.get_by_id(str(m.id)) for m in mapped)
-            if t and t.is_active
-        ]
+        # Super-admin sees all active tenants, not just their own memberships.
+        tenants, _ = SupabaseTenant.list_all(active_only=True)
         today_display = datetime.utcnow().strftime("%d-%m-%Y")
 
         result = [_build_tenant_summary(t, today_display) for t in tenants]

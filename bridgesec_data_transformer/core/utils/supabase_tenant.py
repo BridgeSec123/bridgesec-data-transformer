@@ -52,6 +52,15 @@ class SupabaseTenant:
         # logo_url: permanent public URL stored on upload; returned directly to the UI.
         self.logo_bucket_path     = row.get("logo_bucket_path")
         self.logo_url             = row.get("logo_url")
+        # Recipient email for automated diff anomaly alerts (migration 010).
+        self.alert_email          = row.get("alert_email")
+        # Okta app IDs for service-to-service and OIDC flows.
+        self.service_app_id       = row.get("service_app_id")
+        self.oidc_app_id          = row.get("oidc_app_id")
+        # Per-tenant logging backend (migration 013): 'elasticsearch' | 'splunk' | 'loki'.
+        # Elasticsearch/Splunk/Loki are each ONE shared instance (settings.py) —
+        # this only picks WHICH one; connection details are not per-tenant.
+        self.logging_backend      = row.get("logging_backend") or "elasticsearch"
         self._row                 = row
 
     # ------------------------------------------------------------------ #
@@ -91,6 +100,24 @@ class SupabaseTenant:
             return cls(result.data[0]) if result.data else None
         except Exception as e:
             logger.error(f"SupabaseTenant.get_by_okta_domain({okta_domain}) failed: {e}")
+            return None
+
+    @classmethod
+    def get_by_okta_issuer(cls, okta_issuer: str):
+        """Return SupabaseTenant matching the given Okta issuer URL, or None."""
+        try:
+            result = (
+                get_supabase_client()
+                .table(TABLE)
+                .select("*")
+                .eq("okta_issuer", okta_issuer.rstrip("/"))
+                .eq("is_active", True)
+                .limit(1)
+                .execute()
+            )
+            return cls(result.data[0]) if result.data else None
+        except Exception as e:
+            logger.error(f"SupabaseTenant.get_by_okta_issuer({okta_issuer}) failed: {e}")
             return None
 
     @classmethod

@@ -30,6 +30,22 @@ def get_current_tenant():
     """Return the current SupabaseTenant object, or None if not set."""
     return _current_tenant_ctx.get()
 
+
+# Stores the current authenticated user's email for the duration of a request/task.
+# Set by CustomJWTAuthentication (HTTP) and Celery task entry points (background).
+# Read by UserContextFilter before each log record is emitted.
+_current_user_ctx: ContextVar[Optional[str]] = ContextVar("current_user", default=None)
+
+
+def set_current_user(email) -> None:
+    """Store the authenticated user's email for the current request/task context."""
+    _current_user_ctx.set(email)
+
+
+def get_current_user():
+    """Return the current user's email, or None if not set."""
+    return _current_user_ctx.get()
+
 # Module-level connection pool: keyed by mongo_uri so connections are reused
 _tenant_clients: dict = {}
 
