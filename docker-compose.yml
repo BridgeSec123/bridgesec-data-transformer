@@ -42,6 +42,23 @@ services:
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672/
       - REDIS_URL=redis://redis:6379/0
       - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - OPA_URL=http://opa:8181
+      # host.docker.internal: OkTf/terraform server still runs on the host, not in this compose file
+      - SERVER_URL=http://host.docker.internal:8011
+      # Self-call for the chat feature (core/utils/chat_tools.py): inside this
+      # container gunicorn binds 0.0.0.0:8000 — 8007 is only the host-side
+      # port mapping below, not reachable via loopback from inside the container.
+      - BRIDGESEC_API_URL=http://localhost:8000
+      # Splunk/Loki logging backends — service names, not the host-published
+      # ports (8001/8088/3100), same reasoning as SERVER_URL above.
+      - SPLUNK_HEC_URL=http://splunk-server:8088
+      - SPLUNK_HEC_TOKEN=abcd1234-abcd-1234-abcd-1234abcd1234
+      - SPLUNK_SEARCH_URL=https://splunk-server:8089
+      - SPLUNK_SEARCH_USER=admin
+      - SPLUNK_SEARCH_PASSWORD=${SPLUNK_PASSWORD:-changeme123}
+      - SPLUNK_VERIFY_SSL=False
+      - LOKI_URL=http://loki:3100
+      - LOKI_VERIFY_SSL=False
     ports:
       - "8007:8000"
     volumes:
@@ -91,14 +108,60 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ── Core: Celery Worker (parallel entity fetch) ─────────────────────────────
+  # ── Core: Celery Worker (parallel entity fetch — default queue only) ─────────
+  # Locked to `default` queue so it never picks up notification tasks.
+  # This means a saturated bulk fetch never delays a Slack/Teams/Email alert.
   celery_worker:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: bridgesec_celery
     working_dir: /app/bridgesec_data_transformer
-    command: celery -A bridgesec_data_transformer worker --loglevel=INFO --concurrency=4
+    command: celery -A bridgesec_data_transformer worker --loglevel=INFO --concurrency=4 --queues=default
+    env_file:
+      - .env
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672/
+      - OPA_URL=http://opa:8181
+      - SERVER_URL=http://host.docker.internal:8011
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - SPLUNK_HEC_URL=http://splunk-server:8088
+      - SPLUNK_HEC_TOKEN=abcd1234-abcd-1234-abcd-1234abcd1234
+      - SPLUNK_SEARCH_URL=https://splunk-server:8089
+      - SPLUNK_SEARCH_USER=admin
+      - SPLUNK_SEARCH_PASSWORD=${SPLUNK_PASSWORD:-changeme123}
+      - SPLUNK_VERIFY_SSL=False
+      - LOKI_URL=http://loki:3100
+      - LOKI_VERIFY_SSL=False
+    volumes:
+      - .:/app
+      - ./bridgesec_data_transformer/logs:/app/bridgesec_data_transformer/logs
+      - ./bridgesec_data_transformer/output:/app/bridgesec_data_transformer/output
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+  # ── Core: Celery Notification Worker (Slack / Teams / Email delivery) ────────
+  # Dedicated worker that listens ONLY to the `notifications` queue.
+  # Always free regardless of bulk fetch load — concurrency=2 is enough
+  # because notifications are lightweight HTTP POSTs, not CPU/IO heavy tasks.
+  celery_notification_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bridgesec_celery_notifications
+    working_dir: /app/bridgesec_data_transformer
+    command: >
+      celery -A bridgesec_data_transformer worker
+      --loglevel=INFO
+      --queues=notifications
+      --concurrency=2
+      --hostname=notification-worker@%h
     env_file:
       - .env
     environment:
@@ -108,7 +171,6 @@ services:
     volumes:
       - .:/app
       - ./bridgesec_data_transformer/logs:/app/bridgesec_data_transformer/logs
-      - ./bridgesec_data_transformer/output:/app/bridgesec_data_transformer/output
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -328,6 +390,7 @@ services:
     ports:
       - "8001:8000"
       - "8088:8088"
+      - "8089:8089"
       - "9997:9997"
     volumes:
       - splunk_server_data:/opt/splunk/var
