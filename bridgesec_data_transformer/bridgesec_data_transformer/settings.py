@@ -53,8 +53,16 @@ OKTA_SERVICE_CLIENT_ID = env("OKTA_SERVICE_CLIENT_ID", default=None)
 OKTA_SERVICE_PRIVATE_KEY = env("OKTA_SERVICE_PRIVATE_KEY", default=None)
 OKTA_SERVICE_SCOPES = env("OKTA_SERVICE_SCOPES", default="")
 
-# Anthropic API — used by the AI chat assistant (/api/chat/)
+# Chat model providers — /api/chat/. See docs/CHAT_MODEL_PROVIDERS.md
+CHAT_PROVIDER = env("CHAT_PROVIDER", default="anthropic")   # "anthropic" | "groq"
+CHAT_TIMEOUT  = env.int("CHAT_TIMEOUT", default=120)
+
 ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default=None)
+ANTHROPIC_MODEL   = env("ANTHROPIC_MODEL", default="claude-sonnet-4-6")
+
+GROQ_API_KEY  = env("GROQ_API_KEY", default=None)
+GROQ_MODEL    = env("GROQ_MODEL", default="llama-3.3-70b-versatile")
+GROQ_BASE_URL = env("GROQ_BASE_URL", default="https://api.groq.com/openai/v1")
 
 # Supabase Configuration (for Terraform state file verification)
 # Add these to your .env file:
@@ -330,6 +338,25 @@ MONGO_CONNECTIONS = set()
 # Elasticsearch Configuration (for log querying)
 ELASTICSEARCH_URL = env("ELASTICSEARCH_URL", default="http://localhost:9200")
 
+# Splunk / Loki logging backends — we host one shared instance of each; a
+# tenant only picks WHICH backend (tenants.logging_backend), never brings
+# their own server/credentials. Same pattern as ELASTICSEARCH_URL above.
+#
+# Splunk needs separate write (HEC) vs read (Search API) credentials because
+# those are two distinct Splunk subsystems on different ports with different
+# auth — a HEC token can't run a search, and search creds can't post to HEC.
+SPLUNK_HEC_URL         = env("SPLUNK_HEC_URL", default="http://localhost:8088")
+SPLUNK_HEC_TOKEN       = env("SPLUNK_HEC_TOKEN", default="")
+SPLUNK_SEARCH_URL      = env("SPLUNK_SEARCH_URL", default="https://localhost:8089")
+SPLUNK_SEARCH_USER     = env("SPLUNK_SEARCH_USER", default="admin")
+SPLUNK_SEARCH_PASSWORD = env("SPLUNK_SEARCH_PASSWORD", default="")
+SPLUNK_VERIFY_SSL      = env.bool("SPLUNK_VERIFY_SSL", default=True)
+
+# Loki serves push and query on the same host:port (different paths), so —
+# unlike Splunk — one URL covers both.
+LOKI_URL         = env("LOKI_URL", default="http://localhost:3100")
+LOKI_VERIFY_SSL  = env.bool("LOKI_VERIFY_SSL", default=True)
+
 # ========================================
 # LOGGING CONFIGURATION
 # ========================================
@@ -412,6 +439,9 @@ LOGGING = {
         'tenant_context': {
             '()': 'bridgesec_logging.config.TenantContextFilter',
         },
+        'user_context': {
+            '()': 'bridgesec_logging.config.UserContextFilter',
+        },
     },
 
     'handlers': {
@@ -441,25 +471,25 @@ LOGGING = {
             'level': 'ERROR',
             'filters': ['tenant_context'],
         },
-        # Ships log records to Elasticsearch so the /api/logs/summary/ and
-        # /api/logs/ endpoints have data to query against (bridgesec-logs-* index).
-        'elasticsearch': {
-            '()': 'core.utils.es_log_handler.ElasticsearchHandler',
-            'es_url': env("ELASTICSEARCH_URL", default="http://localhost:9200"),
+        # Ships each log record to whichever backend the record's tenant is
+        # configured for (elasticsearch/splunk/loki — see log_router.py),
+        # so /api/logs/ can read it back from the same place.
+        'tenant_router': {
+            '()': 'core.utils.log_router.TenantLogRouter',
             'level': 'DEBUG',
-            'filters': ['tenant_context'],
+            'filters': ['tenant_context', 'user_context'],
         },
     },
 
     'loggers': {
         # Default logger for all modules
         '': {
-            'handlers': ['console', 'file', 'error_file', 'elasticsearch'],
+            'handlers': ['console', 'file', 'error_file', 'tenant_router'],
             'level': 'INFO',
             'propagate': True,
         },
          "celery": {
-            "handlers": ["console", "celery_file", "elasticsearch"],
+            "handlers": ["console", "celery_file", "tenant_router"],
             "level": "INFO",
             "propagate": False,
         },
@@ -503,8 +533,25 @@ REST_FRAMEWORK = {
         "core.authentication.CustomJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
-        "core.permissions.opa_permission.OPAPermission",
+        "core.permissions.rbac_permission.RolePermission",
+        "core.permissions.rbac_permission.OPAPermission",
     ),
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "okta_push": "10/min",
+    },
+}
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": env("REDIS_URL", default="redis://localhost:6379/0"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+    }
 }
 
 
@@ -544,18 +591,57 @@ CELERY_MONGODB_BACKEND_SETTINGS = {
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
+# ── Celery queues ─────────────────────────────────────────────────────────────
+# Two queues keep notification delivery isolated from heavy bulk-fetch work.
+#
+#   default       → bulk fetch, diff, restore, all existing tasks
+#   notifications → Slack / Teams / Email delivery only
+#
+# The dedicated notification worker listens ONLY to `notifications`, so it is
+# never pulled away to process entity group tasks during a bulk fetch.
+# Dashboard writes are synchronous (no queue) so they are always instant.
+CELERY_TASK_QUEUES = {
+    "default":       {"exchange": "default",       "routing_key": "default"},
+    "notifications": {"exchange": "notifications", "routing_key": "notifications"},
+}
+CELERY_TASK_DEFAULT_QUEUE = "default"
+
+# Route all notification dispatch tasks to the dedicated queue automatically.
+# Any task under core.notifications.tasks.* lands on `notifications`.
+# Everything else keeps going to `default`.
+CELERY_TASK_ROUTES = {
+    "core.notifications.tasks.*": {"queue": "notifications"},
+}
+
 # Explicitly include task modules so they are registered in every worker
 # process at startup — regardless of autodiscovery behaviour.
 CELERY_IMPORTS = [
     'core.tasks.bulk_tasks',
     'core.tasks.diff_tasks',
+    'core.tasks.notification_tasks',
+    'core.notifications.tasks',      # notification channel dispatch tasks
 ]
 
-# Celery Beat — per-tenant schedules are registered at Beat startup via the
-# beat_init signal in celery.py, which reads Supabase once and registers one
-# exact crontab per active tenant. Restart Beat to pick up schedule changes.
-from celery.schedules import crontab  # noqa: F401 — kept for use in celery.py
-CELERY_BEAT_SCHEDULE = {}
+# Celery Beat — a single dispatcher task runs every 15 minutes and fires
+# run_scheduled_bulk_task_for_tenant for any tenant whose local scheduled time
+# matches the current UTC minute. New tenants and config changes are picked up
+# automatically without restarting Beat.
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    "dispatch-tenant-scheduled-runs": {
+        "task": "core.tasks.bulk_tasks.dispatch_tenant_scheduled_runs",
+        "schedule": crontab(minute="0,15,30,45"),
+    },
+}
+
+# ── Email notifications (Resend) ─────────────────────────────────────────────
+# Recipients are resolved per-tenant from Supabase notification_channels.
+RESEND_API_KEY     = env("RESEND_API_KEY", default="")
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="")
+
+# Alert when any entity's record count drops by more than this between snapshots.
+# Receivers are resolved dynamically from Supabase tenant admins — no fixed address needed.
+DIFF_ALERT_THRESHOLD = env.int("DIFF_ALERT_THRESHOLD", default=50)
 
 # APScheduler is the FALLBACK scheduler, used only when Celery Beat is not running.
 # It is OPT-IN: set USE_APSCHEDULER=true only in a deployment that runs APScheduler

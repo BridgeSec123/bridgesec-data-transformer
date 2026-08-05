@@ -56,7 +56,7 @@ class EntityDataService:
 
         return deleted_ids
 
-    def fetch(self, date_str, entity_name, db_name=None):
+    def fetch(self, date_str, entity_name, db_name=None, excluded_app_ids=None):
         logger.info(f"Fetching data for date: {date_str}, entity: {entity_name}",extra={"operation":"FETCHDBFORDATE"})
 
         if db_name is None:
@@ -106,6 +106,15 @@ class EntityDataService:
 
             docs = list(db[collection_name].find({}, {"_id": 0}))
             logger.info(f"Found {len(docs)} records in collection {collection_name}",extra={"operation":"FETCHDBFORDATE"})
+
+            if excluded_app_ids and collection_name == "okta_app_oauth":
+                before = len(docs)
+                docs = [d for d in docs if d.get("app_id") not in excluded_app_ids]
+                if len(docs) < before:
+                    logger.info(
+                        f"Excluded {before - len(docs)} OIDC/service app(s) from {entity_name}",
+                        extra={"operation": "FETCHDBFORDATE"},
+                    )
 
         # Exclude documents tracked as deleted or pending deletion in the restored collection
         id_field = get_entity_id_mapping().get(entity_name)

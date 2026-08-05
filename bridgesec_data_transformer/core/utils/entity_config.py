@@ -146,6 +146,22 @@ def get_disabled_collections_for_tenant(tenant_id) -> dict:
         return {}
 
 
+def get_excluded_app_ids_for_tenant(tenant) -> set:
+    """
+    Return the set of Okta app IDs that should be excluded from the bulk fetch
+    for this tenant (service app and OIDC app).
+    Returns an empty set when the tenant is None or both fields are unset.
+    """
+    if not tenant:
+        return set()
+    ids = set()
+    if getattr(tenant, "service_app_id", None):
+        ids.add(tenant.service_app_id)
+    if getattr(tenant, "oidc_app_id", None):
+        ids.add(tenant.oidc_app_id)
+    return ids
+
+
 def get_entity_catalog_with_status(tenant_id) -> list:
     """
     Return all catalog entries merged with this tenant's enabled/disabled config

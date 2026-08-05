@@ -75,6 +75,13 @@ def run_post_bulk_diff_task(self, current_db_name, request_id=None, tenant_id=No
     mongo_client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000)
     diff_collection = mongo_client[current_db_name]["_diff_report"]
 
+    # Read who triggered this bulk fetch from the job doc written by the view.
+    _job_doc = mongo_client[settings.MONGO_DB_NAME]["bulk_progress"].find_one(
+        {"_id": request_id}, {"initiated_by": 1}
+    )
+    initiated_by = (_job_doc or {}).get("initiated_by")
+    role         = (initiated_by or {}).get("roles", [])
+
     # Diagnostic: log which cluster we connected to and how many prefix-matching
     # snapshots it can see, so a future cluster misconnection is obvious from logs.
     try:
@@ -136,13 +143,15 @@ def run_post_bulk_diff_task(self, current_db_name, request_id=None, tenant_id=No
             diff_collection.replace_one(
                 {"_id": "summary"},
                 {
-                    "_id":              "summary",
-                    "type":             "summary",
+                    "_id":               "summary",
+                    "type":              "summary",
                     "is_first_snapshot": True,
-                    "current_db":       current_db_name,
-                    "previous_db":      None,
-                    "generated_at":     datetime.now(timezone.utc).isoformat(),
-                    "request_id":       request_id,
+                    "current_db":        current_db_name,
+                    "previous_db":       None,
+                    "generated_at":      datetime.now(timezone.utc).isoformat(),
+                    "request_id":        request_id,
+                    "initiated_by":      initiated_by,
+                    "role":              role,
                 },
                 upsert=True,
             )
@@ -423,6 +432,8 @@ def run_post_bulk_diff_task(self, current_db_name, request_id=None, tenant_id=No
                 "previous_db":              previous_db_name,
                 "generated_at":             datetime.now(timezone.utc).isoformat(),
                 "request_id":               request_id,
+                "initiated_by":             initiated_by,
+                "role":                     role,
                 "total_entities_compared":  len(entity_summaries),
                 "entities_skipped":         entities_skipped,
                 "entities_with_changes":    entities_with_changes,
@@ -438,6 +449,49 @@ def run_post_bulk_diff_task(self, current_db_name, request_id=None, tenant_id=No
             upsert=True,
         )
 
+        # ── Anomaly detection: alert admins on significant record-count drops ─
+        _threshold = getattr(settings, "DIFF_ALERT_THRESHOLD", 50)
+        _anomalies = [
+            {
+                "entity":     entity_key,
+                "previous":   summary["total_previous"],
+                "current":    summary["total_current"],
+                "net_change": summary["net_change"],
+            }
+            for entity_key, summary in entity_summaries.items()
+            if summary.get("net_change", 0) <= -_threshold
+        ]
+        if _anomalies:
+            from core.tasks.notification_tasks import send_diff_alert_email
+            send_diff_alert_email.delay(
+                anomalies=_anomalies,
+                current_db=current_db_name,
+                previous_db=previous_db_name,
+                tenant_id=tenant_id,
+                request_id=request_id,
+            )
+            logger.info(
+                f"[DIFF] Anomaly alert queued for {len(_anomalies)} "
+                f"entit{'y' if len(_anomalies) == 1 else 'ies'} below -{_threshold} threshold",
+                extra={
+                    "component":    "celery",
+                    "task_name":    "post_bulk_diff",
+                    "request_id":   request_id,
+                    "anomaly_count": len(_anomalies),
+                },
+            )
+            if tenant_id:
+                try:
+                    from core.notifications import notify
+                    from core.notifications import events
+                    notify(
+                        events.ANOMALY_DETECTED,
+                        {'db_name': current_db_name, 'anomaly_count': len(_anomalies), 'threshold': _threshold, 'anomalies': _anomalies},
+                        tenant_id,
+                    )
+                except Exception:
+                    pass
+
         if track_progress:
             from core.utils.progress_store import set_job_completed
             set_job_completed(request_id, {
@@ -445,6 +499,8 @@ def run_post_bulk_diff_task(self, current_db_name, request_id=None, tenant_id=No
                 "current_db":              current_db_name,
                 "previous_db":             previous_db_name,
                 "generated_at":            datetime.now(timezone.utc).isoformat(),
+                "initiated_by":            initiated_by,
+                "role":                    role,
                 "total_entities_compared": len(entity_summaries),
                 "entities_with_changes":   entities_with_changes,
                 "total_added":             total_added,
@@ -529,6 +585,13 @@ def run_post_bulk_diff_task(self, current_db_name, request_id=None, tenant_id=No
                 'db_name':    current_db_name,
             }
         )
+        if tenant_id:
+            try:
+                from core.notifications import notify
+                from core.notifications import events
+                notify(events.DIFF_TASK_FAILED, {'error': str(e), 'db_name': current_db_name, 'request_id': request_id}, tenant_id)
+            except Exception:
+                pass
         raise  # re-raise so Celery marks task FAILED and records traceback
 
     finally:

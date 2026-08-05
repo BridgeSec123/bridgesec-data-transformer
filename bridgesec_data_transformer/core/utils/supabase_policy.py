@@ -26,6 +26,9 @@ class SupabasePolicyRule:
         self.action      = row.get("action")
         self.effect      = row.get("effect", "allow")
         self.conditions  = row.get("conditions") or {}
+        self.subject_type = row.get("subject_type", "role") or "role"
+        self.subject      = row.get("subject")
+        self.scope        = row.get("scope")
         self.rego_source = row.get("rego_source")
         self.tenant_id   = row.get("tenant_id")   # None = global (super_admin); set = tenant-specific
         self.created_by  = row.get("created_by")
@@ -44,6 +47,9 @@ class SupabasePolicyRule:
             "action":      self.action,
             "effect":      self.effect,
             "conditions":  self.conditions,
+            "subject_type": self.subject_type,
+            "subject":      self.subject,
+            "scope":        self.scope,
             "rego_source": self.rego_source,
             "tenant_id":   self.tenant_id,
             "created_by":  self.created_by,
@@ -73,30 +79,45 @@ class SupabasePolicyRule:
             return None
 
     @classmethod
-    def list_all(cls, role: str = None, page: int = 1, page_size: int = 50, tenant_id: str = None):
-        """Return paginated (rules, total), optionally filtered by role.
+    def list_all(cls, role: str = None, page: int = 1, page_size: int = 50, tenant_id: str = None, include_global: bool = True, scope: str = None, subject: str = None):
+        """Return paginated (rules, total), optionally filtered by role/scope/subject.
 
         When tenant_id is provided (non-super-admin callers) only rules that are
         global (tenant_id IS NULL) or belong to that specific tenant are returned.
         Super admin callers pass tenant_id=None to see all rules.
+
+        include_global=False restricts results to tenant-specific rows only (used
+        for tenant_admin / backup_admin roles that must not see global policies).
+
+        scope filters the audit marker (role|user|data|user_data); subject filters
+        by the targeted user email — used to find fine-grained policies.
         """
         try:
             offset = (page - 1) * page_size
             client = get_supabase_client()
 
+            def _filtered():
+                q = client.table(TABLE).select("*", count="exact")
+                if role:
+                    q = q.eq("role", role)
+                if scope:
+                    q = q.eq("scope", scope)
+                if subject:
+                    q = q.eq("subject", subject)
+                return q
+
             if tenant_id is not None:
+                if not include_global:
+                    # tenant_admin / backup_admin — tenant rows only, no global policies
+                    query = _filtered().eq("tenant_id", str(tenant_id))
+                    result = query.order("role").range(offset, offset + page_size - 1).execute()
+                    return [cls(row) for row in (result.data or [])], (result.count or 0)
+
                 # Fetch global rules (tenant_id IS NULL) + tenant's own rules separately
                 # then merge, because Supabase JS SDK doesn't support OR with IS NULL
                 # in a single .or_() call cleanly across versions.
-                base_q = client.table(TABLE).select("*", count="exact")
-                if role:
-                    base_q = base_q.eq("role", role)
-
-                global_q = base_q.is_("tenant_id", "null")
-                tenant_q = client.table(TABLE).select("*", count="exact")
-                if role:
-                    tenant_q = tenant_q.eq("role", role)
-                tenant_q = tenant_q.eq("tenant_id", str(tenant_id))
+                global_q = _filtered().is_("tenant_id", "null")
+                tenant_q = _filtered().eq("tenant_id", str(tenant_id))
 
                 global_res = global_q.order("role").execute()
                 tenant_res = tenant_q.order("role").execute()
@@ -107,10 +128,7 @@ class SupabasePolicyRule:
                 return [cls(row) for row in page_rows], total
 
             # Super admin — all rules, no tenant filter
-            query = client.table(TABLE).select("*", count="exact")
-            if role:
-                query = query.eq("role", role)
-            result = query.order("role").range(offset, offset + page_size - 1).execute()
+            result = _filtered().order("role").range(offset, offset + page_size - 1).execute()
             return [cls(row) for row in (result.data or [])], (result.count or 0)
         except Exception as e:
             logger.error(f"SupabasePolicyRule.list_all() failed: {e}")

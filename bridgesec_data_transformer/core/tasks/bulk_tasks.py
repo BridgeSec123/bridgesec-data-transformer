@@ -37,6 +37,13 @@ def _on_bulk_task_failure(sender=None, kwargs=None, **kw):
                 "Bulk task failed — job marked as failed via signal",
                 extra={'component': 'celery', 'task_name': sender, 'request_id': request_id, 'tenant_id': tenant_id},
             )
+            if tenant_id:
+                try:
+                    from core.notifications import notify
+                    from core.notifications import events
+                    notify(events.BULK_FETCH_FAILED, {'request_id': request_id, 'task': str(sender)}, tenant_id)
+                except Exception:
+                    pass
         except Exception:
             pass  # never let a signal handler crash the worker
 
@@ -60,6 +67,13 @@ def _on_task_revoked(request=None, terminated=None, signum=None, **kw):
                     'tenant_id':  tenant_id,
                 },
             )
+            if tenant_id:
+                try:
+                    from core.notifications import notify
+                    from core.notifications import events
+                    notify(events.BULK_FETCH_TASK_REVOKED, {'request_id': request_id, 'terminated': terminated, 'signum': str(signum)}, tenant_id)
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -70,17 +84,21 @@ class MockRequest:
     This allows Bearer token authentication in Celery tasks without a real Django request.
     """
 
-    def __init__(self, okta_access_token=None, okta_granted_scopes=None):
-        self.session = MockSession(okta_access_token, okta_granted_scopes)
+    def __init__(self, okta_access_token=None, okta_granted_scopes=None, okta_dpop_key_pem=None):
+        self.session = MockSession(okta_access_token, okta_granted_scopes, okta_dpop_key_pem)
 
 
 class MockSession:
     """Mock session to hold Okta access token for background tasks."""
 
-    def __init__(self, okta_access_token=None, okta_granted_scopes=None):
+    def __init__(self, okta_access_token=None, okta_granted_scopes=None, okta_dpop_key_pem=None):
         self._data = {
             'okta_access_token': okta_access_token,
             'okta_granted_scopes': okta_granted_scopes or [],
+            # Set only for the scheduled service-token flow — see tenant_service_token.py.
+            # Its presence is what tells get_okta_headers() to send DPoP proofs instead
+            # of a plain Bearer token.
+            'okta_dpop_key_pem': okta_dpop_key_pem,
         }
 
     def get(self, key, default=None):
@@ -125,7 +143,7 @@ def notify_backend_via_rabbitmq(db_name, status='completed', error_details=None)
 
 
 @shared_task(bind=True)
-def process_single_entity_group(self, entity_name, viewset_class_path, db_name, okta_access_token=None, okta_granted_scopes=None, request_id=None, tenant_id=None, disabled_collection_names=None, track_progress=True, mongo_uri=None):
+def process_single_entity_group(self, entity_name, viewset_class_path, db_name, okta_access_token=None, okta_granted_scopes=None, okta_dpop_key_pem=None, request_id=None, tenant_id=None, disabled_collection_names=None, excluded_app_ids=None, track_progress=True, mongo_uri=None):
     """
     Process a single entity group in a Celery worker.
     This task runs in parallel with other entity group tasks.
@@ -193,7 +211,7 @@ def process_single_entity_group(self, entity_name, viewset_class_path, db_name, 
         #   - okta_base_url resolves the tenant's Okta domain (via _tenant_id)
         #   - store_data() connects to the tenant's MongoDB (via _mongo_uri)
         #   - get_queryset() uses the tenant's DB prefix (via _db_prefix)
-        mock_request = MockRequest(okta_access_token, okta_granted_scopes)
+        mock_request = MockRequest(okta_access_token, okta_granted_scopes, okta_dpop_key_pem)
         if tenant_id:
             mock_request._tenant_id = tenant_id
         if _resolved_tenant:
@@ -206,6 +224,7 @@ def process_single_entity_group(self, entity_name, viewset_class_path, db_name, 
         # tenant's Okta domain — without this it would fall back to settings.OKTA_API_URL.
         viewset_instance = viewset_class()
         viewset_instance._disabled_collection_names = set(disabled_collection_names or [])
+        viewset_instance._excluded_app_ids = set(excluded_app_ids or [])
         viewset_instance.request = mock_request
         extracted_data = viewset_instance.fetch_and_store_data(db_name, request=mock_request)
 
@@ -304,6 +323,7 @@ def process_single_entity_group(self, entity_name, viewset_class_path, db_name, 
 def run_bulk_entity_task(
     okta_access_token=None,
     okta_granted_scopes=None,
+    okta_dpop_key_pem=None,
     max_workers=4,
     request_id=None,
     db_name=None,
@@ -336,12 +356,32 @@ def run_bulk_entity_task(
     # total_groups derived from filtered set so progress bar stays accurate
     total_groups = len(entity_viewsets)
 
+    # Resolve tenant early so its mongo_db_prefix is available when generating db_name.
+    # This must happen before the db_name block below — scheduled runs don't pass db_name,
+    # and get_dynamic_db() must use the tenant prefix so get_previous_db() can find
+    # the snapshot later (it filters by prefix; a mismatch causes every scheduled diff
+    # to report is_first_snapshot=True).
+    _chord_mongo_uri = None
+    _chord_tenant = None
+    if tenant_id:
+        try:
+            from core.utils.tenant_utils import get_tenant_by_id, set_current_tenant
+            _t = get_tenant_by_id(tenant_id)
+            if _t:
+                _chord_mongo_uri = _t.mongo_uri
+                _chord_tenant = _t
+                set_current_tenant(_t)
+        except Exception:
+            pass
+
     # db_name is pre-generated by the view and passed here so both the job doc
     # and the actual data end up under the same DB name.
-    # For scheduled tasks (no view involvement) generate it here instead.
+    # For scheduled tasks (no view involvement) generate it here using the tenant's
+    # prefix so the snapshot name matches what the diff task searches for.
     job_created_by_view = db_name is not None
     if not db_name:
-        db_name = get_dynamic_db()
+        _prefix = getattr(_chord_tenant, 'mongo_db_prefix', None) or None
+        db_name = get_dynamic_db(prefix=_prefix)
 
     log_task_start(
         'bulk_fetch',
@@ -368,17 +408,10 @@ def run_bulk_entity_task(
         logger.info("Using SSWS token authentication (static API token fallback)")
 
     try:
-        _chord_mongo_uri = None
-        if tenant_id:
-            try:
-                from core.utils.tenant_utils import get_tenant_by_id, set_current_tenant
-                _t = get_tenant_by_id(tenant_id)
-                if _t:
-                    _chord_mongo_uri = _t.mongo_uri
-                    set_current_tenant(_t)
-            except Exception:
-                pass
         ensure_mongo_connection(db_name, mongo_uri=_chord_mongo_uri)
+
+        from core.utils.entity_config import get_excluded_app_ids_for_tenant
+        _excluded_app_ids = get_excluded_app_ids_for_tenant(_chord_tenant)
         logger.info(f"MongoDB connection established for db_name={db_name}")
 
         # For view-triggered runs, create_bulk_job was already called synchronously
@@ -387,7 +420,11 @@ def run_bulk_entity_task(
         # tracking is on. Scheduled runs (track_progress=False) skip the SSE job doc.
         if track_progress and not job_created_by_view:
             from core.utils.progress_store import create_bulk_job
-            create_bulk_job(request_id, db_name, list(entity_viewsets.keys()), mongo_uri=_chord_mongo_uri)
+            create_bulk_job(
+                request_id, db_name, list(entity_viewsets.keys()),
+                mongo_uri=_chord_mongo_uri,
+                initiated_by={"trigger": "scheduled"},
+            )
 
         tasks = []
         for entity_name, viewset_class in entity_viewsets.items():
@@ -399,9 +436,11 @@ def run_bulk_entity_task(
                     db_name=db_name,
                     okta_access_token=okta_access_token,
                     okta_granted_scopes=okta_granted_scopes,
+                    okta_dpop_key_pem=okta_dpop_key_pem,
                     request_id=request_id,
                     tenant_id=tenant_id,
                     disabled_collection_names=list(disabled_collections.get(entity_name, set())),
+                    excluded_app_ids=list(_excluded_app_ids) if entity_name == "apps" else [],
                     track_progress=track_progress,
                     mongo_uri=_chord_mongo_uri,
                 )
@@ -528,6 +567,31 @@ def finalize_bulk_entity_task(entity_results, db_name, request_id, start_time_ep
         duration_ms=duration_ms,
         request_id=request_id,
     )
+
+    try:
+        from core.utils.activity_logger import ActivityLogger
+        ActivityLogger.log(
+            action="bulk_fetch",
+            tenant_id=tenant_id,
+            db_name=db_name,
+            status=overall_status,
+            details={"successful": successful, "failed": failed, "duration_ms": duration_ms},
+        )
+    except Exception:
+        pass
+
+    if tenant_id:
+        try:
+            from core.notifications import notify
+            from core.notifications import events
+            if overall_status == 'success':
+                notify(events.BULK_FETCH_COMPLETED, {'db_name': db_name, 'successful': successful, 'failed': failed, 'duration_ms': duration_ms}, tenant_id)
+            elif overall_status == 'partial_success':
+                notify(events.BULK_FETCH_PARTIAL, {'db_name': db_name, 'successful': successful, 'failed': failed, 'duration_ms': duration_ms}, tenant_id)
+            else:
+                notify(events.BULK_FETCH_FAILED, {'db_name': db_name, 'successful': successful, 'failed': failed, 'duration_ms': duration_ms}, tenant_id)
+        except Exception:
+            pass
 
     logger.info(
         "PARALLEL BULK FETCH COMPLETED",
@@ -681,7 +745,13 @@ def run_scheduled_bulk_task_for_tenant(tenant_id: str):
         return {"status": "skipped", "reason": "already_ran", "slot": slot_key}
 
     try:
-        access_token, granted_scopes = get_service_access_token_for_tenant(tenant)
+        from core.utils.tenant_service_token import dpop_key_to_pem
+
+        access_token, granted_scopes, dpop_key = get_service_access_token_for_tenant(tenant)
+        # dpop_key is an EC private key object — not JSON-serializable across the
+        # Celery broker, so it's passed to the task as PEM text and reloaded inside
+        # each worker (see okta_helpers.get_okta_headers).
+        dpop_key_pem = dpop_key_to_pem(dpop_key) if dpop_key else None
         logger.info(
             f"Service token obtained for tenant '{tenant.name}'. Dispatching bulk task.",
             extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch', 'tenant_id': tenant_id}
@@ -689,6 +759,7 @@ def run_scheduled_bulk_task_for_tenant(tenant_id: str):
         run_bulk_entity_task.delay(
             okta_access_token=access_token,
             okta_granted_scopes=granted_scopes,
+            okta_dpop_key_pem=dpop_key_pem,
             tenant_id=str(tenant.id),
             track_progress=False,
         )
@@ -699,6 +770,67 @@ def run_scheduled_bulk_task_for_tenant(tenant_id: str):
             extra={'component': 'celery', 'task_name': 'scheduled_bulk_fetch', 'tenant_id': tenant_id}
         )
         return {"status": "error", "error": str(e)}
+
+
+@shared_task
+def dispatch_tenant_scheduled_runs():
+    """
+    Runs every 15 min via Celery Beat. Reads all active tenants from Supabase and
+    fires run_scheduled_bulk_task_for_tenant for any tenant whose local scheduled
+    time matches the current UTC minute. Replaces the one-shot beat_init registration
+    so new tenants and config changes are picked up automatically without a Beat restart.
+
+    The slot-claim dedup inside run_scheduled_bulk_task_for_tenant guarantees
+    exactly-once dispatch even if this task overlaps with itself.
+    """
+    import datetime as _dt
+    from zoneinfo import ZoneInfo
+    from core.utils.supabase_tenant import SupabaseTenant
+
+    now_utc = _dt.datetime.now(_dt.timezone.utc)
+
+    try:
+        tenants, _ = SupabaseTenant.list_all(active_only=True, page=1, page_size=1000)
+    except Exception as e:
+        logger.error(
+            f"dispatch_tenant_scheduled_runs: failed to load tenants from Supabase: {e}",
+            extra={'component': 'celery', 'task_name': 'dispatch_tenant_scheduled_runs'}
+        )
+        return {"status": "error", "error": str(e)}
+
+    dispatched = []
+    for tenant in tenants:
+        if not tenant.scheduler_enabled:
+            continue
+
+        hour    = int(tenant.scheduler_hour or 0)
+        minute  = int(tenant.scheduler_minute or 0)
+        tz_name = tenant.scheduler_timezone or "UTC"
+
+        try:
+            tz = ZoneInfo(tz_name)
+            today = now_utc.date()
+            local_dt = _dt.datetime(today.year, today.month, today.day, hour, minute, tzinfo=tz)
+            utc_dt   = local_dt.astimezone(_dt.timezone.utc)
+            utc_h, utc_m = utc_dt.hour, utc_dt.minute
+        except Exception:
+            utc_h, utc_m = hour, minute  # invalid timezone → treat as UTC
+
+        if now_utc.hour == utc_h and now_utc.minute == utc_m:
+            run_scheduled_bulk_task_for_tenant.delay(str(tenant.id))
+            dispatched.append(tenant.name)
+            logger.info(
+                f"dispatch_tenant_scheduled_runs: dispatched tenant '{tenant.name}'",
+                extra={'component': 'celery', 'task_name': 'dispatch_tenant_scheduled_runs',
+                       'tenant_id': str(tenant.id)}
+            )
+
+    logger.info(
+        f"dispatch_tenant_scheduled_runs: checked {len(tenants)} tenant(s) at "
+        f"{now_utc.strftime('%H:%M')} UTC — dispatched {len(dispatched)}: {dispatched}",
+        extra={'component': 'celery', 'task_name': 'dispatch_tenant_scheduled_runs'}
+    )
+    return {"dispatched": dispatched, "checked": len(tenants)}
 
 
 @shared_task

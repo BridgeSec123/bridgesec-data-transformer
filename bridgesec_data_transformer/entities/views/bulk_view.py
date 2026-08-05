@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 import requests
 from core.authentication import CustomJWTAuthentication
+from core.permissions.decorators import require_permission
 from core.tasks.bulk_tasks import run_bulk_entity_task
 from core.utils.progress_store import create_bulk_job
 from core.utils.db_utils import (extract_time,
@@ -54,7 +55,6 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from core.permissions.opa_permission import OPAPermission
 
 from core.utils import fieldfetch
 from core.utils import mapping_handlers
@@ -92,10 +92,11 @@ def _get_mongo_client(tenant):
 
 class BulkEntityViewSet(viewsets.ViewSet):
     authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [IsAuthenticated, OPAPermission]
+    # Authorization via the global RolePermission gate (@require_permission(...) per action).
     serializer_class = RestoreDataSerializer
     entity_type = "bulk"
 
+    @require_permission("trigger_bulk_fetch")
     @swagger_auto_schema(
         operation_description="Fetch data from all registered entity APIs and store them in MongoDB",
         responses={201: openapi.Response("Data fetched and stored successfully")},
@@ -113,7 +114,10 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
         # Get request_id from middleware
         request_id = getattr(request, 'request_id', 'N/A')
-        user = getattr(request.user, 'username', 'anonymous') if hasattr(request, 'user') else 'anonymous'
+        user    = getattr(request.user, 'username', 'anonymous') if hasattr(request, 'user') else 'anonymous'
+        email   = getattr(request.user, 'email',    None)        if hasattr(request, 'user') else None
+        roles   = getattr(request.user, 'roles',    [])          if hasattr(request, 'user') else []
+        user_id = str(getattr(request.user, 'id', '') or '')     if hasattr(request, 'user') else None
 
         logger.info(
             "Bulk fetch triggered",
@@ -124,10 +128,12 @@ class BulkEntityViewSet(viewsets.ViewSet):
             }
         )
 
-        # Get Okta access token and granted scopes from session to pass to background task
+        # Get Okta access token and granted scopes from session to pass to background task.
+        # Manual bulk fetch always runs as the requesting user — service-app (DPoP)
+        # authentication is reserved for scheduled runs only, and is obtained in the
+        # task layer (core/tasks/bulk_tasks.run_scheduled_bulk_task_for_tenant), never here.
         okta_access_token = None
         okta_granted_scopes = []
-        using_service_token = False
         if hasattr(request, 'session'):
             okta_access_token = request.session.get('okta_access_token')
             okta_granted_scopes = request.session.get('okta_granted_scopes', [])
@@ -135,30 +141,8 @@ class BulkEntityViewSet(viewsets.ViewSet):
         # Resolve tenant early so we can use the tenant's Okta domain for token validation.
         tenant = _get_tenant(request)
 
-        # In multi-tenant mode, when no user Okta session token is present (e.g. the
-        # frontend authenticates via JWT header rather than a session cookie), fall back
-        # to the tenant's service-app token so manual bulk tasks work the same way
-        # as scheduled ones.
-        from django.conf import settings as _settings
-        if not okta_access_token and getattr(_settings, 'MULTI_TENANCY_ENABLED', False) and tenant:
-            try:
-                from core.utils.tenant_service_token import get_service_access_token_for_tenant
-                okta_access_token, okta_granted_scopes = get_service_access_token_for_tenant(tenant)
-                using_service_token = True
-                logger.info(
-                    f"No user session token — using service app token for manual bulk task "
-                    f"(tenant: {tenant.name})",
-                    extra={'component': 'api', 'request_id': request_id},
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Could not obtain service app token for tenant '{tenant.name}': {e}",
-                    extra={'component': 'api', 'request_id': request_id},
-                )
-
         # Validate the user's Okta token before dispatching to catch expired sessions early.
-        # Skipped for service-app tokens (freshly obtained above, no user context endpoint).
-        if okta_access_token and not using_service_token:
+        if okta_access_token:
             domain = tenant.okta_domain if tenant and tenant.okta_domain else ''
             domain = domain.rstrip('/')
             if not domain.startswith('http'):
@@ -199,7 +183,17 @@ class BulkEntityViewSet(viewsets.ViewSet):
         from core.utils.entity_config import get_enabled_entities_for_tenant
         _enabled = get_enabled_entities_for_tenant(str(tenant.id) if tenant else None)
         tracked_keys = [k for k in ENTITY_VIEWSETS if k in _enabled]
-        create_bulk_job(request_id, db_name, tracked_keys, mongo_uri=getattr(request, "_mongo_uri", None))
+        create_bulk_job(
+            request_id, db_name, tracked_keys,
+            mongo_uri=getattr(request, "_mongo_uri", None),
+            initiated_by={
+                "user_id":  user_id or None,
+                "username": user,
+                "email":    email,
+                "roles":    roles,
+                "trigger":  "manual",
+            },
+        )
 
         run_bulk_entity_task.delay(
             okta_access_token=okta_access_token,
@@ -345,6 +339,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
         return Response({"tenants": result_tenants}, status=status.HTTP_200_OK)
 
+    @require_permission("view_db_map")
     @swagger_auto_schema(
         operation_description=(
             "Return snapshot database information.\n\n"
@@ -505,6 +500,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @require_permission("view_resources")
     @action(detail=False, methods=["get"], url_path="resources")
     def get_resource_names(self, request):
         """
@@ -536,6 +532,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @require_permission("view_resource_data")
     @swagger_auto_schema(
         operation_description=(
             "Fetch paginated resource data from a specific snapshot DB.\n\n"
@@ -784,6 +781,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+    @require_permission("restore_data")
     @swagger_auto_schema(
         method="post",
         manual_parameters=[
@@ -856,7 +854,10 @@ class BulkEntityViewSet(viewsets.ViewSet):
         tenant = _get_tenant(request)
         active_mongo_client = _get_mongo_client(tenant)
         db_prefix = tenant.mongo_db_prefix if tenant else settings.MONGO_DB_NAME
-        active_server_url = tenant.terraform_server_url if tenant else server_url
+        # OkTf is one shared instance for every tenant — not per-tenant config.
+        active_server_url = server_url
+        from core.utils.entity_config import get_excluded_app_ids_for_tenant
+        _excluded_app_ids = get_excluded_app_ids_for_tenant(tenant)
 
         try:
             # Validate snapshot DB exists (using tenant-scoped client)
@@ -977,6 +978,30 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
             logger.info(f"Operation counts: {len(deleted_records)} deleted, {len(restore_records)} restored, {len(create_records)} created",extra={"operation":"Restore Modified Data"})
 
+            # Fine-grained OPA deny-veto, per target record. This custom action never
+            # calls DRF's has_object_permission, so it is the object-permission point
+            # for restore/create/delete. Use collection_name, not the raw entity_name
+            # URL param — entity_name is a display label (e.g. "App Oauth") while
+            # policies are authored/stored against the Mongo collection name (e.g.
+            # "okta_app_oauth", see get_collection_name()); comparing entity_name
+            # against a policy's `entity` field never matched, so data-specific
+            # deny rules never fired. Author field_conditions/record_id_filter
+            # policies against collection_name; resource_attributes is the submitted doc.
+            from core.permissions.rbac_permission import opa_denies
+            veto_targets = (
+                [(d, "delete") for d in deleted_records]
+                + [(d, "update") for d in restore_records]
+                + [(d, "create") for d in create_records]
+            )
+            for veto_doc, veto_action in veto_targets:
+                if opa_denies(request, collection_name, veto_action,
+                              resource_id=veto_doc.get(id_field), resource_attributes=veto_doc):
+                    return Response(
+                        {"error": f"Policy denies {veto_action} on {entity_name} "
+                                  f"'{veto_doc.get(id_field)}'"},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+
             # Initialize variables for deletion tracking
             deleted_ids_list = []
             cascade_info = {}
@@ -1086,7 +1111,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
 
             # Step 1: Fetch ALL original data from source DB snapshot
             service = EntityDataService(mongo_client=active_mongo_client, db_prefix=db_prefix)
-            original_data = service.fetch(iso_date, entity_name, db_name=source_db)
+            original_data = service.fetch(iso_date, entity_name, db_name=source_db, excluded_app_ids=_excluded_app_ids)
             logger.info(f"Step 1: Fetched {len(original_data)} original records from source DB ({source_db})",extra={"operation":"Restore Modified Data"})
 
             # Step 2: Merge original data with restored data from today's DB
@@ -1187,7 +1212,11 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 target_ids=deleted_ids_list if deleted_records else None
             )
 
-            # Get Okta authorization headers (Bearer token from session)
+            # Forward the user's Okta session token to the Terraform module (the
+            # normal JWT flow). The per-tenant service-app (org-level) token path is
+            # deferred for now — the cross-tenant migration service app currently
+            # enforces DPoP, which the Terraform Okta provider cannot consume, so
+            # requesting a non-DPoP token fails with invalid_dpop_proof.
             tf_headers = get_okta_headers(request)
 
             # Get module-specific Terraform API endpoint
@@ -1233,8 +1262,6 @@ class BulkEntityViewSet(viewsets.ViewSet):
                         "okta_org_name": okta_org_name,
                         "okta_base_url": okta_base_url,
                         "bucket_name":   tenant.supabase_bucket_name if tenant else None,
-                        "supabase_url":  tenant.supabase_url if tenant else None,
-                        "supabase_key":  tenant.supabase_key if tenant else None,
                     },
                     headers=tf_headers,
                 )
@@ -1315,8 +1342,6 @@ class BulkEntityViewSet(viewsets.ViewSet):
                     "okta_org_name": okta_org_name,
                     "okta_base_url": okta_base_url,
                     "bucket_name":   tenant.supabase_bucket_name if tenant else None,
-                    "supabase_url":  tenant.supabase_url if tenant else None,
-                    "supabase_key":  tenant.supabase_key if tenant else None,
                 },
                 headers=tf_headers,
             )
@@ -1381,6 +1406,14 @@ class BulkEntityViewSet(viewsets.ViewSet):
                             )
 
                     logger.info(f"Successfully updated {len(deleted_ids_list)} records to 'deleted' status",extra={"operation":"Restore Modified Data"})
+                    try:
+                        from core.notifications import notify
+                        from core.notifications import events
+                        _t_id = str(tenant.id) if tenant else None
+                        if _t_id:
+                            notify(events.DELETION_CONFIRMED, {'entity': entity_name, 'deleted_count': len(deleted_ids_list), 'by': user}, _t_id)
+                    except Exception:
+                        pass
 
                     # ============================================
                     # NEW: RUN DELETION VERIFICATION
@@ -1424,6 +1457,14 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 else:
                     # FAILURE: Keep status as "deletion_pending" and return error
                     logger.error(f"Terraform deletion failed (status {tf_response.status_code}), keeping 'deletion_pending' status",extra={"operation":"Restore Modified Data"})
+                    try:
+                        from core.notifications import notify
+                        from core.notifications import events
+                        _t_id = str(tenant.id) if tenant else None
+                        if _t_id:
+                            notify(events.DELETION_FAILED, {'entity': entity_name, 'tf_status': tf_response.status_code, 'error': tf_message}, _t_id)
+                    except Exception:
+                        pass
 
                     # Update all records to "deletion_failed" with error message
                     parent_ids = [doc.get(id_field) for doc in complete_deleted_records if doc.get(id_field)]
@@ -1472,6 +1513,14 @@ class BulkEntityViewSet(viewsets.ViewSet):
                         f"Updated {len(label_to_id_map)} created record(s) with real IDs from Terraform state",
                         extra={"operation": "Restore Modified Data"},
                     )
+                    try:
+                        from core.notifications import notify
+                        from core.notifications import events
+                        _t_id = str(tenant.id) if tenant else None
+                        if _t_id:
+                            notify(events.CREATE_COMPLETED, {'entity': entity_name, 'created_count': len(label_to_id_map), 'by': user}, _t_id)
+                    except Exception:
+                        pass
 
             # Build response message based on operations performed
             operation_summary = []
@@ -1561,6 +1610,16 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 }
             )
 
+            if restore_records:
+                try:
+                    from core.notifications import notify
+                    from core.notifications import events
+                    _t_id = str(tenant.id) if tenant else None
+                    if _t_id:
+                        notify(events.RESTORE_COMPLETED, {'entity': entity_name, 'restored_count': len(restore_records), 'by': user}, _t_id)
+                except Exception:
+                    pass
+
             return Response(response_data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
@@ -1578,9 +1637,18 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 },
                 exc_info=True
             )
+            try:
+                from core.notifications import notify
+                from core.notifications import events
+                _t_id = str(tenant.id) if tenant else None
+                if _t_id:
+                    notify(events.RESTORE_FAILED, {'entity': entity_name, 'error': str(e), 'by': user}, _t_id)
+            except Exception:
+                pass
 
             return Response({"error": str(e)}, status=500)
 
+    @require_permission("view_entity_schema")
     @swagger_auto_schema(
         operation_description="Get entity schema for dynamic form generation in frontend",
         responses={
@@ -1624,6 +1692,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @require_permission("diff_collections")
     @swagger_auto_schema(
         manual_parameters=[
             openapi.Parameter(
@@ -1776,6 +1845,7 @@ class BulkEntityViewSet(viewsets.ViewSet):
             return None
         return max(candidate_dbs, key=lambda db: extract_time(db))
 
+    @require_permission("cross_tenant_compare")
     @swagger_auto_schema(
         operation_description=(
             "**Superadmin only.** Compare a single Okta entity between two tenants by listing "
@@ -1956,7 +2026,27 @@ class BulkEntityViewSet(viewsets.ViewSet):
                 remove_metadata_fields(docs_a)
                 remove_metadata_fields(docs_b)
 
-            # 9. Build response
+            # 9. Log the compare action
+            try:
+                from core.utils.activity_logger import ActivityLogger
+                tenant = getattr(request, "_tenant", None)
+                ActivityLogger.log(
+                    action="compare",
+                    tenant_id=str(tenant.id) if tenant else None,
+                    user_email=getattr(request.user, "email", None),
+                    entity_name=entity_name,
+                    status="success",
+                    details={
+                        "source_tenant": tenant_a.name,
+                        "target_tenant": tenant_b.name,
+                        "source_db": db_a,
+                        "target_db": db_b,
+                    },
+                )
+            except Exception:
+                pass
+
+            # 10. Build response
             return Response(
                 {
                     "entity_name": entity_name,

@@ -13,14 +13,24 @@ from core.views.token_retrieval_view import TokenRetrievalView
 from core.views.tenant_viewset import (
     TenantListCreateView, TenantDetailView,
     TenantUserListView, TenantUserDetailView,
+    TenantLoggingConfigView,
 )
 from core.views.tenant_logo_viewset import TenantLogoView
 from core.views.chat_viewset import ChatView
 from core.views.log_views import LogListView, LogSummaryView, LogTraceView, LogStreamView
-from core.views.entity_config_viewset import EntityConfigListView, EntityConfigDetailView, EntityConfigCollectionView
+from core.views.entity_config_viewset import EntityConfigListView, EntityConfigDetailView, EntityConfigCollectionView, TenantAppExclusionView
 from core.views.scheduler_config_viewset import SchedulerConfigView
 from core.views.cross_tenant_summary_view import CrossTenantSummaryView
 from core.views.cross_tenant_migrate_view import CrossTenantMigrateView
+from core.views.okta_push_viewset import OktaPushView
+from core.views.test_okta_push_viewset import TestOktaPushView
+from core.views.notification_channel_viewset import (
+    NotificationChannelListView, NotificationChannelDetailView, NotificationChannelTestView,
+)
+from core.views.notification_viewset import (
+    NotificationListView, NotificationUnreadCountView, NotificationReadAllView,
+    NotificationDetailView, NotificationMarkReadView,
+)
 
 # Your views
 # from core.views.user_views import UserCreateView
@@ -63,12 +73,14 @@ urlpatterns = [
     path("api/tenants/<str:tenant_id>/users/", TenantUserListView.as_view(), name="tenant-users"),
     path("api/tenants/<str:tenant_id>/users/<str:uid>/", TenantUserDetailView.as_view(), name="tenant-user-detail"),
     path("api/tenants/<str:tenant_id>/logo/", TenantLogoView.as_view(), name="tenant-logo"),
+    path("api/tenants/<str:tenant_id>/logging-config/", TenantLoggingConfigView.as_view(), name="tenant-logging-config"),
     path("api/logs/",                 LogListView.as_view(),    name="log-list"),
     path("api/logs/summary/",         LogSummaryView.as_view(), name="log-summary"),
     path("api/logs/stream/",          LogStreamView.as_view(),  name="log-stream"),
     path("api/logs/<str:request_id>/", LogTraceView.as_view(), name="log-trace"),
     # Entity backup configuration (per-tenant enable/disable)
     path("api/entity-config/", EntityConfigListView.as_view(), name="entity-config-list"),
+    path("api/entity-config/apps/exclusions/", TenantAppExclusionView.as_view(), name="app-exclusion"),
     path("api/entity-config/<str:config_name>/", EntityConfigDetailView.as_view(), name="entity-config-detail"),
     path("api/entity-config/<str:entity_name>/collections/<str:collection_name>/", EntityConfigCollectionView.as_view(), name="entity-config-collection"),
     # Scheduler configuration (schedule time + scopes display)
@@ -77,6 +89,18 @@ urlpatterns = [
     path("api/cross-tenant/summary/", CrossTenantSummaryView.as_view(), name="cross-tenant-summary"),
     # Cross-tenant entity migration (super-admin only)
     path("api/cross-tenant-migrate/", CrossTenantMigrateView.as_view(), name="cross-tenant-migrate"),
+    path("api/okta-push/", OktaPushView.as_view(), name="okta-push"),
+    path("api/test-okta-push/", TestOktaPushView.as_view(), name="test-okta-push"),
+    # Notification channel config (tenant-admin only)
+    path("api/notification-channels/", NotificationChannelListView.as_view(), name="notification-channel-list"),
+    path("api/notification-channels/<str:channel_id>/", NotificationChannelDetailView.as_view(), name="notification-channel-detail"),
+    path("api/notification-channels/<str:channel_id>/test/", NotificationChannelTestView.as_view(), name="notification-channel-test"),
+    # Notification inbox (any authenticated user)
+    path("api/notifications/", NotificationListView.as_view(), name="notification-list"),
+    path("api/notifications/unread-count/", NotificationUnreadCountView.as_view(), name="notification-unread-count"),
+    path("api/notifications/read-all/", NotificationReadAllView.as_view(), name="notification-read-all"),
+    path("api/notifications/<str:notification_id>/", NotificationDetailView.as_view(), name="notification-detail"),
+    path("api/notifications/<str:notification_id>/read/", NotificationMarkReadView.as_view(), name="notification-mark-read"),
 ]
     # path("user/", UserCreateView.as_view({"post": "post"}), name="create-user"),
     # path('okta_user/', OktaLoginViewSet.as_view({"post": "create"}), name='okta-login'),

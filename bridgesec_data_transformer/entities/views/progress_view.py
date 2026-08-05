@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.authentication import CustomJWTAuthentication
+from core.permissions.decorators import require_permission
 from core.services.bulk_progress_stream_service import BulkProgressStreamService
 from core.utils.progress_store import get_bulk_job
 from core.utils.sse_helpers import sse_event, make_sse_response
@@ -44,6 +45,7 @@ class BulkProgressView(APIView):
     authentication_classes = [CustomJWTAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
+    @require_permission("view_bulk_progress")
     @swagger_auto_schema(
         operation_description="Poll the current progress of a bulk-fetch job",
         manual_parameters=[
@@ -105,6 +107,7 @@ class BulkProgressStreamView(APIView):
     authentication_classes = [CustomJWTAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
+    @require_permission("view_bulk_progress_stream")
     @swagger_auto_schema(
         operation_description="SSE stream of bulk-fetch progress; terminates with a 'complete' event carrying the diff summary",
         manual_parameters=[
@@ -187,6 +190,7 @@ class SupabasePopulateView(APIView):
         ("parent_entity_mapping",   "populate_parent_entity_mapping"),
     ]
 
+    @require_permission("supabase_populate")
     @swagger_auto_schema(
         operation_description=(
             "Populate the 7 Supabase mapping tables from in-code registries. "
@@ -285,6 +289,7 @@ class DiffReportView(APIView):
     authentication_classes = [CustomJWTAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
+    @require_permission("view_diff_report")
     @swagger_auto_schema(
         operation_description="Fetch the diff summary for a completed snapshot",
         responses={
@@ -330,6 +335,20 @@ class DiffReportView(APIView):
                 {"error": f"Diff report not available for '{db_name}'"},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        # Back-fill initiated_by / role for older snapshots written before these
+        # fields were added to the diff task.
+        if "initiated_by" not in summary:
+            _req_id = summary.get("request_id")
+            try:
+                _job_doc = mongo_client[settings.MONGO_DB_NAME]["bulk_progress"].find_one(
+                    {"_id": _req_id}, {"initiated_by": 1}
+                ) if _req_id else None
+                _initiated_by = (_job_doc or {}).get("initiated_by")
+            except Exception:
+                _initiated_by = None
+            summary["initiated_by"] = _initiated_by
+            summary["role"] = (_initiated_by or {}).get("roles", [])
 
         # Strip MongoDB-internal fields before returning
         for field in ("_id", "type", "request_id"):

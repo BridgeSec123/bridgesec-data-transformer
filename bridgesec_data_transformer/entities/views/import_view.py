@@ -10,6 +10,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.permissions.decorators import require_permission
 from core.utils.db_utils import get_collection_name
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,7 @@ class ImportResourcesView(APIView):
         required=True,
     )
 
+    @require_permission("import_resources")
     @swagger_auto_schema(
         manual_parameters=[entity_name_param, db_name_param],
         responses={
@@ -122,11 +124,10 @@ class ImportResourcesView(APIView):
                     status=status.HTTP_401_UNAUTHORIZED
                 )
 
-            # Call OkTfModules import API
+            # Call OkTfModules import API — OkTf is one shared instance for every tenant.
             from core.utils.tenant_utils import get_tenant_from_request
             _tenant = get_tenant_from_request(request)
-            terraform_server_url = (_tenant.terraform_server_url if _tenant else None) or settings.SERVER_URL
-            import_url = f"{terraform_server_url}/api/import/"
+            import_url = f"{settings.SERVER_URL}/api/import/"
 
             logger.info(f"Calling OkTfModules import API: {import_url}")
             logger.info(f"Entity: {entity_name} | Collection: {collection_name} | DB: {db_name}")

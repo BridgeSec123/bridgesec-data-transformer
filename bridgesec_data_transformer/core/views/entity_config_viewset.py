@@ -17,37 +17,24 @@ import logging
 
 from django.conf import settings
 from rest_framework import status
-from rest_framework.permissions import BasePermission, SAFE_METHODS
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.permissions.decorators import require_permission
 from core.utils.entity_config import (
     get_entity_catalog_with_status,
     bulk_update_entity_config,
     toggle_collection_config,
 )
+from core.utils.supabase_client import get_supabase_client
 from core.utils.jwt_utils import get_user_from_request
 from core.utils.tenant_utils import get_tenant_from_request
 
 logger = logging.getLogger(__name__)
 
-_WRITE_ROLES = {"super_admin", "tenant_admin", "entity_config_admin"}
-
-
-class EntityConfigPermission(BasePermission):
-    """
-    Read: any authenticated user.
-    Write: super_admin, tenant_admin or entity_config_admin only.
-    Intentionally does NOT go through OPA — simple inline role check.
-    """
-
-    def has_permission(self, request, view):
-        if not getattr(request.user, "is_authenticated", False):
-            return False
-        if request.method in SAFE_METHODS:
-            return True
-        roles = set(getattr(request.user, "roles", []) or [])
-        return bool(roles & _WRITE_ROLES)
+# Read open to any authenticated user; write restricted to
+# super_admin/tenant_admin/entity_config_admin. Enforced per-method by
+# @require_permission(...) via the global RolePermission gate.
 
 
 def _resolve_tenant_id(request):
@@ -71,8 +58,8 @@ def _resolve_tenant_id(request):
 
 
 class EntityConfigListView(APIView):
-    permission_classes = [EntityConfigPermission]
 
+    @require_permission("view_entity_config")
     def get(self, request):
         """
         Return all entities with their enabled status for the caller's tenant.
@@ -97,6 +84,7 @@ class EntityConfigListView(APIView):
             "total": len(catalog),
         })
 
+    @require_permission("update_entity_config")
     def put(self, request):
         """
         Batch update enabled/disabled for multiple entities and/or collections.
@@ -131,8 +119,8 @@ class EntityConfigListView(APIView):
 
 
 class EntityConfigDetailView(APIView):
-    permission_classes = [EntityConfigPermission]
 
+    @require_permission("update_entity_config_detail")
     def patch(self, request, config_name):
         """
         Toggle a single entity.
@@ -166,8 +154,8 @@ class EntityConfigDetailView(APIView):
 
 class EntityConfigCollectionView(APIView):
     """PATCH /api/entity-config/<entity_name>/collections/<collection_name>/"""
-    permission_classes = [EntityConfigPermission]
 
+    @require_permission("update_entity_config_collection")
     def patch(self, request, entity_name, collection_name):
         """
         Toggle a single collection within an entity.
@@ -232,3 +220,69 @@ class EntityConfigCollectionView(APIView):
             {"tenant_id": tenant_id, "entity_name": entity_name, "collection_name": collection_name, "enabled": enabled},
             status=status.HTTP_200_OK,
         )
+
+
+class TenantAppExclusionView(APIView):
+    """
+    GET  /api/entity-config/apps/exclusions/ — return the tenant's current service_app_id and oidc_app_id
+    PATCH /api/entity-config/apps/exclusions/ — set service_app_id and/or oidc_app_id on the tenant row
+
+    These two IDs identify the tenant's own Okta apps that should be excluded from every
+    bulk fetch (they are infrastructure apps, not data to back up).
+    """
+
+    def _get_tenant_row(self, tenant_id):
+        sb = get_supabase_client()
+        if not tenant_id:
+            return None
+        rows = sb.table("tenants").select("id, service_app_id, oidc_app_id").eq("id", str(tenant_id)).execute().data or []
+        return rows[0] if rows else None
+
+    @require_permission("view_app_exclusions")
+    def get(self, request):
+        tenant_id = _resolve_tenant_id(request)
+        row = self._get_tenant_row(tenant_id)
+        if row is None:
+            return Response({"service_app_id": None, "oidc_app_id": None, "tenant_id": tenant_id})
+        return Response({
+            "tenant_id": tenant_id,
+            "service_app_id": row.get("service_app_id"),
+            "oidc_app_id": row.get("oidc_app_id"),
+        })
+
+    @require_permission("update_app_exclusions")
+    def patch(self, request):
+        """
+        Body (all fields optional): {"service_app_id": "0oa...", "oidc_app_id": "0oa..."}
+        Pass null/empty string to clear an exclusion.
+        """
+        service_app_id = request.data.get("service_app_id", ...)
+        oidc_app_id = request.data.get("oidc_app_id", ...)
+
+        if service_app_id is ... and oidc_app_id is ...:
+            return Response(
+                {"detail": "Provide at least one of 'service_app_id' or 'oidc_app_id'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        tenant_id = _resolve_tenant_id(request)
+        if not tenant_id:
+            return Response(
+                {"detail": "Tenant could not be resolved for this request."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        updates = {}
+        if service_app_id is not ...:
+            updates["service_app_id"] = service_app_id or None
+        if oidc_app_id is not ...:
+            updates["oidc_app_id"] = oidc_app_id or None
+
+        try:
+            sb = get_supabase_client()
+            sb.table("tenants").update(updates).eq("id", str(tenant_id)).execute()
+        except Exception as exc:
+            logger.warning(f"TenantAppExclusionView: failed to update tenant {tenant_id}: {exc}")
+            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        return Response({"tenant_id": tenant_id, **updates}, status=status.HTTP_200_OK)

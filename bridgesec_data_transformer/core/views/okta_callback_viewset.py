@@ -185,7 +185,7 @@ class OktaCallbackView(APIView):
             )
 
         UserBackend = _get_user_backend()
-        user = UserBackend.get_by_email(email)
+        user = UserBackend.get_by_email(email, tenant_id=str(tenant.id) if tenant else None)
         if not user:
             tenant_id_str = str(tenant.id) if tenant else None
             user = UserBackend.create_or_update(
@@ -213,6 +213,18 @@ class OktaCallbackView(APIView):
                     'user': email,
                     'action': 'user_login',
                 }
+            )
+
+        # Ensure a users row exists for this (email, tenant) so resolve-tenant can find the user.
+        if tenant and user:
+            from core.utils.supabase_user import SupabaseUser
+            SupabaseUser.create_or_update(
+                email=user.email,
+                username=user.username,
+                roles=user.roles,
+                tenant_id=str(tenant.id),
+                okta_user_id=getattr(user, "okta_user_id", None),
+                app_access_enabled=True,
             )
 
         # Log login activity (multi-tenancy)

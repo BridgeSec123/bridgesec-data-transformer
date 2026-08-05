@@ -2,20 +2,29 @@ import json
 import logging
 
 import anthropic
+import requests
 from core.authentication import CustomJWTAuthentication
+from core.permissions.decorators import require_permission
 from core.utils.activity_logger import ActivityLogger
 from core.utils.chat_tools import execute_tool, get_tools_for_user
 from django.conf import settings
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 
-claude_client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+# Lazy so a Groq-only deployment doesn't require an Anthropic key at import time.
+_anthropic_client = None
+
+
+def _get_anthropic():
+    global _anthropic_client
+    if _anthropic_client is None:
+        _anthropic_client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    return _anthropic_client
 
 SYSTEM_PROMPT = """You are an AI assistant for BridgeSec Data Transformer — an enterprise tool \
 for managing Okta backups, restores, and configurations.
@@ -65,8 +74,8 @@ class ChatView(APIView):
     """
 
     authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [IsAuthenticated]
 
+    @require_permission("view_chat")
     @swagger_auto_schema(
         operation_summary="AI Chat Assistant",
         operation_description=(
@@ -144,14 +153,33 @@ class ChatView(APIView):
             {"role": "user", "content": user_message}
         ]
 
+        # Provider + model are selectable per request; fall back to configured defaults.
+        provider = (request.data.get("provider") or settings.CHAT_PROVIDER).lower()
+        model = request.data.get("model")
+
         try:
-            reply = self._run_agent_loop(messages, tools, user_token, request.user)
-            return Response({"reply": reply, "role": "assistant"})
+            if provider == "groq":
+                reply = self._run_groq_loop(
+                    messages, tools, user_token, request.user,
+                    model or settings.GROQ_MODEL,
+                )
+            else:
+                reply = self._run_anthropic_loop(
+                    messages, tools, user_token, request.user,
+                    model or settings.ANTHROPIC_MODEL,
+                )
+            return Response({"reply": reply, "role": "assistant", "provider": provider})
 
         except anthropic.AuthenticationError:
             logger.error("Anthropic API key is invalid or missing")
             return Response(
                 {"error": "AI service authentication failed. Contact your administrator."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except requests.RequestException as e:
+            logger.error(f"Groq request failed: {e}")
+            return Response(
+                {"error": "AI service unavailable. Please try again."},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         except Exception as e:
@@ -161,91 +189,132 @@ class ChatView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    def _run_agent_loop(
-        self, messages: list, tools: list, user_token: str, user
+    def _execute_and_log(self, name: str, tool_input: dict, user_token: str, user) -> dict:
+        """Run a tool call, write the audit trail, and normalize errors to a dict.
+        Shared by both provider loops."""
+        logger.info(f"Tool call: user={user} tool={name} input_keys={list(tool_input.keys())}")
+
+        # Activity log (audit trail) — only when tenant_id is available; never block the response.
+        try:
+            tenant_id = getattr(user, "tenant_id", None)
+            if tenant_id:
+                ActivityLogger.log(
+                    tenant_id=tenant_id,
+                    user_email=getattr(user, "email", str(user)),
+                    action=f"chat_tool:{name}",
+                    details={"input_keys": list(tool_input.keys())},
+                )
+        except Exception:
+            pass
+
+        try:
+            return execute_tool(name, tool_input, user_token)
+        except Exception as e:
+            logger.error(f"Tool '{name}' failed for user={user}: {e}")
+            return {"error": str(e)}
+
+    def _run_anthropic_loop(
+        self, messages: list, tools: list, user_token: str, user, model: str
     ) -> str:
         """
-        Agentic loop:
+        Anthropic agentic loop (native Messages API format):
           1. Send messages to Claude.
-          2. If Claude wants to call tools → execute them, append results, repeat.
+          2. If Claude wants tools → execute them, append results, repeat.
           3. If Claude gives a final text answer → return it.
-
         Max 10 iterations to prevent infinite loops.
         """
         max_iterations = 10
 
         for iteration in range(max_iterations):
-            response = claude_client.messages.create(
-                model="claude-sonnet-4-6",
+            response = _get_anthropic().messages.create(
+                model=model,
                 max_tokens=4096,
                 system=SYSTEM_PROMPT,
                 tools=tools,
                 messages=messages,
             )
 
-            # Claude produced a final text response
             if response.stop_reason == "end_turn":
                 return next(
                     (block.text for block in response.content if hasattr(block, "text")),
                     "",
                 )
 
-            # Claude wants to call one or more tools
             if response.stop_reason == "tool_use":
-                # Append Claude's response (including tool_use blocks) to history
                 messages.append({"role": "assistant", "content": response.content})
 
                 tool_results = []
                 for block in response.content:
                     if block.type != "tool_use":
                         continue
+                    result = self._execute_and_log(block.name, block.input, user_token, user)
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": json.dumps(result),
+                    })
 
-                    logger.info(
-                        f"Tool call: user={user} tool={block.name} "
-                        f"input_keys={list(block.input.keys())}"
-                    )
-
-                    # Log to activity log (audit trail) — only when tenant_id is available
-                    try:
-                        tenant_id = getattr(user, "tenant_id", None)
-                        if tenant_id:
-                            ActivityLogger.log(
-                                tenant_id=tenant_id,
-                                user_email=getattr(user, "email", str(user)),
-                                action=f"chat_tool:{block.name}",
-                                details={"input_keys": list(block.input.keys())},
-                            )
-                    except Exception:
-                        pass  # Never let logging block the response
-
-                    try:
-                        result = execute_tool(block.name, block.input, user_token)
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": json.dumps(result),
-                        })
-                    except Exception as e:
-                        logger.error(
-                            f"Tool '{block.name}' failed for user={user}: {e}"
-                        )
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": json.dumps({"error": str(e)}),
-                            "is_error": True,
-                        })
-
-                # Feed tool results back — Claude will process and either answer or call more tools
                 messages.append({"role": "user", "content": tool_results})
 
             else:
-                # Unexpected stop reason — return whatever text is available
                 logger.warning(f"Unexpected stop_reason: {response.stop_reason}")
                 return next(
                     (block.text for block in response.content if hasattr(block, "text")),
                     "Unexpected response from AI. Please try again.",
                 )
+
+        logger.warning(f"Agent loop hit max iterations ({max_iterations}) for user={user}")
+        return "The request required too many steps to complete. Please try a more specific query."
+
+    def _run_groq_loop(
+        self, messages: list, tools: list, user_token: str, user, model: str
+    ) -> str:
+        """
+        Groq agentic loop (OpenAI-compatible /chat/completions format).
+        Wraps the Anthropic-format tool defs into OpenAI function schema inline.
+        Max 10 iterations to prevent infinite loops.
+        """
+        oai_tools = [{"type": "function", "function": {
+            "name": t["name"],
+            "description": t["description"],
+            "parameters": t["input_schema"],
+        }} for t in tools]
+        convo = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
+
+        max_iterations = 10
+
+        for iteration in range(max_iterations):
+            resp = requests.post(
+                f"{settings.GROQ_BASE_URL}/chat/completions",
+                headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"},
+                json={
+                    "model": model,
+                    "messages": convo,
+                    "tools": oai_tools,
+                    "tool_choice": "auto",
+                    "max_tokens": 4096,
+                },
+                timeout=settings.CHAT_TIMEOUT,
+            )
+            resp.raise_for_status()
+            msg = resp.json()["choices"][0]["message"]
+
+            calls = msg.get("tool_calls")
+            if not calls:
+                return msg.get("content") or ""
+
+            convo.append(msg)
+            for call in calls:
+                fn = call["function"]
+                args = fn.get("arguments") or {}
+                if isinstance(args, str):
+                    args = json.loads(args)
+                result = self._execute_and_log(fn["name"], args, user_token, user)
+                convo.append({
+                    "role": "tool",
+                    "tool_call_id": call["id"],
+                    "content": json.dumps(result),
+                })
 
         logger.warning(f"Agent loop hit max iterations ({max_iterations}) for user={user}")
         return "The request required too many steps to complete. Please try a more specific query."

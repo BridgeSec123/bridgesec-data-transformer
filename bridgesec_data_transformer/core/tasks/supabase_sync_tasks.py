@@ -6,11 +6,9 @@ sync_okta_users_to_supabase
     ensures each Okta user exists in the Supabase `users` table.
 
     Behaviour:
-    - Insert-only for `users`: rows that already exist (matched by email) are
-      never overwritten, so existing roles, passwords, or tenant assignments are
-      preserved.
-    - Upsert for `user_tenants`: every user (new or pre-existing) gets a
-      junction row linking them to the tenant that ran the bulk fetch.
+    - Upsert into `users` on (email, tenant_id): new rows are inserted, existing
+      (email, tenant_id) combos are skipped — existing roles and passwords are preserved.
+      app_access_enabled is set to True for all synced rows.
     - Tenant-universal: dispatched from finalize_bulk_entity_task with
       tenant_id as a parameter, so every tenant — including future ones — is
       handled identically without configuration changes.
@@ -39,8 +37,8 @@ def sync_okta_users_to_supabase(
     """
     Sync Okta users from MongoDB snapshot to Supabase after each bulk fetch.
 
-    New users are inserted; existing users (by email) are skipped.
-    All users are linked to the tenant via user_tenants (upsert — safe to re-run).
+    New (email, tenant_id) combos are upserted with app_access_enabled=True.
+    Existing rows (same email + tenant_id) are left untouched.
     """
     # ── Resolve mongo_uri — mirrors diff_tasks.py pattern exactly ─────────────
     if not mongo_uri and tenant_id:
@@ -116,12 +114,17 @@ def sync_okta_users_to_supabase(
     from core.utils.supabase_client import get_supabase_client
     sb = get_supabase_client()
 
-    existing_map: dict = {}  # {email: user_uuid}
+    # Scope the existing-user check to this tenant so each (email, tenant_id)
+    # combo is handled independently — same email in a different tenant is a new row.
+    existing_map: dict = {}  # {email: user_uuid} for THIS tenant
 
     for i in range(0, total, BATCH_SIZE):
         batch_emails = all_emails[i:i + BATCH_SIZE]
         try:
-            resp = sb.table("users").select("id, email").in_("email", batch_emails).execute()
+            query = sb.table("users").select("id, email").in_("email", batch_emails)
+            if tenant_id:
+                query = query.eq("tenant_id", str(tenant_id))
+            resp = query.execute()
             for row in (resp.data or []):
                 if row.get("email") and row.get("id"):
                     existing_map[row["email"].strip()] = row["id"]
@@ -130,7 +133,7 @@ def sync_okta_users_to_supabase(
                 "[SUPABASE SYNC] Email lookup batch (offset %d) failed: %s", i, exc
             )
 
-    # ── Step 2: Insert only users not already in Supabase ─────────────────────
+    # ── Step 2: Upsert users — insert new, skip existing (email, tenant_id) combos
     new_docs = [
         doc for doc in unique_docs
         if doc.get("email", "").strip() not in existing_map
@@ -143,23 +146,20 @@ def sync_okta_users_to_supabase(
         for doc in batch:
             email = doc.get("email", "").strip()
             rows.append({
-                "email":        email,
-                "username":     (doc.get("login") or email).strip(),
-                "okta_user_id": doc.get("user_id"),
-                "tenant_id":    str(tenant_id) if tenant_id else None,
-                "roles":        ["user"],
+                "email":               email,
+                "username":            (doc.get("login") or email).strip(),
+                "okta_user_id":        doc.get("user_id"),
+                "tenant_id":           str(tenant_id) if tenant_id else None,
+                "roles":               ["user"],
+                "app_access_enabled":  True,
             })
         try:
-            resp = sb.table("users").insert(rows).execute()
+            resp = sb.table("users").upsert(rows, on_conflict="email,tenant_id").execute()
             batch_count = len(resp.data or [])
             inserted += batch_count
-            # Capture UUIDs of newly inserted users for user_tenants step.
-            for row in (resp.data or []):
-                if row.get("email") and row.get("id"):
-                    existing_map[row["email"].strip()] = row["id"]
         except Exception as exc:
             logger.error(
-                "[SUPABASE SYNC] Insert batch (offset %d, size %d) failed: %s",
+                "[SUPABASE SYNC] Upsert batch (offset %d, size %d) failed: %s",
                 i, len(rows), exc,
             )
 

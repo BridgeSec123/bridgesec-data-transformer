@@ -64,6 +64,15 @@ class CustomTokenObtainView(APIView):
             #  Generate a JWT with user_id, email, role, exp
             token = generate_jwt_token(user)
 
+            try:
+                from core.notifications import notify
+                from core.notifications import events
+                tenant_id = getattr(user, 'tenant_id', None)
+                if tenant_id:
+                    notify(events.USER_LOGIN, {'email': user.email}, tenant_id, user_id=str(user.id))
+            except Exception:
+                pass
+
             # Return token to frontend
             return Response({"token": token}, status=status.HTTP_200_OK)
 
@@ -76,27 +85,30 @@ def _resolve_default_tenant_for_user(user):
 
     Priority:
     1. user.tenant_id — sticky last-used / seeded home tenant, validated against
-       active membership (prevents redirect to a tenant the user was removed from).
-    2. First row in user_tenants for this user.
+       active app_access_enabled membership.
+    2. First users row returned for this email with app_access_enabled=True.
     3. (super_admin only) First active tenant in the system as a last resort.
+
+    Looks up all tenants by email across the users table (one row per tenant).
     """
     from core.utils.supabase_tenant import SupabaseTenant
-    from core.utils.supabase_user_tenant import SupabaseUserTenant
+    from core.utils.supabase_user import SupabaseUser
 
     is_super_admin = "super_admin" in (getattr(user, "roles", None) or [])
-    assigned = SupabaseUserTenant.get_tenants_for_user(user.id)
-    assigned_ids = {str(t.id) for t in assigned}
+    user_rows = SupabaseUser.get_all_by_email(user.email, app_access_only=True)
+    assigned_tenant_ids = {str(r.tenant_id) for r in user_rows if r.tenant_id}
 
     if getattr(user, "tenant_id", None):
         candidate_id = str(user.tenant_id)
-        # Only use the stored pointer if the user is still an active member.
-        if candidate_id in assigned_ids:
+        if candidate_id in assigned_tenant_ids:
             tenant = SupabaseTenant.get_by_id(candidate_id)
             if tenant and tenant.is_active:
                 return tenant
 
-    if assigned:
-        return assigned[0]
+    if user_rows:
+        first_tenant_id = next((r.tenant_id for r in user_rows if r.tenant_id), None)
+        if first_tenant_id:
+            return SupabaseTenant.get_by_id(str(first_tenant_id))
 
     # Super admin fallback: any active tenant in the system.
     if is_super_admin:
@@ -183,7 +195,6 @@ class MyTenantsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        from core.utils.supabase_user_tenant import SupabaseUserTenant
         from core.utils.supabase_tenant import SupabaseTenant
 
         user = request.user
@@ -206,27 +217,20 @@ class MyTenantsView(APIView):
                     "switch_url": f"/okta/login/?okta_domain={t.okta_domain}&force_login=false{login_hint_param}",
                 })
         else:
-            assigned = SupabaseUserTenant.get_tenants_for_user(str(user.id))
-            roles_map = {}
-            try:
-                from core.utils.supabase_client import get_supabase_client
-                result = (
-                    get_supabase_client()
-                    .table("user_tenants")
-                    .select("tenant_id, role")
-                    .eq("user_id", str(user.id))
-                    .execute()
-                )
-                roles_map = {row["tenant_id"]: row["role"] for row in (result.data or [])}
-            except Exception as e:
-                logger.warning(f"my-tenants: role lookup failed for user {user.id}: {e}")
-
-            for t in assigned:
+            from core.utils.supabase_user import SupabaseUser
+            user_rows = SupabaseUser.get_all_by_email(user_email, app_access_only=True)
+            for row in user_rows:
+                if not row.tenant_id:
+                    continue
+                t = SupabaseTenant.get_by_id(str(row.tenant_id))
+                if not t or not t.is_active:
+                    continue
+                role = (row.roles or ["user"])[0]
                 tenant_entries.append({
                     "id": str(t.id),
                     "name": t.name,
                     "okta_domain": t.okta_domain,
-                    "role": roles_map.get(str(t.id), "user"),
+                    "role": role,
                     "current": str(t.id) == str(current_tenant_id),
                     "switch_url": f"/okta/login/?okta_domain={t.okta_domain}&force_login=false{login_hint_param}",
                 })

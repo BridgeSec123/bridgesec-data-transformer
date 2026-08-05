@@ -49,7 +49,10 @@ def _can_manage_logo(request, tenant_id: str) -> bool:
 
 class TenantLogoView(APIView):
     authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    # Lives under /api/tenants/ but its access is per-tenant ownership, enforced
+    # below by _can_access_tenant / _can_manage_logo. Opt out of the role gate
+    # (rbac_exempt, honored by RolePermission/OPAPermission); still requires auth.
+    rbac_exempt = True
     parser_classes = [MultiPartParser, FormParser]
 
     def get(self, request, tenant_id):

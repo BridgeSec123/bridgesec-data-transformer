@@ -130,19 +130,17 @@ class UserManagementViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # When scoped to a tenant, fetch from user_tenants junction table so users
-        # added via tenant membership (not just users.tenant_id FK) are included.
         if tenant_id:
-            from core.utils.supabase_user_tenant import SupabaseUserTenant
-            rows, total = SupabaseUserTenant.get_users_for_tenant(
-                tenant_id, page=page, page_size=page_size
+            from core.utils.supabase_user import SupabaseUser
+            users_list, total = SupabaseUser.list_all(
+                tenant_id=tenant_id, page=page, page_size=page_size
             )
             return Response({
                 "total":     total,
                 "page":      page,
                 "page_size": page_size,
                 "tenant_id": tenant_id,
-                "results":   [_serialize_user_from_junction(r, tenant_id) for r in rows],
+                "results":   [_serialize_user(u) for u in users_list],
             })
 
         # No tenant_id — super_admin listing all users system-wide.
@@ -204,7 +202,7 @@ class UserManagementViewSet(viewsets.ViewSet):
             raise ValidationError({"password": "Password must be at least 12 characters."})
 
         UserBackend = _get_user_backend()
-        if UserBackend.get_by_email(email):
+        if UserBackend.get_by_email(email, tenant_id=tenant_id):
             raise ValidationError({"email": "A user with this email already exists."})
 
         user = UserBackend.create_or_update(
@@ -217,6 +215,14 @@ class UserManagementViewSet(viewsets.ViewSet):
             get_supabase_client().table("users").update(
                 {"password": make_password(password)}
             ).eq("id", str(user.id)).execute()
+
+        try:
+            from core.notifications import notify
+            from core.notifications import events
+            if tenant_id:
+                notify(events.USER_CREATED, {'email': email, 'roles': roles, 'by': getattr(request.user, 'email', None)}, tenant_id, user_id=str(user.id))
+        except Exception:
+            pass
 
         return Response(_serialize_user(user), status=status.HTTP_201_CREATED)
 
@@ -257,7 +263,7 @@ class UserManagementViewSet(viewsets.ViewSet):
         if new_email:
             new_email = new_email.strip().lower()
             UserBackend = _get_user_backend()
-            existing = UserBackend.get_by_email(new_email)
+            existing = UserBackend.get_by_email(new_email, tenant_id=getattr(user, 'tenant_id', None))
             if existing and str(existing.id) != str(user.id):
                 raise ValidationError({"email": "A user with this email already exists."})
             user.email = new_email
@@ -280,6 +286,14 @@ class UserManagementViewSet(viewsets.ViewSet):
         UserBackend = _get_user_backend()
         if not UserBackend.delete_by_id(pk):
             raise NotFound(f"User '{pk}' not found.")
+        try:
+            from core.notifications import notify
+            from core.notifications import events
+            t_id = getattr(request, '_tenant_id', None) or getattr(request.user, 'tenant_id', None)
+            if t_id:
+                notify(events.USER_REMOVED, {'user_id': str(pk), 'by': getattr(request.user, 'email', None)}, t_id)
+        except Exception:
+            pass
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     # ------------------------------------------------------------------ #
@@ -313,6 +327,14 @@ class UserManagementViewSet(viewsets.ViewSet):
         self._guard_last_super_admin(user, new_roles)
         UserBackend = _get_user_backend()
         UserBackend.update_roles(pk, new_roles)
+        try:
+            from core.notifications import notify
+            from core.notifications import events
+            t_id = getattr(request, '_tenant_id', None) or getattr(request.user, 'tenant_id', None)
+            if t_id:
+                notify(events.USER_ROLE_ESCALATED, {'user_id': str(pk), 'email': getattr(user, 'email', ''), 'new_roles': new_roles, 'by': getattr(request.user, 'email', None)}, t_id)
+        except Exception:
+            pass
         return Response({"id": str(user.id), "roles": new_roles})
 
     # ------------------------------------------------------------------ #

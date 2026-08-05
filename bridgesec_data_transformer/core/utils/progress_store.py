@@ -33,7 +33,7 @@ def _col(mongo_uri=None):
     return client[_s.MONGO_DB_NAME]["bulk_progress"]
 
 
-def create_bulk_job(request_id: str, db_name: str, entity_keys: list, mongo_uri: str = None):
+def create_bulk_job(request_id: str, db_name: str, entity_keys: list, mongo_uri: str = None, initiated_by: dict = None):
     """
     Insert the initial job document.  Called once, just before the chord is dispatched.
     Uses $setOnInsert so a duplicate call never overwrites (idempotent).
@@ -54,6 +54,7 @@ def create_bulk_job(request_id: str, db_name: str, entity_keys: list, mongo_uri:
                 "started_at":         datetime.now(timezone.utc).isoformat(),
                 "completed_at":       None,
                 "diff_summary":       None,
+                "initiated_by":       initiated_by,
                 "entities":           entities,
             }
         },

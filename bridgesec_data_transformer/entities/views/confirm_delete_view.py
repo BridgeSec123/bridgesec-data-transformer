@@ -15,6 +15,7 @@ import logging
 
 import requests
 from core.authentication import CustomJWTAuthentication
+from core.permissions.decorators import require_permission
 from core.utils.jwt_utils import get_user_from_request
 from core.utils.mongo_utils import ensure_mongo_connection
 from core.utils.okta_helpers import get_okta_headers
@@ -34,7 +35,6 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from core.permissions.opa_permission import OPAPermission
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +59,9 @@ class ConfirmDeletionView(APIView):
     within the last 15 minutes and by the same user making this request.
     """
     authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [IsAuthenticated, OPAPermission]
+    # Authorization via the global RolePermission gate (@require_permission("confirm_delete")).
 
+    @require_permission("confirm_delete")
     @swagger_auto_schema(
         manual_parameters=[
             openapi.Parameter(

@@ -12,19 +12,6 @@ logger = logging.getLogger(__name__)
 
 TABLE = "roles"
 
-SYSTEM_ROLES = [
-    {"name": "super_admin",        "display_name": "Super Admin",           "description": "Full access to all features, data, and tenants"},
-    {"name": "admin",              "display_name": "Admin",                 "description": "Full access to all features within their tenant"},
-    {"name": "tenant_admin",       "display_name": "Tenant Admin",          "description": "Full control within their tenant"},
-    {"name": "backup_admin",       "display_name": "Backup Admin",          "description": "Can initiate backup and restore processes"},
-    {"name": "restore_viewer",     "display_name": "Restore Viewer",        "description": "Read-only access to backup history, logs, and restore info"},
-    {"name": "policy_admin",       "display_name": "Policy Admin",          "description": "Can define and manage OPA policies"},
-    {"name": "config_admin",       "display_name": "Configuration Admin",   "description": "Can manage tenant-level configurations"},
-    {"name": "entity_config_admin","display_name": "Entity Config Admin",   "description": "Can define which entities are included in backups"},
-    {"name": "read_only_admin",    "display_name": "Read-Only Admin",       "description": "Can view and compare data; no restore or delete"},
-    {"name": "user",               "display_name": "User",                  "description": "Read-only access to all resources"},
-]
-
 
 class SupabaseRole:
     """Lightweight role object backed by a Supabase row."""
@@ -38,6 +25,7 @@ class SupabaseRole:
         self.tenant_id    = row.get("tenant_id")
         self.created_at   = row.get("created_at")
         self.created_by   = row.get("created_by")
+        self.permissions  = row.get("permissions") or []
 
     # ------------------------------------------------------------------ #
     # Queries                                                              #
@@ -173,11 +161,3 @@ class SupabaseRole:
             logger.error(f"SupabaseRole.delete({name}) failed: {e}")
             return False
 
-    @classmethod
-    def seed_system_roles(cls):
-        """Upsert the 8 system roles. Safe to call multiple times."""
-        client = get_supabase_client()
-        for role_data in SYSTEM_ROLES:
-            payload = {**role_data, "is_system": True, "tenant_id": None}
-            client.table(TABLE).upsert(payload, on_conflict="name").execute()
-        logger.info("System roles seeded into Supabase")

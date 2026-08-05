@@ -93,9 +93,6 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
         # Build URL using tenant-specific base when available
         okta_url = build_okta_url(self.okta_endpoint, okta_base=self.okta_base_url)
 
-        # Get appropriate Okta headers (uses session token if available, otherwise static token)
-        headers = get_okta_headers(request)
-
         # Validate scope before making request
         is_valid, required_scopes, granted_scopes, missing_scopes = validate_scope_for_endpoint(request, okta_url)
 
@@ -110,6 +107,9 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
         )
 
         while True:  # Keep retrying if rate limited
+            # Regenerated each attempt: a DPoP proof is single-use (unique jti), so
+            # replaying the same one on a retry would be rejected.
+            headers = get_okta_headers(request, method="GET", url=okta_url)
             response = requests.get(okta_url, headers=headers)
 
             if handle_rate_limit(response):  # Handle rate limit
@@ -149,7 +149,7 @@ class BaseEntityViewSet(viewsets.ModelViewSet):
             # Check if pagination is needed
             next_url = response.links.get("next", {}).get("url")
             if next_url:
-                all_data = fetch_all_pages(okta_url, headers)
+                all_data = fetch_all_pages(okta_url, headers, request=request)
                 return all_data, 200, rate_limit_headers(response)
 
             return response_data, 200, rate_limit_headers(response)

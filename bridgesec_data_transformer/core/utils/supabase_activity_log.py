@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 TABLE = "activity_logs"
 
-VALID_ACTIONS = {"login", "logout", "bulk_fetch", "restore", "create", "delete", "view"}
+VALID_ACTIONS = {"login", "logout", "bulk_fetch", "restore", "create", "delete", "view", "compare", "migrate", "okta_push"}
 
 
 class SupabaseActivityLog:
@@ -54,6 +54,7 @@ class SupabaseActivityLog:
     def list_for_tenant(
         tenant_id: str,
         action: str = None,
+        actions: list = None,
         user_email: str = None,
         date_from: str = None,
         date_to: str = None,
@@ -62,7 +63,8 @@ class SupabaseActivityLog:
     ):
         """
         Return paginated (logs, total) for a specific tenant.
-        Optional filters: action, user_email, date_from/date_to (ISO strings).
+        Optional filters: action (single), actions (list), user_email,
+        date_from/date_to (ISO strings).
         """
         try:
             offset = (page - 1) * page_size
@@ -73,7 +75,10 @@ class SupabaseActivityLog:
                 .eq("tenant_id", str(tenant_id))
                 .order("timestamp", desc=True)
             )
-            if action:
+            # multi-action filter takes precedence over single action
+            if actions:
+                query = query.in_("action", actions)
+            elif action:
                 query = query.eq("action", action)
             if user_email:
                 query = query.eq("user_email", user_email)

@@ -12,9 +12,9 @@ Multi-tenant mode:
   GET/PUT → operate on the tenants table columns added in migration 005.
   Tenant is resolved from request._tenant (set by middleware); super_admin is tenant-scoped.
 
-Permission: read = any authenticated user; write = super_admin or tenant_admin.
-This view intentionally bypasses OPA (listed in OPA_BYPASS_PATHS) and uses its
-own inline role check — same pattern as EntityConfigListView.
+Permission: read = any authenticated user ("view_scheduler_config"); write =
+super_admin or tenant_admin ("update_scheduler_config"), enforced via
+@require_permission(...) + the Supabase role permission lists.
 """
 import logging
 
@@ -24,6 +24,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.permissions.decorators import require_permission
 from core.utils.tenant_utils import get_tenant_from_request
 
 logger = logging.getLogger(__name__)
@@ -66,8 +67,11 @@ def _resolve_tenant(request):
 
 
 class SchedulerConfigView(APIView):
-    permission_classes = [IsAuthenticated]
+    # Read open to any authenticated user; write (PUT) restricted to
+    # super_admin/tenant_admin via "update_scheduler_config" in their Supabase
+    # permission list. _can_write still separately drives the GET "editable" flag.
 
+    @require_permission("view_scheduler_config")
     def get(self, request):
         multi = getattr(settings, "MULTI_TENANCY_ENABLED", False)
         global_scopes = _resolve_scopes(getattr(settings, "OKTA_SERVICE_SCOPES", ""))
@@ -102,10 +106,8 @@ class SchedulerConfigView(APIView):
             "available_timezones": AVAILABLE_TIMEZONES,
         })
 
+    @require_permission("update_scheduler_config")
     def put(self, request):
-        if not _can_write(request):
-            return Response({"detail": "Insufficient permissions."}, status=status.HTTP_403_FORBIDDEN)
-
         if not getattr(settings, "MULTI_TENANCY_ENABLED", False):
             return Response(
                 {"detail": "Configure scheduler via SCHEDULER_HOUR / SCHEDULER_ENABLED in .env (single-tenant mode)."},
