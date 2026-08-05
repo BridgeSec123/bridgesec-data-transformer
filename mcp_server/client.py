@@ -42,3 +42,11 @@ def post(path: str, token: str, body: dict | list = None, params: dict = None) -
     resp = requests.post(url, headers=_headers(token), json=body or {}, params=params, timeout=60)
     resp.raise_for_status()
     return resp.json()
+
+
+def put(path: str, token: str, body: dict | list = None, params: dict = None) -> Any:
+    url = f"{BASE_URL}{path}"
+    logger.debug(f"PUT {url} params={params}")
+    resp = requests.put(url, headers=_headers(token), json=body or {}, params=params, timeout=30)
+    resp.raise_for_status()
+    return resp.json()

@@ -10,7 +10,9 @@ djangorestframework-simplejwt
 dnspython
 debugpy
 celery
+django-celery-beat
 redis
+django-redis
 pika
 gunicorn
 python-jose
@@ -22,6 +24,7 @@ apscheduler
 deepdiff
 supabase
 python-dotenv
+resend
 
 # Logging and Observability
 python-logging-loki==0.3.1
@@ -31,7 +34,6 @@ opentelemetry-sdk==1.21.0
 opentelemetry-instrumentation-django==0.42b0
 opentelemetry-instrumentation-celery==0.42b0
 prometheus-client==0.19.0
-mcp[cli]
+mcp[cli]>=1.0.0
 anthropic
-
 elasticsearch>=8.0.0,<9.0.0

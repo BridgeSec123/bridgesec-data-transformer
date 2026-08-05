@@ -112,6 +112,76 @@ def diff_snapshots(ctx: Context, entity_name: str, db1: str, db2: str) -> dict:
     return api.get(f"/diff-collections/{entity_name}/", _caller_token(ctx), params={"db1": db1, "db2": db2})
 
 
+@mcp.tool()
+def get_diff_report(ctx: Context, db_name: str) -> dict:
+    """
+    Fetch the stored diff summary for a completed snapshot.
+
+    Use this when a bulk fetch's SSE progress stream was closed before the
+    `complete` event arrived, or when revisiting a past snapshot later.
+    Returns 404 if no diff has run yet for that db_name.
+    """
+    return api.get(f"/api/diff-report/{db_name}/", _caller_token(ctx))
+
+
+@mcp.tool()
+def list_activity_logs(
+    ctx: Context,
+    operations_only: bool = False,
+    action: str = None,
+    actions: str = None,
+    user_email: str = None,
+    date_from: str = None,
+    date_to: str = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> dict:
+    """
+    List per-tenant activity log entries (bulk fetches, restores, creates, deletes, etc).
+
+    Only available in multi-tenant mode; requires tenant context on the caller's token.
+    operations_only: shortcut to only return UI operation actions (bulk_fetch, restore,
+        create, delete, compare, migrate) — overrides action/actions if set.
+    actions: comma-separated action list, e.g. "bulk_fetch,restore,delete".
+    date_from / date_to: ISO 8601 date strings, inclusive.
+    """
+    params = {
+        "operations_only": "true" if operations_only else None,
+        "action": action,
+        "actions": actions,
+        "user_email": user_email,
+        "date_from": date_from,
+        "date_to": date_to,
+        "page": page,
+        "page_size": page_size,
+    }
+    return api.get("/logs/", _caller_token(ctx), params={k: v for k, v in params.items() if v is not None})
+
+
+@mcp.tool()
+def get_scheduler_config(ctx: Context) -> dict:
+    """
+    Get the caller's tenant scheduled-fetch configuration.
+
+    Returns scheduler_enabled, scheduler_hour, scheduler_minute, scheduler_timezone,
+    and which Okta service scopes are granted. In single-tenant mode, returns the
+    read-only values from .env (editable=False).
+    """
+    return api.get("/api/scheduler-config/", _caller_token(ctx))
+
+
+@mcp.tool()
+def get_entity_config(ctx: Context, tenant_id: str = None) -> dict:
+    """
+    List all backup entities/collections and their enabled status for the caller's tenant.
+
+    Grouped by category. Super admins may pass tenant_id to inspect another tenant's
+    config; omitted, they get the global default config.
+    """
+    params = {"tenant_id": tenant_id} if tenant_id else {}
+    return api.get("/api/entity-config/", _caller_token(ctx), params=params)
+
+
 # ─── WRITE TOOLS (disabled when MCP_READ_ONLY=true) ──────────────────────────
 
 if not READ_ONLY:
@@ -198,6 +268,42 @@ if not READ_ONLY:
         Removes all staged records from MongoDB and invalidates the plan_id.
         """
         return api.post("/confirm-delete/", _caller_token(ctx), params={"plan_id": plan_id, "action": "deny"})
+
+    @mcp.tool()
+    def update_scheduler_config(
+        ctx: Context,
+        scheduler_enabled: bool = None,
+        scheduler_hour: int = None,
+        scheduler_minute: int = None,
+        scheduler_timezone: str = None,
+    ) -> dict:
+        """
+        Update the caller's tenant scheduled-fetch configuration. Multi-tenant mode only.
+
+        Only super_admin/tenant_admin may write. scheduler_minute must be one of
+        0, 15, 30, 45 (the scheduler polls every 15 minutes — any other value would
+        be configured but never fire). Call get_scheduler_config first to see current values
+        and available_timezones.
+        """
+        body = {
+            "scheduler_enabled": scheduler_enabled,
+            "scheduler_hour": scheduler_hour,
+            "scheduler_minute": scheduler_minute,
+            "scheduler_timezone": scheduler_timezone,
+        }
+        return api.put("/api/scheduler-config/", _caller_token(ctx), body={k: v for k, v in body.items() if v is not None})
+
+    @mcp.tool()
+    def update_entity_config(ctx: Context, updates: list) -> dict:
+        """
+        Enable or disable backup entities/collections for the caller's tenant.
+
+        updates: list of {"name": "<entity_name>", "enabled": true|false} for entity-level
+        toggles, or {"name": "<entity_name>", "collection": "<collection_name>", "enabled": true|false}
+        for a single collection within an entity. A collection can only be enabled if its
+        parent entity is already enabled. Call get_entity_config first to see valid names.
+        """
+        return api.put("/api/entity-config/", _caller_token(ctx), body=updates)
 
 
 # ─── ENTRY POINT ─────────────────────────────────────────────────────────────
