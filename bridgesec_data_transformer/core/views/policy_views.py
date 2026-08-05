@@ -5,10 +5,9 @@ import uuid
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from core.authentication import CustomJWTAuthentication
 from core.serializers.policy_serializer import PolicyRuleSerializer
@@ -33,6 +32,10 @@ class PolicyViewSet(viewsets.ViewSet):
 
     def _is_super_admin(self, request) -> bool:
         return "super_admin" in (getattr(request.user, "roles", None) or [])
+
+    def _is_tenant_scoped_admin(self, request) -> bool:
+        roles = getattr(request.user, "roles", None) or []
+        return any(r in roles for r in ("tenant_admin", "backup_admin"))
 
     def _caller_tenant_id(self, request):
         """Return the tenant scope for policy management.
@@ -70,6 +73,9 @@ class PolicyViewSet(viewsets.ViewSet):
         if self._is_super_admin(request):
             return
         caller_tid = self._caller_tenant_id(request)
+        if rule.tenant_id is None and self._is_tenant_scoped_admin(request):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Global policies are not accessible to your role.")
         if rule.tenant_id and rule.tenant_id != caller_tid:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("You can only view policies that belong to your tenant.")
@@ -86,10 +92,14 @@ class PolicyViewSet(viewsets.ViewSet):
             page_size = min(200, max(1, int(request.query_params.get("page_size", 50))))
         except ValueError:
             page, page_size = 1, 50
-        # Non-super-admin callers see global + their own tenant's policies only
+        # tenant_admin / backup_admin see only their tenant's policies (no globals)
         tenant_id = self._caller_tenant_id(request)
+        include_global = not self._is_tenant_scoped_admin(request)
         rules, total = SupabasePolicyRule.list_all(
-            role=role_filter, page=page, page_size=page_size, tenant_id=tenant_id
+            role=role_filter, page=page, page_size=page_size,
+            tenant_id=tenant_id, include_global=include_global,
+            scope=request.query_params.get("scope"),
+            subject=request.query_params.get("subject"),
         )
         data = [PolicyRuleSerializer(r, context={"request": request}).to_representation(r) for r in rules]
         return Response({"total": total, "page": page, "page_size": page_size, "results": data})
@@ -121,6 +131,13 @@ class PolicyViewSet(viewsets.ViewSet):
                 {"error": "Failed to push policy to OPA.", "detail": str(e)},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
+        try:
+            from core.notifications import notify
+            from core.notifications import events
+            if resolved_tenant_id:
+                notify(events.POLICY_CREATED, {'policy_id': str(rule.id), 'name': getattr(rule, 'name', ''), 'by': getattr(request.user, 'email', None)}, str(resolved_tenant_id))
+        except Exception:
+            pass
         return Response(
             PolicyRuleSerializer(rule, context={"request": request}).to_representation(rule),
             status=status.HTTP_201_CREATED,
@@ -140,6 +157,14 @@ class PolicyViewSet(viewsets.ViewSet):
         ser.is_valid(raise_exception=True)
         rule = ser.save()
         opa_client.push_policy(str(rule.id), rule.rego_source)
+        try:
+            from core.notifications import notify
+            from core.notifications import events
+            t_id = str(getattr(rule, 'tenant_id', '') or '')
+            if t_id:
+                notify(events.POLICY_UPDATED, {'policy_id': str(rule.id), 'name': getattr(rule, 'name', ''), 'by': getattr(request.user, 'email', None)}, t_id)
+        except Exception:
+            pass
         return Response(PolicyRuleSerializer(rule, context={"request": request}).to_representation(rule))
 
     @swagger_auto_schema(tags=_OPA_TAG)
@@ -150,6 +175,14 @@ class PolicyViewSet(viewsets.ViewSet):
         ser.is_valid(raise_exception=True)
         rule = ser.save()
         opa_client.push_policy(str(rule.id), rule.rego_source)
+        try:
+            from core.notifications import notify
+            from core.notifications import events
+            t_id = str(getattr(rule, 'tenant_id', '') or '')
+            if t_id:
+                notify(events.POLICY_UPDATED, {'policy_id': str(rule.id), 'name': getattr(rule, 'name', ''), 'by': getattr(request.user, 'email', None)}, t_id)
+        except Exception:
+            pass
         return Response(PolicyRuleSerializer(rule, context={"request": request}).to_representation(rule))
 
     @swagger_auto_schema(tags=_OPA_TAG)
@@ -163,6 +196,14 @@ class PolicyViewSet(viewsets.ViewSet):
                            extra={"policy_id": str(rule.id), "error": str(e)})
         from core.utils.supabase_policy import SupabasePolicyRule
         SupabasePolicyRule.delete(str(rule.id))
+        try:
+            from core.notifications import notify
+            from core.notifications import events
+            t_id = str(getattr(rule, 'tenant_id', '') or '')
+            if t_id:
+                notify(events.POLICY_DELETED, {'policy_id': str(pk), 'name': getattr(rule, 'name', str(pk)), 'by': getattr(request.user, 'email', None)}, t_id)
+        except Exception:
+            pass
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     # ------------------------------------------------------------------
@@ -210,39 +251,3 @@ class PolicyViewSet(viewsets.ViewSet):
         })
 
 
-class UserRoleUpdateView(APIView):
-    """PATCH /api/users/<id>/role/ — legacy single-role update (deprecated in favour of /roles/ endpoints)."""
-
-    authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    entity_type = "users"
-    http_method_names = ["patch", "options"]
-
-    @swagger_auto_schema(tags=_OPA_TAG)
-    def patch(self, request, pk=None):
-        if "super_admin" not in (getattr(request.user, "roles", None) or []):
-            return Response(
-                {"detail": "Super-admin access required."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        new_role = request.data.get("role")
-        if not new_role:
-            raise ValidationError({"role": "This field is required."})
-
-        from core.authentication import _get_user_backend
-        UserBackend = _get_user_backend()
-        user = UserBackend.get_by_id(pk)
-        if not user:
-            raise NotFound(f"User '{pk}' not found.")
-
-        current_roles = list(user.roles or ["user"])
-        if new_role not in current_roles:
-            current_roles.append(new_role)
-        UserBackend.update_roles(str(user.id), current_roles)
-        user.roles = current_roles
-        return Response({
-            "id":     str(user.id),
-            "email":  user.email,
-            "roles":  user.roles,
-        })

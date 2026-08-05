@@ -25,18 +25,17 @@ def generate_jwt_token(user, expiry_hours: int = 24, login_tenant_id: str = None
     # Super admin has user.tenant_id=None, so login_tenant_id is essential for them.
     tenant_id = login_tenant_id or (str(user.tenant_id) if getattr(user, "tenant_id", None) else None)
 
-    # Multi-tenancy: scope the roles claim to the active tenant. A user can hold a
-    # different role per tenant (user_tenants.role), so the global users.roles list
-    # is not authoritative for an active session. super_admin is a global role and is
-    # preserved as-is (super admins bypass OPA entirely).
+    # Multi-tenancy: roles are stored per (email, tenant_id) row in users.
+    # Fetch the tenant-specific row to get the correct roles for this session.
+    # super_admin is a global role and is preserved as-is.
     if getattr(settings, "MULTI_TENANCY_ENABLED", False) and tenant_id and "super_admin" not in roles:
         try:
-            from core.utils.supabase_user_tenant import SupabaseUserTenant
-            tenant_role = SupabaseUserTenant.get_role(str(user.id), str(tenant_id))
-            if tenant_role:
-                roles = [tenant_role]
+            from core.utils.supabase_user import SupabaseUser
+            tenant_user = SupabaseUser.get_by_email(user.email, tenant_id=str(tenant_id))
+            if tenant_user and tenant_user.roles:
+                roles = tenant_user.roles
         except Exception as e:
-            logger.warning(f"Per-tenant role lookup failed for user={user.id} tenant={tenant_id}: {e}")
+            logger.warning(f"Per-tenant role lookup failed for user={user.email} tenant={tenant_id}: {e}")
 
     payload = {
         "user_id":   str(user.id),

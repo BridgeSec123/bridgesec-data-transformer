@@ -37,6 +37,34 @@ def query(input_data: dict) -> bool:
         return False  # fail-closed
 
 
+def query_denied(input_data: dict) -> bool:
+    """Veto check — used after the role/permission gate has already granted the
+    allow. True if any pushed policy's `deny` rule fires for this input (tenant-
+    scoped overrides, future field_conditions/own_records_only rules). OPA's
+    BASE_REGO already exposes `data.authz.denies` as an aggregate over every
+    pushed policy's `deny` rule, so no rego change was needed for this. Fail-closed:
+    an unreachable/erroring OPA is treated as denied, same posture as query()."""
+    try:
+        r = requests.post(
+            f"{_base_url()}/v1/data/authz/denies",
+            json={"input": input_data},
+            timeout=_timeout(),
+        )
+        if r.status_code != 200:
+            logger.warning(
+                "OPA denies-check returned non-200",
+                extra={"component": "opa", "status_code": r.status_code, "body": r.text[:200]},
+            )
+            return True
+        return r.json().get("result") is True
+    except Exception as e:
+        logger.error(
+            "OPA denies-check failed",
+            extra={"component": "opa", "error": str(e)},
+        )
+        return True  # fail-closed
+
+
 def push_policy(policy_id: str, rego_text: str) -> None:
     """Upload or replace a policy. PUT is idempotent."""
     r = requests.put(

@@ -28,7 +28,11 @@ def sync_from_mongo() -> dict:
     supabase_ids = {"base"}
     for raw in SupabasePolicyRule.list_all_raw():
         rule = SupabasePolicyRule(raw)
-        rego_text = rule.rego_source or rego_builder.translate(rule)
+        # Always recompile from current role/entity/subject/tenant columns rather
+        # than trusting the cached rego_source — rows created before a rego_builder
+        # change (e.g. user/entity-specific conditions) would otherwise keep
+        # re-pushing stale text on every resync.
+        rego_text = rego_builder.translate(rule)
         opa_client.push_policy(str(rule.id), rego_text)
         pushed.append(str(rule.id))
         supabase_ids.add(str(rule.id))

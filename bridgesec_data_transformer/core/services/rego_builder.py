@@ -68,6 +68,14 @@ def translate(rule) -> str:
     if role and role != "*":
         # Support both legacy single-role field and new multi-role array
         conditions.append(f'"{role}" in input.user.roles')
+
+    # subject_type == "user" targets ONE specific person by email, ANDed with any
+    # role line above (both must hold). role="*" + subject → user-only rule.
+    subject_type = getattr(rule, "subject_type", "role") or "role"
+    subject = getattr(rule, "subject", None)
+    if subject_type == "user" and subject:
+        conditions.append(f'input.user.email == "{subject}"')
+
     if entity and entity != "*":
         conditions.append(f'input.entity == "{entity}"')
     if action and action != "*":
@@ -118,3 +126,31 @@ def translate(rule) -> str:
         f"import future.keywords.in\n\n"
         f"{rule_keyword} if {{\n    {body}\n}}\n"
     )
+
+
+def demo():
+    import types
+    # user + data + id combo → all conditions ANDed in one deny rule
+    rego = translate(types.SimpleNamespace(
+        policy_id="p1", role="*", entity="apps", action="delete", effect="deny",
+        subject_type="user", subject="alice@corp.com",
+        conditions={"field_conditions": {"label": "Prod"}, "record_id_filter": ["0oa1"]},
+    ))
+    assert 'input.user.email == "alice@corp.com"' in rego
+    assert 'input.entity == "apps"' in rego
+    assert 'input.resource_attributes["label"] == "Prod"' in rego
+    assert 'input.resource_id == "0oa1"' in rego
+    assert '"*" in input.user.roles' not in rego          # wildcard role emits no line
+    assert rego.strip().startswith("package authz.rules.policy_p1")
+
+    # subject_type="role" (default) must NOT emit an email line
+    rego_role = translate(types.SimpleNamespace(
+        policy_id="p2", role="admin", entity="users", action="update", effect="deny",
+    ))
+    assert "input.user.email" not in rego_role
+    assert '"admin" in input.user.roles' in rego_role
+    print("rego_builder demo OK")
+
+
+if __name__ == "__main__":
+    demo()

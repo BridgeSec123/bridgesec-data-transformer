@@ -63,12 +63,15 @@ class CustomJWTAuthentication(BaseAuthentication):
 
             # Store the resolved tenant object in ContextVar so log records carry tenant_id
             try:
-                from core.utils.tenant_utils import set_current_tenant
+                from core.utils.tenant_utils import set_current_tenant, set_current_user
                 set_current_tenant(getattr(request, '_tenant', None))
+                set_current_user(getattr(user, 'email', None))
             except Exception:
                 pass
 
             return (user, None)
+        except jwt.ExpiredSignatureError:
+            raise AuthenticationFailed('Token has expired')
         except Exception:
             pass  # Not an internal token, try Okta token
 
@@ -85,70 +88,100 @@ class CustomJWTAuthentication(BaseAuthentication):
     def _authenticate_okta_token(self, request, token):
         """
         Validate Okta access token and return user.
-        Also stores the token in session for subsequent Okta API calls.
+
+        In multi-tenant mode the issuer (`iss`) claim is read from the unverified
+        token, the matching tenant is looked up from Supabase, and that tenant's
+        `okta_issuer` / `okta_audience` are used for validation — no global .env
+        values needed. Falls back to settings.OKTA_ISSUER / OKTA_AUDIENCE when
+        no tenant matches (single-tenant or unknown issuer).
         """
         try:
-            # Normalize OKTA_ISSUER - remove trailing slash if present
-            issuer_base = settings.OKTA_ISSUER.rstrip('/')
+            # Read iss from unverified claims to identify which tenant issued this token.
+            unverified_claims = jwt.get_unverified_claims(token)
+            token_issuer = (unverified_claims.get("iss") or "").rstrip("/")
 
-            # Build JWKS URL - handle both org and custom auth servers
-            if '/oauth2/' in issuer_base:
-                # Custom authorization server (e.g., /oauth2/default)
+            # Resolve per-tenant Okta config via issuer URL.
+            tenant = None
+            if token_issuer:
+                from core.utils.supabase_tenant import SupabaseTenant
+                tenant = SupabaseTenant.get_by_okta_issuer(token_issuer)
+
+            # Per-tenant values take priority; fall back to global settings.
+            issuer_base = (
+                (tenant.okta_issuer if tenant else None) or settings.OKTA_ISSUER
+            ).rstrip("/")
+            # okta_audience == okta_issuer for Okta service tokens.
+            expected_audience = issuer_base
+
+            # Build JWKS URL — handle both org and custom auth servers.
+            if "/oauth2/" in issuer_base:
                 jwks_url = f"{issuer_base}/v1/keys"
             else:
-                # Org authorization server
                 jwks_url = f"{issuer_base}/oauth2/v1/keys"
 
-            # Get Okta JWKS for token verification
             jwks_response = requests.get(jwks_url)
             jwks = jwks_response.json()
 
-            # Get token header to find the key
             unverified_header = jwt.get_unverified_header(token)
             kid = unverified_header.get("kid")
-
-            # Find matching key
             key = next((k for k in jwks.get("keys", []) if k["kid"] == kid), None)
             if not key:
-                logger.warning("No matching key found for Okta token")
+                logger.warning(
+                    f"No matching key found for kid={kid} issuer={issuer_base}",
+                    extra={"component": "auth", "tenant_id": str(tenant.id) if tenant else None}
+                )
                 return None
 
-            # Verify the token. Audience AND issuer are now enforced (fail-closed).
-            # OKTA_AUDIENCE must match the `aud` your Okta authorization server issues
-            # (default auth server -> "api://default"; org server -> the issuer URL).
-            expected_audience = getattr(settings, "OKTA_AUDIENCE", "api://default")
             payload = jwt.decode(
                 token,
                 key,
                 algorithms=["RS256"],
                 audience=expected_audience,
-                issuer=settings.OKTA_ISSUER,
+                issuer=issuer_base,
                 options={"verify_aud": True, "verify_iss": True},
             )
 
-            # Get user email from token
             email = payload.get("sub") or payload.get("email")
             if not email:
                 logger.warning("No email/sub found in Okta token")
                 return None
 
-            # Find or create user (Supabase or MongoDB depending on config)
             UserBackend = _get_user_backend()
             user = UserBackend.get_by_email(email)
             if not user:
                 user = UserBackend.create_or_update(email=email, username=email, roles=["user"])
                 logger.info(f"Created new user from Okta token: {email}")
 
-            # Store Okta access token in session for API calls
             if hasattr(request, 'session'):
                 request.session['okta_access_token'] = token
                 request.session['okta_granted_scopes'] = payload.get('scp', [])
                 request.session.save()
                 logger.info(f"Stored Okta access token in session for user: {email}")
 
-            # Mirror the same attribute set by the HS256 path so downstream
-            # code (e.g. UserManagementViewSet) can always read request._tenant_id.
             request._tenant_id = str(user.tenant_id) if getattr(user, "tenant_id", None) else None
+
+            # Guard: the tenant resolved from the unverified `iss` claim must match
+            # the tenant on the Supabase user record. Without this check, an attacker
+            # controlling their own Okta org could issue a token with sub=victim@email
+            # and get authenticated as the victim's tenant.
+            if tenant and getattr(user, 'tenant_id', None):
+                if str(user.tenant_id) != str(tenant.id):
+                    logger.warning(
+                        f"Issuer/user tenant mismatch: iss tenant={tenant.id}, "
+                        f"user.tenant_id={user.tenant_id} — rejecting token"
+                    )
+                    return None
+
+            # Attach the resolved tenant so downstream code avoids a second Supabase call.
+            if tenant and not getattr(request, '_tenant', None):
+                request._tenant = tenant
+
+            # Store the authenticated user's email in ContextVar so log records carry it
+            try:
+                from core.utils.tenant_utils import set_current_user
+                set_current_user(email)
+            except Exception:
+                pass
 
             return user
 
