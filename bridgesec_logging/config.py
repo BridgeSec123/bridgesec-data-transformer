@@ -70,6 +70,21 @@ class TenantContextFilter(logging.Filter):
         return True
 
 
+class UserContextFilter(logging.Filter):
+    """
+    Injects the current request's authenticated user email into every log record.
+    Reads the email from the ContextVar set by CustomJWTAuthentication.
+    """
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not getattr(record, "user_email", None):
+            try:
+                from core.utils.tenant_utils import get_current_user
+                record.user_email = get_current_user() or "unknown"
+            except Exception:
+                record.user_email = "unknown"
+        return True
+
+
 def setup_logging(
     app_name='bridgesec',
     log_dir=None,

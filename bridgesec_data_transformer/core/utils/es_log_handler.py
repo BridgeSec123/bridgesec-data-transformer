@@ -116,11 +116,12 @@ class ElasticsearchHandler(logging.Handler):
             "operation":  None,
             "action":     None,
             "user":       None,
+            "user_email": None,
             "tenant_id":  "unknown",
         }
 
-        # Pull structured fields injected via logger.xxx(..., extra={...}) or TenantContextFilter
-        for field in ("request_id", "component", "entity_type", "operation", "action", "user", "tenant_id"):
+        # Pull structured fields injected via logger.xxx(..., extra={...}) or TenantContextFilter/UserContextFilter
+        for field in ("request_id", "component", "entity_type", "operation", "action", "user", "user_email", "tenant_id"):
             val = getattr(record, field, None)
             if val is not None:
                 doc[field] = str(val)

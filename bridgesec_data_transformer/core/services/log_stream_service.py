@@ -1,12 +1,11 @@
 """
-Log streaming service — ES polling logic.
+Log streaming service — polls whichever backend the tenant is configured
+for (Elasticsearch/Splunk/Loki, via LogReader.tail()) and yields events.
 
 This service is transport-agnostic. It yields dicts that can be formatted as:
 - SSE (Phase 1)
 - WebSocket messages (Phase 3)
 - Celery task updates (Phase 2)
-
-No Django dependencies — unit testable.
 """
 
 import json
@@ -14,33 +13,17 @@ import time
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Iterator, Optional
 
-from core.utils.es_client import get_es_client, ConnectionError as ESConnectionError, RequestError as ESRequestError
-from core.utils.es_query_builder import build_live_log_query, INDEX_PATTERN
+from core.utils.log_readers import get_log_reader
 from core.serializers.log_serializer import LogEntrySerializer
-
-
-def hit_to_dict(hit: dict) -> dict:
-    """Flatten an ES search hit into the shape LogEntrySerializer expects."""
-    doc = hit.get("_source", {})
-    doc["_id"] = hit.get("_id")
-    # Normalise both timestamp field names Filebeat may produce
-    if "@timestamp" in doc and "timestamp" not in doc:
-        doc["timestamp"] = doc["@timestamp"]
-    return doc
 
 
 class LogStreamService:
     """
-    Reusable service for polling Elasticsearch and yielding log entries.
-
-    Design goals:
-    - Testable: no Django dependencies, can be unit tested with mocked ES client
-    - Scalable: works with sync views, async views, Celery tasks
-    - Migrateable: works now with sync generators, can become async later
+    Reusable service for polling the tenant's log backend and yielding log entries.
 
     Example usage:
-        service = LogStreamService()
-        for event in service.poll_logs(filters={'component': 'celery'}):
+        service = LogStreamService(tenant_id="...")
+        for event in service.poll_logs():
             if event['type'] == 'log':
                 print(event['data'])
     """
@@ -56,7 +39,7 @@ class LogStreamService:
         Initialize the streaming service.
 
         Args:
-            poll_interval: Seconds between ES queries (default: 2)
+            poll_interval: Seconds between backend queries (default: 2)
             heartbeat_interval: Seconds between keep-alive pings (default: 15)
             initial_lookback_seconds: How far back to start (default: 30)
             tenant_id: Scope stream to this tenant's logs only
@@ -65,7 +48,7 @@ class LogStreamService:
         self.heartbeat_interval = heartbeat_interval
         self.initial_lookback_seconds = initial_lookback_seconds
         self.tenant_id = tenant_id
-        self.es_client = get_es_client()
+        self.reader = get_log_reader(tenant_id)
 
     def get_initial_timestamp(self) -> str:
         """
@@ -111,40 +94,20 @@ class LogStreamService:
         # Poll indefinitely
         while True:
             try:
-                # Build ES query for logs newer than last_ts, scoped to this tenant
-                body = build_live_log_query(last_timestamp=last_ts, tenant_id=self.tenant_id)
-                result = self.es_client.search(index=INDEX_PATTERN, body=body)
-                hits = result["hits"]["hits"]
+                # Fetch logs newer than last_ts, scoped to this tenant, from
+                # whichever backend this tenant is configured for.
+                docs = self.reader.tail(self.tenant_id, last_timestamp=last_ts)
 
                 # Yield each log entry
-                if hits:
-                    for hit in hits:
+                if docs:
+                    for doc in docs:
                         last_heartbeat = time.monotonic()
-                        doc = hit_to_dict(hit)
                         serialized = LogEntrySerializer(doc).data
                         yield {"type": "log", "data": serialized}
 
                     # Advance cursor to the latest timestamp seen
                     # Next query will only return logs AFTER this timestamp
-                    last_ts = hits[-1]["_source"]["@timestamp"]
-
-            except ESConnectionError as exc:
-                # Elasticsearch is unavailable
-                yield {
-                    "type": "error",
-                    "error": "ES_CONNECTION_ERROR",
-                    "detail": str(exc),
-                }
-                last_heartbeat = time.monotonic()
-
-            except ESRequestError as exc:
-                # Query is invalid (e.g., bad filter)
-                yield {
-                    "type": "error",
-                    "error": "ES_REQUEST_ERROR",
-                    "detail": str(exc),
-                }
-                last_heartbeat = time.monotonic()
+                    last_ts = docs[-1].get("@timestamp") or docs[-1].get("timestamp") or last_ts
 
             except Exception as exc:
                 # Unexpected error
