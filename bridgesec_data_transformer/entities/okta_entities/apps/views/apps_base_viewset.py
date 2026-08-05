@@ -45,6 +45,11 @@ class BaseAppViewSet(BaseEntityViewSet):
             apps_response, status_code, _ = self.fetch_from_okta(request=request)
             if status_code == 200:
                 all_apps = apps_response if isinstance(apps_response, list) else []
+                excluded = getattr(self, "_excluded_app_ids", set())
+                if excluded:
+                    before = len(all_apps)
+                    all_apps = [app for app in all_apps if app.get("id") not in excluded]
+                    logger.info(f"[APP FILTER] Excluded {before - len(all_apps)} app(s) for this tenant.")
                 extracted_data["all_apps"] = all_apps
         except Exception as e:
             logger.exception(f"Error fetching apps: {str(e)}")
@@ -142,6 +147,9 @@ class BaseAppViewSet(BaseEntityViewSet):
                     okta_response, status_code, _ = viewset_instance.fetch_from_okta(request=request)
                     if status_code == 200:
                         entity_data = viewset_instance.extract_data(okta_response)
+                        excluded = getattr(self, "_excluded_app_ids", set())
+                        if excluded:
+                            entity_data = [r for r in entity_data if r.get("app_id") not in excluded]
                         extracted_data[entity_name].extend(entity_data)
                         store_entity_incrementally(entity_name, extracted_data[entity_name], viewset_instance, db_name)
                 except Exception as e:

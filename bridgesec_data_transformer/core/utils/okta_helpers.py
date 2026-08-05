@@ -91,32 +91,46 @@ def validate_scope_for_endpoint(request, endpoint):
     return is_valid, required_scopes, granted_scopes, missing_scopes
 
 
-def get_okta_headers(request=None):
+def get_okta_headers(request=None, method="GET", url=None):
     """
     Get authorization headers for Okta API calls.
 
-    Uses OAuth access token from user's session (Bearer token).
-    Falls back to static OKTA_API_TOKEN only if available and no session token.
+    Uses OAuth access token from user's session. Plain Bearer format, unless the
+    session also carries a DPoP private key (only the scheduled service-token flow
+    does — see tenant_service_token.py) — those tokens are sender-constrained by
+    Okta and MUST be presented with a fresh per-request DPoP proof or every call
+    is rejected, so in that case a proof is generated here using `method`/`url`.
 
     Args:
         request: Optional Django request object
+        method: HTTP method of the request these headers are for (DPoP proofs only)
+        url: Exact URL of the request these headers are for (DPoP proofs only)
 
     Returns:
-        dict: Headers with Authorization
+        dict: Headers with Authorization (and DPoP, when the token is DPoP-bound)
     """
     okta_access_token = None
+    dpop_key_pem = None
 
     # Try to get Okta access token from session
     if request and hasattr(request, 'session'):
         okta_access_token = request.session.get('okta_access_token')
+        dpop_key_pem = request.session.get('okta_dpop_key_pem')
 
-    if okta_access_token:
-        # Use user's Okta access token (Bearer format)
-        return {"Authorization": f"Bearer {okta_access_token}"}
-    else:
+    if not okta_access_token:
         # No token available — in multi-tenant mode Bearer token is the only supported auth
         logger.error("No Okta authentication token available! User must be logged in.", extra={"operation": "Get Okta Headers"})
         return {}
+
+    if dpop_key_pem and url:
+        from core.utils.tenant_service_token import generate_dpop_proof, dpop_key_from_pem
+        private_key = dpop_key_from_pem(dpop_key_pem)
+        # ponytail: no DPoP-nonce retry for resource calls (only the token endpoint
+        # needs it in practice) — add if Okta starts requiring nonces here too.
+        proof = generate_dpop_proof(method, url, private_key=private_key, access_token=okta_access_token)
+        return {"Authorization": f"DPoP {okta_access_token}", "DPoP": proof}
+
+    return {"Authorization": f"Bearer {okta_access_token}"}
 
 
 def make_okta_request(url, request=None, method="GET", data=None, params=None):
@@ -137,7 +151,7 @@ def make_okta_request(url, request=None, method="GET", data=None, params=None):
     # Get request_id from request if available
     request_id = getattr(request, 'request_id', None) if request else None
 
-    headers = get_okta_headers(request)
+    headers = get_okta_headers(request, method=method, url=url)
 
     # Validate scope before making request
     is_valid, required_scopes, granted_scopes, missing_scopes = validate_scope_for_endpoint(request, url)
@@ -273,7 +287,7 @@ def get_permissions(permissions_url, request=None):
         Fetch permissions from the given URL.
         """
         try:
-            headers = get_okta_headers(request)
+            headers = get_okta_headers(request, method="GET", url=permissions_url)
             response = requests.get(permissions_url, headers=headers)
             response.raise_for_status()
             data = response.json()
