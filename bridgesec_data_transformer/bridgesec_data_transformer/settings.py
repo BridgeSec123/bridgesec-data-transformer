@@ -199,13 +199,13 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG", default=False)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-ALLOWED_HOSTS = [
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[
     '.onrender.com',
     '127.0.0.1',
     '31.97.229.6',
     "localhost",
     "jaggiest-stephania-autonomously.ngrok-free.dev",
-]
+])
 
 # Application definition
 
