@@ -385,7 +385,7 @@ if not os.path.exists(LOG_DIR):
 # CLIENT_ID = env("CLIENT_ID")
 # ISSUER_URL = env("ISSUER_URL")
 
-CORS_ALLOWED_ORIGINS = [
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[
     "http://127.0.0.1:3000",
     "https://bridgesec-fe.vercel.app",
     "http://31.97.229.6:3000",
@@ -393,8 +393,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://jaggiest-stephania-autonomously.ngrok-free.dev",
-
-]
+])
 
 CORS_ALLOW_CREDENTIALS = True
 
