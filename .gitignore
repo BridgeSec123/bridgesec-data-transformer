@@ -13,6 +13,7 @@ ven
 staticfiles
 *.md
 *.sh
+!entrypoint.sh
 bridgesec_logging.egg-info/
 bridgesec_data_transformer/core/decorators/
 bridgesec_data_transformer/core/middleware/
