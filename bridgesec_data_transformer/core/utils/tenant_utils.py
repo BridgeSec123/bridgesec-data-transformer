@@ -98,11 +98,17 @@ def get_tenant_from_request(request):
     ConfirmDeletionView, etc.) so tenant-resolution behaviour is consistent.
     Returns None when MULTI_TENANCY_ENABLED=False or no tenant on the request.
 
-    CustomJWTAuthentication sets request._tenant_id from the JWT payload;
-    this function resolves the full tenant object from that ID.
+    CustomJWTAuthentication already resolves the tenant and attaches it as
+    request._tenant during authentication — reuse that instead of hitting
+    Supabase again for the same tenant on every call within the same request.
+    Falls back to a fresh lookup by request._tenant_id when _tenant isn't set
+    (e.g. some Okta-token auth paths don't always attach it).
     """
     if not getattr(settings, "MULTI_TENANCY_ENABLED", False):
         return None
+    cached_tenant = getattr(request, "_tenant", None)
+    if cached_tenant:
+        return cached_tenant
     tenant_id = getattr(request, "_tenant_id", None)
     if tenant_id:
         return get_tenant_by_id(tenant_id)
