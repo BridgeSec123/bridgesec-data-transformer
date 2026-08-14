@@ -1,3 +1,4 @@
+import time
 import requests
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
@@ -6,6 +7,22 @@ from django.conf import settings
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _log_latency(label, start_time, request=None):
+    """Log how long a single auth sub-step took, so slow steps show up in the
+    logs as [AUTH_LATENCY] lines greppable independently of total request time."""
+    duration_ms = int((time.time() - start_time) * 1000)
+    logger.info(
+        f"[AUTH_LATENCY] {label}: {duration_ms}ms",
+        extra={
+            'component': 'auth_timing',
+            'auth_step': label,
+            'duration_ms': duration_ms,
+            'request_id': getattr(request, 'request_id', 'N/A') if request else 'N/A',
+        }
+    )
+    return duration_ms
 
 
 def _get_user_backend():
@@ -31,7 +48,11 @@ class CustomJWTAuthentication(BaseAuthentication):
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
             user_id = payload.get('user_id')
             UserBackend = _get_user_backend()
+
+            _t0 = time.time()
             user = UserBackend.get_by_id(user_id)
+            _log_latency("supabase_get_user_by_id", _t0, request)
+
             if not user:
                 raise Exception("User not found")
             # Attach tenant_id and roles from JWT to the request
@@ -52,10 +73,18 @@ class CustomJWTAuthentication(BaseAuthentication):
             if getattr(settings, 'MULTI_TENANCY_ENABLED', False) and request._tenant_id:
                 try:
                     from core.utils.tenant_utils import get_tenant_by_id, get_mongo_client_for_tenant
+
+                    _t0 = time.time()
                     _tenant = get_tenant_by_id(request._tenant_id)
+                    _log_latency("supabase_get_tenant_by_id", _t0, request)
+
                     if _tenant:
                         request._tenant       = _tenant
+
+                        _t0 = time.time()
                         request._mongo_client = get_mongo_client_for_tenant(_tenant)
+                        _log_latency("get_mongo_client_for_tenant", _t0, request)
+
                         request._db_prefix    = _tenant.mongo_db_prefix
                         request._mongo_uri    = _tenant.mongo_uri
                 except Exception as _e:
@@ -119,8 +148,10 @@ class CustomJWTAuthentication(BaseAuthentication):
             else:
                 jwks_url = f"{issuer_base}/oauth2/v1/keys"
 
+            _t0 = time.time()
             jwks_response = requests.get(jwks_url)
             jwks = jwks_response.json()
+            _log_latency("okta_jwks_fetch", _t0, request)
 
             unverified_header = jwt.get_unverified_header(token)
             kid = unverified_header.get("kid")
@@ -147,7 +178,11 @@ class CustomJWTAuthentication(BaseAuthentication):
                 return None
 
             UserBackend = _get_user_backend()
+
+            _t0 = time.time()
             user = UserBackend.get_by_email(email)
+            _log_latency("supabase_get_user_by_email", _t0, request)
+
             if not user:
                 user = UserBackend.create_or_update(email=email, username=email, roles=["user"])
                 logger.info(f"Created new user from Okta token: {email}")
