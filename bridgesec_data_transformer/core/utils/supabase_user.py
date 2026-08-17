@@ -22,12 +22,33 @@ Supabase table (see supabase/migrations/001_rbac_schema.sql):
     CREATE INDEX idx_users_roles  ON public.users USING gin(roles);
 """
 import logging
+import time
+
+from django.conf import settings
 
 from core.utils.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
 TABLE = "users"
+
+# TTL cache for user-by-id lookups (reuses MAPPINGS_CACHE_TTL_SEC).
+# CustomJWTAuthentication calls get_by_id() on every single authenticated
+# request — without caching, that's a full Supabase round trip (200ms-700ms+
+# depending on region distance) on every request, for data that rarely
+# changes. Invalidated explicitly on user write (save/create_or_update/
+# delete_by_id/update_roles) so admin changes take effect immediately.
+_user_by_id_cache: dict = {}  # user_id (str) -> (user, expires_at)
+
+
+def _user_cache_ttl_seconds() -> int:
+    return getattr(settings, "MAPPINGS_CACHE_TTL_SEC", 300)
+
+
+def invalidate_user_cache(user_id) -> None:
+    """Drop the cached entry so the next lookup re-reads Supabase. Call after a user write."""
+    if user_id:
+        _user_by_id_cache.pop(str(user_id), None)
 
 
 class SupabaseUser:
@@ -84,20 +105,28 @@ class SupabaseUser:
 
     @classmethod
     def get_by_id(cls, user_id: str):
-        """Return SupabaseUser for the given UUID, or None."""
+        """Return SupabaseUser for the given UUID, TTL-cached, or None."""
+        cache_key = str(user_id)
+        cached = _user_by_id_cache.get(cache_key)
+        if cached and cached[1] > time.monotonic():
+            return cached[0]
+
         try:
             result = (
                 get_supabase_client()
                 .table(TABLE)
                 .select("*")
-                .eq("id", str(user_id))
+                .eq("id", cache_key)
                 .limit(1)
                 .execute()
             )
-            return cls(result.data[0]) if result.data else None
+            user = cls(result.data[0]) if result.data else None
         except Exception as e:
             logger.error(f"SupabaseUser.get_by_id({user_id}) failed: {e}")
             return None
+
+        _user_by_id_cache[cache_key] = (user, time.monotonic() + _user_cache_ttl_seconds())
+        return user
 
     @classmethod
     def get_by_username(cls, username: str):
@@ -148,6 +177,7 @@ class SupabaseUser:
             )
             if result.data:
                 logger.info(f"Upserted user in Supabase: {email}")
+                invalidate_user_cache(result.data[0].get("id"))
                 return cls(result.data[0])
             raise ValueError(f"Supabase upsert returned no data for {email}")
         except Exception as e:
@@ -171,6 +201,7 @@ class SupabaseUser:
                 result = client.table(TABLE).upsert(data, on_conflict="email,tenant_id").execute()
                 if result.data:
                     self.id = result.data[0].get("id")
+            invalidate_user_cache(self.id)
             logger.info(f"Saved user to Supabase: {self.email}")
         except Exception as e:
             logger.error(f"SupabaseUser.save() failed for {self.email}: {e}")
@@ -207,6 +238,7 @@ class SupabaseUser:
                 .eq("id", str(user_id))
                 .execute()
             )
+            invalidate_user_cache(user_id)
             return bool(result.data)
         except Exception as e:
             logger.error(f"SupabaseUser.delete_by_id({user_id}) failed: {e}")
@@ -223,6 +255,7 @@ class SupabaseUser:
                 .eq("id", str(user_id))
                 .execute()
             )
+            invalidate_user_cache(user_id)
             return bool(result.data)
         except Exception as e:
             logger.error(f"SupabaseUser.update_roles({user_id}) failed: {e}")

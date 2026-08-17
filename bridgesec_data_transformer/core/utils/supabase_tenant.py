@@ -198,6 +198,8 @@ class SupabaseTenant:
                 .eq("id", str(tenant_id))
                 .execute()
             )
+            from core.utils.tenant_utils import invalidate_tenant_cache
+            invalidate_tenant_cache(tenant_id)
             if result.data:
                 return cls(result.data[0])
             return None
@@ -216,6 +218,8 @@ class SupabaseTenant:
                 .eq("id", str(tenant_id))
                 .execute()
             )
+            from core.utils.tenant_utils import invalidate_tenant_cache
+            invalidate_tenant_cache(tenant_id)
             return bool(result.data)
         except Exception as e:
             logger.error(f"SupabaseTenant.soft_delete({tenant_id}) failed: {e}")

@@ -6,6 +6,7 @@ Tenant data is stored in Supabase (not MongoDB).
 MongoDB connections in this module are only for per-tenant snapshot databases.
 """
 import logging
+import time
 from contextvars import ContextVar
 from datetime import datetime
 from typing import Optional
@@ -14,6 +15,24 @@ from django.conf import settings
 from pymongo import MongoClient
 
 logger = logging.getLogger(__name__)
+
+# TTL cache for tenant-by-id lookups (reuses MAPPINGS_CACHE_TTL_SEC).
+# CustomJWTAuthentication calls get_tenant_by_id() on every single
+# authenticated request — without caching, that's a full Supabase round
+# trip (200ms-700ms+ depending on region distance) on every request, for
+# data that rarely changes. Invalidated explicitly on tenant update/delete
+# (see SupabaseTenant.update/soft_delete) so admin changes take effect
+# immediately instead of waiting out the TTL.
+_tenant_cache: dict = {}  # tenant_id (str) -> (tenant, expires_at)
+
+
+def _tenant_cache_ttl_seconds() -> int:
+    return getattr(settings, "MAPPINGS_CACHE_TTL_SEC", 300)
+
+
+def invalidate_tenant_cache(tenant_id) -> None:
+    """Drop the cached entry so the next lookup re-reads Supabase. Call after a tenant write."""
+    _tenant_cache.pop(str(tenant_id), None)
 
 # Stores the current SupabaseTenant object for the duration of a request/task.
 # Set by CustomJWTAuthentication (HTTP) and Celery task entry points (background).
@@ -52,17 +71,26 @@ _tenant_clients: dict = {}
 
 def get_tenant_by_id(tenant_id: str):
     """
-    Load a Tenant from Supabase by its UUID.
+    Load a Tenant from Supabase by its UUID, TTL-cached (see _tenant_cache above).
     Returns None if not found or multi-tenancy is disabled.
     """
     if not getattr(settings, "MULTI_TENANCY_ENABLED", False):
         return None
+
+    cache_key = str(tenant_id)
+    cached = _tenant_cache.get(cache_key)
+    if cached and cached[1] > time.monotonic():
+        return cached[0]
+
     try:
         from core.utils.supabase_tenant import SupabaseTenant
-        return SupabaseTenant.get_by_id(str(tenant_id))
+        tenant = SupabaseTenant.get_by_id(cache_key)
     except Exception as e:
         logger.warning(f"get_tenant_by_id({tenant_id}) failed: {e}")
         return None
+
+    _tenant_cache[cache_key] = (tenant, time.monotonic() + _tenant_cache_ttl_seconds())
+    return tenant
 
 
 def get_tenant_by_okta_domain(domain: str):
