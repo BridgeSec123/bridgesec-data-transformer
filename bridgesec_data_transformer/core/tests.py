@@ -126,3 +126,50 @@ class DpopProofHtuTests(SimpleTestCase):
         proof = generate_dpop_proof("GET", "https://tenant.okta.com/api/v1/org")
         claims = jwt.get_unverified_claims(proof)
         self.assertEqual(claims["htu"], "https://tenant.okta.com/api/v1/org")
+
+
+class _ScopeSession:
+    def __init__(self, scopes=None):
+        self._scopes = scopes or []
+
+    def get(self, key, default=None):
+        if key == "okta_granted_scopes":
+            return self._scopes
+        return default
+
+
+class _ScopeRequest:
+    def __init__(self, tenant=None, tenant_id=None, scopes=None):
+        self._tenant = tenant
+        self._tenant_id = tenant_id
+        self.session = _ScopeSession(scopes)
+
+
+class ScopeValidationTests(SimpleTestCase):
+    def test_prefers_tenant_scopes_over_session_scopes(self):
+        from core.utils.okta_helpers import validate_scope_for_endpoint
+
+        tenant = type("Tenant", (), {"service_scopes": "okta.users.read okta.groups.read"})()
+        request = _ScopeRequest(tenant=tenant, scopes=["okta.apps.read"])
+
+        is_valid, required, granted, missing = validate_scope_for_endpoint(request, "https://example.okta.com/api/v1/users")
+
+        self.assertTrue(required)
+        self.assertEqual(granted, ["okta.users.read", "okta.groups.read"])
+        self.assertIsInstance(is_valid, bool)
+        self.assertIsInstance(missing, list)
+
+    @patch("core.utils.okta_helpers.settings")
+    @patch("core.utils.okta_helpers.get_tenant_by_id")
+    def test_falls_back_to_tenant_lookup_from_tenant_id(self, mock_get_tenant, mock_settings):
+        from core.utils.okta_helpers import validate_scope_for_endpoint
+
+        mock_settings.MULTI_TENANCY_ENABLED = True
+        tenant = type("Tenant", (), {"service_scopes": "okta.users.read"})()
+        mock_get_tenant.return_value = tenant
+
+        request = _ScopeRequest(tenant=None, tenant_id="tenant-123", scopes=["okta.apps.read"])
+
+        _, _, granted, _ = validate_scope_for_endpoint(request, "https://example.okta.com/api/v1/users")
+
+        self.assertEqual(granted, ["okta.users.read"])

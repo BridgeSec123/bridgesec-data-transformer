@@ -8,6 +8,18 @@ from bridgesec_logging import log_okta_api_call
 logger = logging.getLogger(__name__)
 
 
+def _split_scopes(raw_scopes):
+    """Normalize a scope container into a flat list of strings."""
+    if not raw_scopes:
+        return []
+    if isinstance(raw_scopes, str):
+        return [scope for scope in raw_scopes.split() if scope]
+    if isinstance(raw_scopes, (list, tuple, set)):
+        return [str(scope).strip() for scope in raw_scopes if str(scope).strip()]
+    scope = str(raw_scopes).strip()
+    return [scope] if scope else []
+
+
 def build_okta_url(endpoint, okta_base=None):
     """
     Build a properly formatted Okta API URL.
@@ -81,8 +93,25 @@ def validate_scope_for_endpoint(request, endpoint):
         return True, [], [], []
 
     granted_scopes = []
-    if request and hasattr(request, 'session'):
-        granted_scopes = request.session.get('okta_granted_scopes', [])
+    if request:
+        # Prefer the tenant's configured service scopes when tenant context is
+        # available. This keeps manual bulk fetches and scheduler-driven runs
+        # aligned with the values stored in Supabase for the active tenant.
+        tenant = getattr(request, "_tenant", None)
+        if tenant is None and getattr(settings, "MULTI_TENANCY_ENABLED", False):
+            tenant_id = getattr(request, "_tenant_id", None)
+            if tenant_id:
+                try:
+                    from core.utils.tenant_utils import get_tenant_by_id
+                    tenant = get_tenant_by_id(tenant_id)
+                except Exception:
+                    tenant = None
+
+        tenant_scopes = _split_scopes(getattr(tenant, "service_scopes", None)) if tenant else []
+        if tenant_scopes:
+            granted_scopes = tenant_scopes
+        elif hasattr(request, 'session'):
+            granted_scopes = _split_scopes(request.session.get('okta_granted_scopes', []))
 
     # Check which required scopes are missing
     missing_scopes = [scope for scope in required_scopes if scope not in granted_scopes]
