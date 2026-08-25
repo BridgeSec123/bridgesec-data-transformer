@@ -61,6 +61,8 @@ services:
       - LOKI_VERIFY_SSL=False
     ports:
       - "8007:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - .:/app
       - static_volume:/app/bridgesec_data_transformer/staticfiles
